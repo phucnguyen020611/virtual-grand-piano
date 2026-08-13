@@ -13,7 +13,7 @@ function curvePoint(curve, t, y) {
   return curve.getPoint(t).setY(y);
 }
 
-/** Extend a bridge-to-hitch line forward through the front bearing and pin. */
+/** Build one straight plan-view route from a bridge contact and rail hitch. */
 function makeStraightRoute(bridgePoint, hitchPoint, tuningZ, stringY) {
   const direction = new THREE.Vector3().subVectors(hitchPoint, bridgePoint);
   direction.y = 0;
@@ -31,6 +31,63 @@ function makeStraightRoute(bridgePoint, hitchPoint, tuningZ, stringY) {
   bridgePoint.y = DIM.bridgeContactY + stringY;
   hitchPoint.y = DIM.hitchPointY + stringY;
   return { tuningPoint, frontBearingPoint, bridgePoint, hitchPoint };
+}
+
+function routeFitsTuningField(route) {
+  const { tuningPoint, frontBearingPoint } = route;
+  return (
+    tuningPoint.x >= DIM.tuningFieldMinX &&
+    tuningPoint.x <= DIM.tuningFieldMaxX &&
+    frontBearingPoint.x >= DIM.frontBearingMinX &&
+    frontBearingPoint.x <= DIM.frontBearingMaxX &&
+    tuningPoint.x >= DIM.pinblockMinX &&
+    tuningPoint.x <= DIM.pinblockMaxX &&
+    tuningPoint.z >= DIM.pinblockMinZ &&
+    tuningPoint.z <= DIM.pinblockMaxZ
+  );
+}
+
+/**
+ * Pick a hitch location from the rail that satisfies a desired tuning-field
+ * coordinate. This keeps all four route points collinear in plan view rather
+ * than clamping a completed route and introducing a bridge kink.
+ */
+function solveConstrainedRoute(
+  bridgePoint,
+  hitchRail,
+  hitchRange,
+  desiredTuningX,
+  tuningZ,
+  stringY,
+) {
+  let bestRoute;
+  let bestScore = Infinity;
+  const samples = 180;
+  for (let sample = 0; sample <= samples; sample++) {
+    const t = THREE.MathUtils.lerp(
+      hitchRange[0],
+      hitchRange[1],
+      sample / samples,
+    );
+    const route = makeStraightRoute(
+      bridgePoint.clone(),
+      curvePoint(hitchRail, t, 0),
+      tuningZ,
+      stringY,
+    );
+    const error = route.tuningPoint.x - desiredTuningX;
+    const score = error * error;
+    if (routeFitsTuningField(route) && score < bestScore) {
+      bestRoute = route;
+      bestScore = score;
+    }
+  }
+  if (!bestRoute) {
+    throw new Error(
+      `No valid hitch-rail solution for string route at tuning X ${desiredTuningX}.`,
+    );
+  }
+  return bestRoute;
 }
 
 function routeOffset(route, amount) {
@@ -51,7 +108,8 @@ function routeOffset(route, amount) {
 /** Development-only guard against plan-view string kinks. */
 export function validateStringRouting(routes, tolerance = 3) {
   let maximum = 0;
-  const failures = [];
+  const directionFailures = [];
+  const boundsFailures = [];
   for (const route of routes) {
     const incoming = new THREE.Vector2(
       route.bridgePoint.x - route.frontBearingPoint.x,
@@ -65,15 +123,22 @@ export function validateStringRouting(routes, tolerance = 3) {
       Math.acos(THREE.MathUtils.clamp(incoming.dot(outgoing), -1, 1)),
     );
     maximum = Math.max(maximum, change);
-    if (change > tolerance) failures.push({ route, change });
+    if (change > tolerance) directionFailures.push({ route, change });
+    if (!routeFitsTuningField(route)) boundsFailures.push(route);
   }
-  if (import.meta.env?.DEV && failures.length) {
+  if (import.meta.env?.DEV && directionFailures.length) {
     console.warn(
       "String routes exceed the plan-view direction tolerance.",
-      failures,
+      directionFailures,
     );
   }
-  return { maximum, failures };
+  if (import.meta.env?.DEV && boundsFailures.length) {
+    console.warn(
+      "String routes extend outside the tuning-pin field.",
+      boundsFailures,
+    );
+  }
+  return { maximum, directionFailures, boundsFailures };
 }
 
 /** Static, shared course map consumed by strings, bridges, and pin fields. */
@@ -83,32 +148,55 @@ export function createStringLayout() {
   const bassBridge = bassBridgeCurve();
   const hitchRail = hitchRailCurve();
   const zones = [
-    { name: "bass", courses: 11, strings: 1, spacing: 0, stringY: 0.014 },
-    { name: "tenor", courses: 11, strings: 2, spacing: 0.028, stringY: 0 },
-    { name: "treble", courses: 14, strings: 3, spacing: 0.021, stringY: 0 },
+    {
+      name: "bass",
+      courses: 11,
+      strings: 1,
+      spacing: 0,
+      stringY: 0.014,
+      bridgeRange: [0.08, 0.66],
+      hitchRange: [0.5, 0.9],
+      tuningRange: [-1.08, -2.72],
+    },
+    {
+      name: "tenor",
+      courses: 11,
+      strings: 2,
+      spacing: 0.028,
+      stringY: 0,
+      bridgeRange: [0.92, 0.52],
+      hitchRange: [0.48, 0.72],
+      tuningRange: [-0.72, 1.35],
+    },
+    {
+      name: "treble",
+      courses: 14,
+      strings: 3,
+      spacing: 0.021,
+      stringY: 0,
+      bridgeRange: [0.5, 0.08],
+      hitchRange: [0.1, 0.48],
+      tuningRange: [1.48, 2.64],
+    },
   ];
   let courseIndex = 0;
 
   for (const zone of zones) {
     for (let course = 0; course < zone.courses; course++) {
       const t = zone.courses === 1 ? 0 : course / (zone.courses - 1);
-      let bridgePoint;
-      let hitchPoint;
-      if (zone.name === "bass") {
-        bridgePoint = curvePoint(bassBridge, 0.08 + t * 0.82, 0);
-        hitchPoint = curvePoint(hitchRail, 0.62 + t * 0.28, 0);
-      } else if (zone.name === "tenor") {
-        bridgePoint = curvePoint(mainBridge, 0.92 - t * 0.4, 0);
-        hitchPoint = curvePoint(hitchRail, 0.72 - t * 0.24, 0);
-      } else {
-        bridgePoint = curvePoint(mainBridge, 0.5 - t * 0.46, 0);
-        hitchPoint = curvePoint(hitchRail, 0.48 - t * 0.38, 0);
-      }
+      const bridge = zone.name === "bass" ? bassBridge : mainBridge;
+      const bridgePoint = curvePoint(
+        bridge,
+        THREE.MathUtils.lerp(zone.bridgeRange[0], zone.bridgeRange[1], t),
+        0,
+      );
 
       const row = courseIndex % 3;
-      const route = makeStraightRoute(
+      const route = solveConstrainedRoute(
         bridgePoint,
-        hitchPoint,
+        hitchRail,
+        zone.hitchRange,
+        THREE.MathUtils.lerp(zone.tuningRange[0], zone.tuningRange[1], t),
         DIM.tuningPinZ + row * DIM.tuningRowStep,
         zone.stringY,
       );
