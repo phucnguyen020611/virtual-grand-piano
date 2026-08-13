@@ -24,6 +24,18 @@ export function createReflectionEnvironment(renderer) {
   overhead.rotation.x = Math.PI / 2;
   studio.add(overhead);
 
+  // Narrow front card: gives the raised lid and fallboard a long controlled
+  // lacquer highlight at the default three-quarter inspection angle.
+  const lidStrip = reflectionCard(10, 1.35, 0xf5ead7, 2.1);
+  lidStrip.position.set(2.4, 5.8, 6.6);
+  lidStrip.rotation.y = Math.PI;
+  studio.add(lidStrip);
+
+  const lidBroadHighlight = reflectionCard(10, 1.6, 0xe8e1d2, 0.25);
+  lidBroadHighlight.position.set(-7.2, 1.55, -6.5);
+  lidBroadHighlight.rotation.y = 0.88;
+  studio.add(lidBroadHighlight);
+
   const warmSide = reflectionCard(6, 4, 0xc88e58, 1.15);
   warmSide.position.set(-7, 2.8, 2.2);
   warmSide.rotation.y = Math.PI / 2;
@@ -41,6 +53,12 @@ export function createReflectionEnvironment(renderer) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   pmrem.compileEquirectangularShader();
   const target = pmrem.fromScene(studio, 0.04, 0.1, 30);
+  studio.traverse((object) => {
+    object.geometry?.dispose();
+    if (Array.isArray(object.material))
+      object.material.forEach((m) => m.dispose());
+    else object.material?.dispose();
+  });
   pmrem.dispose();
 
   return {

@@ -48,10 +48,10 @@ export function createLighting(scene) {
 
   const keyLight = new THREE.SpotLight(
     0xffe6bf,
-    115,
-    30,
-    Math.PI * 0.29,
-    0.78,
+    72,
+    22,
+    Math.PI * 0.245,
+    0.86,
     2,
   );
   keyLight.position.set(0, 8.7, -0.6);
@@ -64,19 +64,24 @@ export function createLighting(scene) {
   keyLight.shadow.camera.far = 30;
   scene.add(keyLight, keyLight.target);
 
-  const keyReflection = new THREE.RectAreaLight(0xffe0b8, 7.5, 8.5, 4.5);
+  const keyReflection = new THREE.RectAreaLight(0xffe0b8, 3.6, 8.5, 4.5);
   keyReflection.position.set(-0.8, 7.6, 5.7);
   scene.add(keyReflection);
 
-  const sideReflection = new THREE.RectAreaLight(0xe9bd8b, 4.8, 3.2, 6.5);
+  const sideReflection = new THREE.RectAreaLight(0xe9bd8b, 2.4, 3.2, 6.5);
   sideReflection.position.set(-6.4, 4.4, 2.8);
   scene.add(sideReflection);
 
-  const coolRim = new THREE.RectAreaLight(0xa9bbdd, 2.6, 4.5, 5.5);
+  const coolRim = new THREE.RectAreaLight(0xa9bbdd, 1.4, 4.5, 5.5);
   coolRim.position.set(6.5, 5.3, -4.5);
   scene.add(coolRim);
 
-  const ambient = new THREE.HemisphereLight(0x3a4153, 0x170f0b, 0.38);
+  // Low, rearward card catches the raised lid without filling the whole room.
+  const lidReflection = new THREE.RectAreaLight(0xe8e1d2, 0.12, 10, 1.2);
+  lidReflection.position.set(-6.2, 2.1, -5.8);
+  scene.add(lidReflection);
+
+  const ambient = new THREE.HemisphereLight(0x3a4153, 0x170f0b, 0.24);
   scene.add(ambient);
 
   const normalFocus = new THREE.Vector3(0, 1.2, -0.35);
@@ -91,6 +96,7 @@ export function createLighting(scene) {
     keyReflection.lookAt(focus);
     sideReflection.lookAt(focus);
     coolRim.lookAt(focus);
+    lidReflection.lookAt(focus);
   }
 
   function setExploded(value) {

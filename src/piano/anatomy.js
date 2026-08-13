@@ -509,8 +509,9 @@ export function buildLid(mats) {
   lid.position.set(3.6, 0, 0); // spine edge aligns with the pivot axis
   pivot.add(lid);
 
-  // Underlid trim so the raised interior face reads as finished.
-  const underTrim = extrudeFlat(lidShape(), 0.012, mats.gold, 0);
+  // Finished satin-black underside; it remains distinct from the exterior
+  // clearcoat without turning the open lid into a bright metallic panel.
+  const underTrim = extrudeFlat(lidShape(), 0.012, mats.blackSatin, 0);
   underTrim.position.set(3.6, -0.014, 0);
   pivot.add(underTrim);
 

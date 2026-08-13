@@ -8,6 +8,7 @@ export function createStage(scene, mats) {
   const stage = new THREE.Mesh(
     new THREE.BoxGeometry(22, 0.55, 15),
     new THREE.MeshPhysicalMaterial({
+      color: 0x75685d,
       map: mats.woodTex,
       roughness: 0.8,
       metalness: 0,

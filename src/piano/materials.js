@@ -17,15 +17,15 @@ export function createWoodTexture(maxAniso) {
   const tex = makeCanvasTexture(
     (g, w, h) => {
       const base = g.createLinearGradient(0, 0, 0, h);
-      base.addColorStop(0, "#2b190f");
-      base.addColorStop(0.5, "#3d2619");
-      base.addColorStop(1, "#24150f");
+      base.addColorStop(0, "#1e110b");
+      base.addColorStop(0.5, "#2d1a11");
+      base.addColorStop(1, "#190e0a");
       g.fillStyle = base;
       g.fillRect(0, 0, w, h);
       for (let i = 0; i < 118; i++) {
         const y = (i / 118) * h + Math.sin(i * 11.7) * 7;
         const a = 0.025 + ((i * 17) % 9) * 0.006;
-        g.strokeStyle = `rgba(193,137,83,${a})`;
+        g.strokeStyle = `rgba(151,98,59,${a})`;
         g.lineWidth = 0.45 + ((i * 7) % 5) * 0.24;
         g.beginPath();
         g.moveTo(0, y);
@@ -39,7 +39,7 @@ export function createWoodTexture(maxAniso) {
       for (let y = 0; y < h; y += 106) {
         g.fillStyle = "rgba(12,6,4,.32)";
         g.fillRect(0, y, w, 3);
-        g.fillStyle = "rgba(116,72,45,.14)";
+        g.fillStyle = "rgba(91,54,34,.14)";
         g.fillRect(0, y + 4, w, 1);
       }
     },
@@ -56,15 +56,15 @@ export function createSpruceTexture(maxAniso) {
   const tex = makeCanvasTexture(
     (g, w, h) => {
       const base = g.createLinearGradient(0, 0, w, h);
-      base.addColorStop(0, "#c9a56f");
-      base.addColorStop(0.5, "#e1c58f");
-      base.addColorStop(1, "#c49c63");
+      base.addColorStop(0, "#afa68f");
+      base.addColorStop(0.5, "#c8bea4");
+      base.addColorStop(1, "#ada28a");
       g.fillStyle = base;
       g.fillRect(0, 0, w, h);
       // Fine, low-saturation longitudinal spruce grain.
       for (let x = 0; x < w; x += 5) {
         const a = 0.028 + ((x * 13) % 17) * 0.0024;
-        g.strokeStyle = `rgba(103,75,40,${a})`;
+        g.strokeStyle = `rgba(93,79,53,${a})`;
         g.lineWidth = 0.45 + ((x * 3) % 4) * 0.2;
         g.beginPath();
         g.moveTo(x, 0);
@@ -78,7 +78,7 @@ export function createSpruceTexture(maxAniso) {
         );
         g.stroke();
       }
-      g.fillStyle = "rgba(88,58,28,.055)";
+      g.fillStyle = "rgba(85,73,49,.05)";
       for (let y = 18; y < h; y += 120) g.fillRect(0, y, w, 1);
     },
     1024,
@@ -89,19 +89,42 @@ export function createSpruceTexture(maxAniso) {
   return tex;
 }
 
-function createLinearNoiseTexture(size = 128) {
-  const data = new Uint8Array(size * size);
+function createRoughnessTexture(size, sample) {
+  const data = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const wave = Math.sin(x * 0.43 + y * 0.17) * 9;
-      const grain = ((x * 19 + y * 31) % 23) - 11;
-      data[y * size + x] = THREE.MathUtils.clamp(128 + wave + grain, 0, 255);
+      const value = THREE.MathUtils.clamp(sample(x, y), 0, 255);
+      const index = (y * size + x) * 4;
+      // Three.js roughness maps read green; replicate into RGB so this stays
+      // robust for diagnostics and future channel-specific material maps.
+      data[index] = data[index + 1] = data[index + 2] = value;
+      data[index + 3] = 255;
     }
   }
-  const tex = new THREE.DataTexture(data, size, size, THREE.RedFormat);
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.colorSpace = THREE.NoColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(5, 5);
   tex.needsUpdate = true;
+  return tex;
+}
+
+function createCastRoughnessTexture() {
+  const tex = createRoughnessTexture(128, (x, y) => {
+    const grain = ((x * 47 + y * 71 + x * y * 3) % 29) - 14;
+    const wave = Math.sin(x * 0.71 + y * 0.43) * 8;
+    return 164 + grain + wave;
+  });
+  tex.repeat.set(5, 5);
+  return tex;
+}
+
+function createWoodRoughnessTexture() {
+  const tex = createRoughnessTexture(192, (x, y) => {
+    const grain = Math.sin(x * 0.18 + Math.sin(y * 0.06) * 2.2) * 18;
+    const longWave = Math.sin(x * 0.042) * 10;
+    return 183 + grain + longWave;
+  });
+  tex.repeat.set(3, 2);
   return tex;
 }
 
@@ -207,21 +230,23 @@ export function createSheetTexture(maxAniso) {
 export function createMaterials(maxAniso) {
   const woodTex = createWoodTexture(maxAniso);
   const spruceTex = createSpruceTexture(maxAniso);
-  const microRoughness = createLinearNoiseTexture();
+  const castRoughness = createCastRoughnessTexture();
+  const woodRoughness = createWoodRoughnessTexture();
 
   return {
     woodTex,
     spruceTex,
-    microRoughness,
+    castRoughness,
+    woodRoughness,
     maxAniso,
 
     // Case / exterior
     blackLacquer: new THREE.MeshPhysicalMaterial({
       color: 0x08090a,
       metalness: 0,
-      roughness: 0.115,
+      roughness: 0.13,
       clearcoat: 1,
-      clearcoatRoughness: 0.045,
+      clearcoatRoughness: 0.065,
       ior: 1.5,
       specularIntensity: 1,
       envMapIntensity: 1.55,
@@ -242,17 +267,17 @@ export function createMaterials(maxAniso) {
 
     // Metals
     gold: new THREE.MeshStandardMaterial({
-      color: 0x9c7539,
+      color: 0x756348,
       metalness: 0.9,
-      roughness: 0.22,
-      envMapIntensity: 1.15,
+      roughness: 0.3,
+      envMapIntensity: 0.78,
     }),
     plateGold: new THREE.MeshStandardMaterial({
-      color: 0x6e633f,
+      color: 0x514f42,
       metalness: 0.72,
-      roughness: 0.54,
-      roughnessMap: microRoughness,
-      envMapIntensity: 0.68,
+      roughness: 0.62,
+      roughnessMap: castRoughness,
+      envMapIntensity: 0.45,
     }),
     bronze: new THREE.MeshStandardMaterial({
       color: 0x735637,
@@ -279,10 +304,10 @@ export function createMaterials(maxAniso) {
       roughness: 0.62,
     }),
     spruce: new THREE.MeshStandardMaterial({
-      color: 0xcaae78,
-      roughness: 0.7,
+      color: 0xb9b5ab,
+      roughness: 0.76,
       map: spruceTex,
-      roughnessMap: microRoughness,
+      roughnessMap: woodRoughness,
     }),
     bridge: new THREE.MeshStandardMaterial({
       color: 0x3f2112,
