@@ -4,6 +4,7 @@ import {
   box,
   cyl,
   extrudeFlat,
+  applyPlanarXZUV,
   tag,
   outerFootprint,
   cavityPath,
@@ -156,6 +157,9 @@ export function buildSoundboard(mats, stringLayout) {
     mats.spruce,
     0.01,
   );
+  // Long spruce grain follows the piano's XZ-oriented soundboard as one
+  // continuous surface, independent of the extrusion triangulation.
+  applyPlanarXZUV(board.geometry);
   board.position.y = DIM.soundboardTopY - DIM.soundboardThickness;
   g.add(board);
 

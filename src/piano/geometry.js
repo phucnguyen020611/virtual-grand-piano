@@ -141,6 +141,28 @@ export function extrudeFlat(shape, thickness, mat, bevel = 0.03) {
   return m;
 }
 
+/**
+ * Replace per-triangle extrusion UVs with one continuous XZ projection. This
+ * is useful for broad timber faces whose grain must run across the complete
+ * shape rather than restarting at each triangulated polygon.
+ */
+export function applyPlanarXZUV(geometry) {
+  geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox;
+  const position = geometry.getAttribute("position");
+  const uv = new Float32Array(position.count * 2);
+  const width = Math.max(bounds.max.x - bounds.min.x, Number.EPSILON);
+  const depth = Math.max(bounds.max.z - bounds.min.z, Number.EPSILON);
+
+  for (let index = 0; index < position.count; index++) {
+    uv[index * 2] = (position.getX(index) - bounds.min.x) / width;
+    uv[index * 2 + 1] = (position.getZ(index) - bounds.min.z) / depth;
+  }
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  geometry.attributes.uv.needsUpdate = true;
+  return geometry;
+}
+
 /** Attach inspection metadata to a group and route child meshes back to it. */
 export function tag(obj, name, desc, category = "Piano anatomy") {
   obj.userData.inspectable = true;

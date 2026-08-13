@@ -48,7 +48,7 @@ export function createLighting(scene) {
 
   const keyLight = new THREE.SpotLight(
     0xffe6bf,
-    72,
+    66,
     22,
     Math.PI * 0.245,
     0.86,
@@ -64,15 +64,15 @@ export function createLighting(scene) {
   keyLight.shadow.camera.far = 30;
   scene.add(keyLight, keyLight.target);
 
-  const keyReflection = new THREE.RectAreaLight(0xffe0b8, 3.6, 8.5, 4.5);
+  const keyReflection = new THREE.RectAreaLight(0xffe0b8, 3, 8.5, 4.5);
   keyReflection.position.set(-0.8, 7.6, 5.7);
   scene.add(keyReflection);
 
-  const sideReflection = new THREE.RectAreaLight(0xe9bd8b, 2.4, 3.2, 6.5);
+  const sideReflection = new THREE.RectAreaLight(0xe9bd8b, 1.8, 3.2, 6.5);
   sideReflection.position.set(-6.4, 4.4, 2.8);
   scene.add(sideReflection);
 
-  const coolRim = new THREE.RectAreaLight(0xa9bbdd, 1.4, 4.5, 5.5);
+  const coolRim = new THREE.RectAreaLight(0xa9bbdd, 0.9, 4.5, 5.5);
   coolRim.position.set(6.5, 5.3, -4.5);
   scene.add(coolRim);
 

@@ -9,7 +9,11 @@ import { createLighting } from "./scene/lighting.js";
 import { createReflectionEnvironment } from "./scene/environment.js";
 import { createAudioEngine } from "./audio/pianoAudio.js";
 import { createInspection } from "./interaction/inspection.js";
-import { createExplodedView } from "./interaction/explodedView.js";
+import {
+  createExplodedView,
+  NORMAL_DEFAULT_CAMERA_POSITION,
+  NORMAL_DEFAULT_TARGET,
+} from "./interaction/explodedView.js";
 
 // --- Renderer / scene / camera ---------------------------------------------
 const scene = new THREE.Scene();
@@ -22,7 +26,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   80,
 );
-camera.position.set(9.2, 6.4, 11.5);
+camera.position.copy(NORMAL_DEFAULT_CAMERA_POSITION);
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -40,7 +44,7 @@ document.querySelector("#scene").appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.055;
-controls.target.set(0, 1.25, -0.4);
+controls.target.copy(NORMAL_DEFAULT_TARGET);
 controls.minDistance = 4;
 controls.maxDistance = 26;
 controls.maxPolarAngle = Math.PI * 0.49;

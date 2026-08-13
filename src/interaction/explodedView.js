@@ -6,6 +6,13 @@ const CAMERA_EXPANSION = 1.04;
 const CAMERA_POSITION_EPSILON = 0.018;
 const CAMERA_TARGET_EPSILON = 0.012;
 
+export const NORMAL_DEFAULT_CAMERA_POSITION = new THREE.Vector3(
+  7.7,
+  5.45,
+  9.75,
+);
+export const NORMAL_DEFAULT_TARGET = new THREE.Vector3(0, 1.25, -0.4);
+
 function captureTransform(object) {
   return {
     position: object.position.clone(),
@@ -37,9 +44,9 @@ export function createExplodedView({ piano, camera, controls }) {
   const center = new THREE.Vector3();
   const explodedSize = new THREE.Vector3();
   const desiredTarget = new THREE.Vector3();
-  const normalTarget = new THREE.Vector3(0, 1.25, -0.4);
+  const normalTarget = NORMAL_DEFAULT_TARGET.clone();
   const normalDefaultTarget = normalTarget.clone();
-  const normalDefaultPosition = new THREE.Vector3(9.2, 6.4, 11.5);
+  const normalDefaultPosition = NORMAL_DEFAULT_CAMERA_POSITION.clone();
   const defaultCameraDirection = new THREE.Vector3()
     .subVectors(normalDefaultPosition, normalDefaultTarget)
     .normalize();
