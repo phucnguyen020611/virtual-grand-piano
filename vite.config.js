@@ -1,9 +1,9 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: '/virtual-grand-piano/',
+  base: "/virtual-grand-piano/",
   build: {
-    target: 'es2022',
+    target: "es2022",
     sourcemap: true,
   },
 });

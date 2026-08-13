@@ -1,64 +1,92 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#050506" />
-  <meta name="description" content="An interactive 3D concert grand piano experience with playable keys and exploded anatomy inspection." />
-  <link rel="icon" href="./logo.svg" type="image/svg+xml" />
-  <title>Virtual Grand Piano</title>
-</head>
-<body>
-<div id="app"><div id="scene"></div><div class="grain"></div></div>
-
-<div class="topbar">
-  <div class="brand">
-    <div class="eyebrow">Interactive Instrument Study</div>
-    <div class="title">Concert Grand</div>
-    <div class="subtitle">Play it. Orbit it. Separate every system and inspect the anatomy of a concert grand.</div>
-  </div>
-  <div class="status"><span class="dot"></span><span id="statusText">Ready · 88 keys</span></div>
-</div>
-
-<div class="toolbar">
-  <button id="normalBtn" class="active">Normal Inspect</button>
-  <button id="explodeBtn">Exploded Parts</button>
-  <button id="lidBtn">Close Lid</button>
-  <button id="autoBtn" class="gold">▶ Für Elise</button>
-  <button id="resetBtn">Reset View</button>
-</div>
-
-<div class="bottom">
-  <div class="card help">
-    <h3>Play & inspect</h3>
-    <p>Drag to orbit · wheel to zoom · right-drag to pan · click any piano part to identify it · click keys to play.</p>
-    <div class="keys">
-      <span class="kbd">A</span><span class="kbd">W</span><span class="kbd">S</span><span class="kbd">E</span>
-      <span class="kbd">D</span><span class="kbd">F</span><span class="kbd">T</span><span class="kbd">G</span>
-      <span class="kbd">Y</span><span class="kbd">H</span><span class="kbd">U</span><span class="kbd">J</span>
-      <span class="kbd">K</span><span class="kbd">O</span><span class="kbd">L</span><span class="kbd">P</span><span class="kbd">;</span>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#050506" />
+    <meta
+      name="description"
+      content="An interactive 3D concert grand piano experience with playable keys and exploded anatomy inspection."
+    />
+    <link rel="icon" href="./logo.svg" type="image/svg+xml" />
+    <title>Virtual Grand Piano</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="scene"></div>
+      <div class="grain"></div>
     </div>
-  </div>
-  <div class="card inspector">
-    <div class="meta" id="partMeta">Selected component</div>
-    <div class="part" id="partName">Concert grand piano</div>
-    <p id="partText">High-gloss lacquered body, cast plate, soundboard, action, strings, keyboard, pedals and lid are individually modeled.</p>
-    <div class="progress"><i id="songProgress"></i></div>
-  </div>
-</div>
 
-<div class="audioGate" id="audioGate">
-  <div class="gateInner">
-    <div class="seal">S</div>
-    <div class="eyebrow">A virtual concert stage</div>
-    <h1>Grand Piano Anatomy</h1>
-    <p>Enter the stage to enable audio. Use your keyboard or mouse to play, then switch to exploded view to inspect the instrument from any angle.</p>
-    <button class="enter" id="enterBtn">Enter stage & enable sound</button>
-    <p class="mobileHint">Touch the keys and drag anywhere to orbit.</p>
-  </div>
-</div>
+    <div class="topbar">
+      <div class="brand">
+        <div class="eyebrow">Interactive Instrument Study</div>
+        <div class="title">Concert Grand</div>
+        <div class="subtitle">
+          Play it. Orbit it. Separate every system and inspect the anatomy of a
+          concert grand.
+        </div>
+      </div>
+      <div class="status">
+        <span class="dot"></span><span id="statusText">Ready · 88 keys</span>
+      </div>
+    </div>
 
-<div id="labels"></div>
-<script type="module" src="/src/main.js"></script>
-</body>
+    <div class="toolbar">
+      <button id="normalBtn" class="active">Normal Inspect</button>
+      <button id="explodeBtn">Exploded Parts</button>
+      <button id="lidBtn">Close Lid</button>
+      <button id="autoBtn" class="gold">▶ Für Elise</button>
+      <button id="resetBtn">Reset View</button>
+    </div>
+
+    <div class="bottom">
+      <div class="card help">
+        <h3>Play & inspect</h3>
+        <p>
+          Drag to orbit · wheel to zoom · right-drag to pan · click any piano
+          part to identify it · click keys to play.
+        </p>
+        <div class="keys">
+          <span class="kbd">A</span><span class="kbd">W</span
+          ><span class="kbd">S</span><span class="kbd">E</span>
+          <span class="kbd">D</span><span class="kbd">F</span
+          ><span class="kbd">T</span><span class="kbd">G</span>
+          <span class="kbd">Y</span><span class="kbd">H</span
+          ><span class="kbd">U</span><span class="kbd">J</span>
+          <span class="kbd">K</span><span class="kbd">O</span
+          ><span class="kbd">L</span><span class="kbd">P</span
+          ><span class="kbd">;</span>
+        </div>
+      </div>
+      <div class="card inspector">
+        <div class="meta" id="partMeta">Selected component</div>
+        <div class="part" id="partName">Concert grand piano</div>
+        <p id="partText">
+          High-gloss lacquered body, cast plate, soundboard, action, strings,
+          keyboard, pedals and lid are individually modeled.
+        </p>
+        <div class="progress"><i id="songProgress"></i></div>
+      </div>
+    </div>
+
+    <div class="audioGate" id="audioGate">
+      <div class="gateInner">
+        <div class="seal">S</div>
+        <div class="eyebrow">A virtual concert stage</div>
+        <h1>Grand Piano Anatomy</h1>
+        <p>
+          Enter the stage to enable audio. Use your keyboard or mouse to play,
+          then switch to exploded view to inspect the instrument from any angle.
+        </p>
+        <button class="enter" id="enterBtn">Enter stage & enable sound</button>
+        <p class="mobileHint">Touch the keys and drag anywhere to orbit.</p>
+      </div>
+    </div>
+
+    <div id="labels"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>

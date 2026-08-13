@@ -1,5 +1,6 @@
 node_modules/
 dist/
+package-lock.json
 .DS_Store
 *.log
 .env
@@ -7,3 +8,11 @@ dist/
 !.env.example
 .vscode/
 .idea/
+
+# AI coding agents
+.agents/
+.claude/
+.codex/
+.cursor/
+.continue/
+skills-lock.json

@@ -6,9 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "start": "vite preview",
     "build": "vite build",
-    "preview": "vite preview",
-    "check": "npm run build"
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "engines": {
     "node": ">=22.12.0"
@@ -26,6 +27,7 @@
     "three": "0.185.1"
   },
   "devDependencies": {
+    "prettier": "3.9.6",
     "vite": "8.1.5"
   }
 }
