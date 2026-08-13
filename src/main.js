@@ -8,6 +8,7 @@ import { createStage } from "./scene/stage.js";
 import { createLighting } from "./scene/lighting.js";
 import { createAudioEngine } from "./audio/pianoAudio.js";
 import { createInspection } from "./interaction/inspection.js";
+import { createExplodedView } from "./interaction/explodedView.js";
 
 // --- Renderer / scene / camera ---------------------------------------------
 const scene = new THREE.Scene();
@@ -50,7 +51,7 @@ createLighting(scene);
 
 const piano = createPiano(mats, stageTopY);
 scene.add(piano.group);
-const { keyMeshes, midiToKey, lidPivot, prop, explodeItems } = piano;
+const { keyMeshes, midiToKey, lidPivot, prop } = piano;
 
 // Dev-only inspection hook for geometry validation (stripped from production).
 if (import.meta.env.DEV) {
@@ -74,6 +75,8 @@ const dom = {
 const inspection = createInspection(renderer, camera, piano, dom, (midi) =>
   audio.playMidi(midi, 0.8),
 );
+const explodedView = createExplodedView({ piano, camera, controls });
+if (import.meta.env.DEV) window.__vgp.explodedView = explodedView;
 
 // --- Computer-keyboard performance -----------------------------------------
 const keyboardMap = {
@@ -205,8 +208,12 @@ const explodeBtn = document.querySelector("#explodeBtn");
 const lidBtn = document.querySelector("#lidBtn");
 let lidOpen = true;
 
-normalBtn.onclick = () => inspection.setMode(false, { normalBtn, explodeBtn });
-explodeBtn.onclick = () => inspection.setMode(true, { normalBtn, explodeBtn });
+function setExplodedMode(exploded) {
+  inspection.setMode(exploded, { normalBtn, explodeBtn });
+  explodedView.setExploded(exploded);
+}
+normalBtn.onclick = () => setExplodedMode(false);
+explodeBtn.onclick = () => setExplodedMode(true);
 autoBtn.onclick = startAutoplay;
 document.querySelector("#resetBtn").onclick = () => {
   camera.position.set(9.2, 6.4, 11.5);
@@ -225,28 +232,13 @@ document.querySelector("#enterBtn").onclick = () => {
 
 // --- Animation loop ---------------------------------------------------------
 const clock = new THREE.Clock();
-let explodeMix = 0;
 
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.035);
   controls.update();
 
-  explodeMix = THREE.MathUtils.damp(
-    explodeMix,
-    inspection.exploded ? 1 : 0,
-    4.2,
-    dt,
-  );
-  for (const [g] of explodeItems) {
-    const base = g.userData.base,
-      off = g.userData.offset;
-    g.position.set(
-      base.x + off.x * explodeMix,
-      base.y + off.y * explodeMix,
-      base.z + off.z * explodeMix,
-    );
-  }
+  explodedView.update(dt);
 
   const targetLid = lidOpen ? 0.32 : 0;
   lidPivot.rotation.z = THREE.MathUtils.damp(
@@ -269,7 +261,8 @@ function animate() {
     const elapsed = (performance.now() - songStart) / 1000;
     progressEl.style.width = Math.min(1, elapsed / songLength) * 100 + "%";
   }
-  if (inspection.exploded) inspection.updateLabels();
+  if (explodedView.exploded || explodedView.isTransitioning)
+    inspection.updateLabels();
 
   renderer.render(scene, camera);
 }

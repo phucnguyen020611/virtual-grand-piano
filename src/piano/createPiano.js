@@ -13,8 +13,8 @@ import { buildKeyboard } from "./keyboard.js";
 import { buildStringSystem, createStringLayout } from "./strings.js";
 
 /**
- * Assemble the full procedural grand piano from its anatomy modules and wire
- * up the exploded-view layout, labels, lid pivot and keyboard lookups.
+ * Assemble the full procedural grand piano and expose component metadata for
+ * the separate exploded-view controller.
  *
  * @returns API consumed by main.js and the interaction/audio layers.
  */
@@ -46,22 +46,24 @@ export function createPiano(mats, stageTopY) {
     keyboard,
   );
 
-  // Exploded-view layout: each system separates along its own offset vector.
-  const explodeItems = [
-    [lid, new THREE.Vector3(-4.6, 3.4, -0.4), "Lid"],
-    [strings, new THREE.Vector3(4.2, 2.8, -0.2), "Strings"],
-    [plate, new THREE.Vector3(4.0, 1.55, -0.2), "Cast plate"],
-    [soundboard, new THREE.Vector3(-4.4, 0.5, -0.2), "Soundboard"],
-    [action, new THREE.Vector3(-0.2, 1.9, 3.2), "Action"],
-    [keyboard, new THREE.Vector3(0, 0.3, 4.3), "Keyboard"],
-    [pedals, new THREE.Vector3(2.4, -0.1, 3.4), "Pedals"],
-    [musicDesk, new THREE.Vector3(-2.6, 2.5, 2.4), "Music desk"],
-    [legs, new THREE.Vector3(-3.9, 0.1, 2.0), "Legs"],
+  const explodedComponents = [
+    {
+      id: "rim",
+      label: "Rim & case",
+      object: caseRim,
+      priority: 10,
+      anchor: "top",
+    },
+    { id: "soundboard", label: "Soundboard", object: soundboard, priority: 7 },
+    { id: "plate", label: "Cast plate", object: plate, priority: 8 },
+    { id: "strings", label: "Strings", object: strings, priority: 9 },
+    { id: "action", label: "Action", object: action, priority: 6 },
+    { id: "musicDesk", label: "Music desk", object: musicDesk, priority: 3 },
+    { id: "lid", label: "Lid", object: lid, priority: 4 },
+    { id: "keyboard", label: "Keyboard", object: keyboard, priority: 5 },
+    { id: "pedals", label: "Pedal lyre", object: pedals, priority: 2 },
+    { id: "legs", label: "Legs & casters", object: legs, priority: 1 },
   ];
-  for (const [g, v] of explodeItems) {
-    g.userData.base = g.position.clone();
-    g.userData.offset = v;
-  }
 
   return {
     group,
@@ -69,7 +71,7 @@ export function createPiano(mats, stageTopY) {
     midiToKey,
     lidPivot,
     prop,
-    explodeItems,
+    explodedComponents,
     // Static reference for raycasting the whole instrument.
     parts: group,
   };

@@ -247,6 +247,10 @@ button.gold:hover {
 .label3d.show {
   opacity: 1;
 }
+.label3d.emphasis {
+  border-color: rgba(213, 184, 116, 0.8);
+  color: #fff3d2;
+}
 .label3d:before {
   content: "";
   width: 4px;
