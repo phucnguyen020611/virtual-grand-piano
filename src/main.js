@@ -8,6 +8,8 @@ import { createStage } from "./scene/stage.js";
 import { createLighting } from "./scene/lighting.js";
 import { createReflectionEnvironment } from "./scene/environment.js";
 import { createAudioEngine } from "./audio/pianoAudio.js";
+import { createMechanics } from "./piano/mechanics.js";
+import { createPerformanceController } from "./performance/performanceController.js";
 import { createInspection } from "./interaction/inspection.js";
 import {
   createExplodedView,
@@ -58,7 +60,7 @@ const lighting = createLighting(scene);
 
 const piano = createPiano(mats, stageTopY);
 scene.add(piano.group);
-const { keyMeshes, midiToKey, lidPivot, prop } = piano;
+const { midiToKey, lidPivot, prop } = piano;
 
 // Dev-only inspection hook for geometry validation (stripped from production).
 if (import.meta.env.DEV) {
@@ -73,12 +75,12 @@ if (import.meta.env.DEV) {
   };
 }
 
-// --- Audio -----------------------------------------------------------------
-function keyVisual(midi, on) {
-  const k = midiToKey.get(midi);
-  if (k) k.userData.pressed = on;
-}
-const audio = createAudioEngine(keyVisual);
+// --- Audio and mechanical performance --------------------------------------
+const audio = createAudioEngine();
+const mechanics = createMechanics(piano);
+const pianoPerformance = createPerformanceController(audio, mechanics);
+if (import.meta.env.DEV)
+  Object.assign(window.__vgp, { mechanics, performance: pianoPerformance });
 
 // --- Inspection / interaction ----------------------------------------------
 const dom = {
@@ -87,8 +89,16 @@ const dom = {
   partMeta: document.querySelector("#partMeta"),
   labelRoot: document.querySelector("#labels"),
 };
-const inspection = createInspection(renderer, camera, piano, dom, (midi) =>
-  audio.playMidi(midi, 0.8),
+const inspection = createInspection(
+  renderer,
+  camera,
+  piano,
+  dom,
+  (midi) => pianoPerformance.playMidi(midi, 0.8, 0.72, "pointer"),
+  (type, down) => {
+    if (type === "sustain") pianoPerformance.setSustain(down);
+    else mechanics.setPedal(type, down);
+  },
 );
 const explodedView = createExplodedView({ piano, camera, controls });
 if (import.meta.env.DEV) window.__vgp.explodedView = explodedView;
@@ -116,15 +126,25 @@ const keyboardMap = {
 };
 const held = new Set();
 addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    if (!e.repeat) pianoPerformance.setSustain(true);
+    return;
+  }
   if (e.repeat || !keyboardMap[e.code] || e.metaKey || e.ctrlKey) return;
   e.preventDefault();
   held.add(e.code);
-  audio.noteOn(keyboardMap[e.code], 0.72);
+  pianoPerformance.noteOn(keyboardMap[e.code], 0.72, "computer-keyboard");
 });
 addEventListener("keyup", (e) => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    pianoPerformance.setSustain(false);
+    return;
+  }
   if (!keyboardMap[e.code]) return;
   held.delete(e.code);
-  audio.noteOff(keyboardMap[e.code], 0.45);
+  pianoPerformance.noteOff(keyboardMap[e.code], "computer-keyboard");
 });
 
 // --- Für Elise autoplay (public-domain composition, simplified) ------------
@@ -189,7 +209,7 @@ function stopAutoplay() {
   autoTimers.forEach(clearTimeout);
   autoTimers = [];
   autoBtn.textContent = "▶ Für Elise";
-  for (const [m] of audio.activeVoices) audio.noteOff(m, 0.25);
+  pianoPerformance.stopAll();
   progressEl.style.width = "0%";
 }
 function startAutoplay() {
@@ -208,7 +228,7 @@ function startAutoplay() {
     autoTimers.push(
       setTimeout(() => {
         if (!autoplay) return;
-        audio.playMidi(m, d * tempo * 0.92, 0.68);
+        pianoPerformance.playMidi(m, d * tempo * 0.92, 0.68, "autoplay");
         inspection.selectPart(midiToKey.get(m));
       }, t * 1000),
     );
@@ -266,12 +286,7 @@ function animate() {
   prop.scale.y = THREE.MathUtils.damp(prop.scale.y, lidOpen ? 1 : 0.06, 6, dt);
   prop.visible = prop.scale.y > 0.08;
 
-  for (const k of keyMeshes) {
-    const ty = k.userData.restY + (k.userData.pressed ? -0.05 : 0);
-    k.position.y = THREE.MathUtils.damp(k.position.y, ty, 22, dt);
-    const targetRot = k.userData.pressed ? -0.018 : 0;
-    k.rotation.x = THREE.MathUtils.damp(k.rotation.x, targetRot, 22, dt);
-  }
+  pianoPerformance.update(dt);
 
   if (autoplay) {
     const elapsed = (performance.now() - songStart) / 1000;

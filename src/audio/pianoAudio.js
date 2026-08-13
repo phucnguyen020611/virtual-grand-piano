@@ -1,11 +1,9 @@
 /**
  * Lightweight Web Audio piano synthesizer. No external samples: each note is a
  * small additive voice with a hammer transient, low-pass tone shaping, a
- * compressor and a short delay bus.
- *
- * @param {(midi:number, on:boolean)=>void} onKeyVisual - key press callback.
+ * compressor and a short delay bus. Visual state is owned by piano mechanics.
  */
-export function createAudioEngine(onKeyVisual = () => {}) {
+export function createAudioEngine() {
   let audioCtx = null,
     master = null,
     compressor = null,
@@ -90,28 +88,18 @@ export function createAudioEngine(onKeyVisual = () => {}) {
     transient.start(now);
     transient.stop(now + 0.04);
     activeVoices.set(midi, { oscs, bus });
-    onKeyVisual(midi, true);
     return now;
   }
 
   function noteOff(midi, release = 0.8) {
     const v = activeVoices.get(midi);
-    if (!v) {
-      onKeyVisual(midi, false);
-      return;
-    }
+    if (!v) return;
     const now = audioCtx.currentTime;
     v.bus.gain.cancelScheduledValues(now);
     v.bus.gain.setTargetAtTime(0.0001, now, release * 0.16);
     v.oscs.forEach((o) => o.stop(now + Math.max(0.18, release)));
     activeVoices.delete(midi);
-    onKeyVisual(midi, false);
   }
 
-  function playMidi(midi, dur = 0.55, vel = 0.7) {
-    noteOn(midi, vel);
-    setTimeout(() => noteOff(midi, dur * 0.8), dur * 1000);
-  }
-
-  return { ensureAudio, noteOn, noteOff, playMidi, freq, activeVoices };
+  return { ensureAudio, noteOn, noteOff, freq, activeVoices };
 }

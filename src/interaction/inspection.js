@@ -8,8 +8,16 @@ import * as THREE from "three";
  * @param piano     { parts, explodedComponents } from createPiano
  * @param dom       { partName, partText, partMeta, labelRoot }
  * @param onPlayKey callback(midi) when a playable key is clicked
+ * @param onPedal callback(type, down) while a pedal is pointer-held
  */
-export function createInspection(renderer, camera, piano, dom, onPlayKey) {
+export function createInspection(
+  renderer,
+  camera,
+  piano,
+  dom,
+  onPlayKey,
+  onPedal = () => {},
+) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const v3 = new THREE.Vector3();
@@ -38,6 +46,15 @@ export function createInspection(renderer, camera, piano, dom, onPlayKey) {
       if (p.userData?.pianoKey) return p;
       if (p.userData?.owner) return p.userData.owner;
       if (p.userData?.inspectable) return p;
+      p = p.parent;
+    }
+    return null;
+  }
+
+  function pedalOf(o) {
+    let p = o;
+    while (p) {
+      if (p.userData?.pedalType) return p.userData.pedalType;
       p = p.parent;
     }
     return null;
@@ -93,10 +110,27 @@ export function createInspection(renderer, camera, piano, dom, onPlayKey) {
   }
 
   let down = { x: 0, y: 0 };
+  let activePedal = null;
   renderer.domElement.addEventListener("pointerdown", (e) => {
     down = { x: e.clientX, y: e.clientY };
+    pointerNDC(e);
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObjects(piano.parts.children, true)[0];
+    activePedal = hit ? pedalOf(hit.object) : null;
+    if (activePedal) {
+      e.preventDefault();
+      renderer.domElement.setPointerCapture?.(e.pointerId);
+      onPedal(activePedal, true);
+      selectPart(hit.object);
+    }
   });
   renderer.domElement.addEventListener("pointerup", (e) => {
+    if (activePedal) {
+      e.preventDefault();
+      onPedal(activePedal, false);
+      activePedal = null;
+      return;
+    }
     if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) return; // ignore drags
     pointerNDC(e);
     raycaster.setFromCamera(pointer, camera);
@@ -107,6 +141,11 @@ export function createInspection(renderer, camera, piano, dom, onPlayKey) {
       onPlayKey(o.userData.midi);
       selectPart(o);
     } else selectPart(o);
+  });
+  renderer.domElement.addEventListener("pointercancel", () => {
+    if (!activePedal) return;
+    onPedal(activePedal, false);
+    activePedal = null;
   });
   renderer.domElement.addEventListener("pointermove", (e) => {
     pointerNDC(e);

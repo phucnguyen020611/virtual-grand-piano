@@ -10,6 +10,7 @@ import {
   buildMusicDesk,
 } from "./anatomy.js";
 import { buildKeyboard } from "./keyboard.js";
+import { createKeyboardLayout } from "./keyboardLayout.js";
 import { buildStringSystem, createStringLayout } from "./strings.js";
 
 /**
@@ -21,17 +22,27 @@ import { buildStringSystem, createStringLayout } from "./strings.js";
 export function createPiano(mats, stageTopY) {
   const group = new THREE.Group();
   const stringLayout = createStringLayout();
+  const keyboardLayout = createKeyboardLayout();
 
   const caseRim = buildCaseRim(mats);
   const soundboard = buildSoundboard(mats, stringLayout);
   const plate = buildPlate(mats);
   const strings = buildStringSystem(mats, stringLayout);
-  const action = buildAction(mats);
+  const { group: action, midiToMechanism: actionMechanisms } = buildAction(
+    mats,
+    keyboardLayout,
+    stringLayout.routes,
+  );
   const legs = buildLegs(mats, stageTopY);
-  const pedals = buildPedals(mats);
+  const { group: pedals, pedalPivots } = buildPedals(mats);
   const musicDesk = buildMusicDesk(mats);
   const { group: lid, pivot: lidPivot, prop } = buildLid(mats);
-  const { group: keyboard, keyMeshes, midiToKey } = buildKeyboard(mats);
+  const {
+    group: keyboard,
+    keyMeshes,
+    midiToKey,
+    midiToMechanism,
+  } = buildKeyboard(mats, keyboardLayout);
 
   group.add(
     caseRim,
@@ -69,6 +80,10 @@ export function createPiano(mats, stageTopY) {
     group,
     keyMeshes,
     midiToKey,
+    keyboardLayout,
+    midiToMechanism,
+    actionMechanisms,
+    pedalPivots,
     lidPivot,
     prop,
     explodedComponents,

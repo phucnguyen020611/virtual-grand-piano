@@ -327,49 +327,89 @@ export function buildPlate(mats) {
 // Action / hammers / dampers ------------------------------------------------
 // ---------------------------------------------------------------------------
 
-export function buildAction(mats) {
+export function buildAction(mats, layout, stringRoutes = []) {
   const g = new THREE.Group();
+  const midiToMechanism = new Map();
 
-  // Damper felt rail sitting just behind the strings’ front termination.
+  const capstanGeo = new THREE.CylinderGeometry(0.018, 0.022, 0.09, 6);
+  const wippenGeo = new THREE.BoxGeometry(0.055, 0.035, 0.24);
+  const shankGeo = new THREE.CylinderGeometry(
+    0.011,
+    0.011,
+    DIM.hammerShankLength,
+    6,
+  );
+  const hammerGeo = new THREE.BoxGeometry(0.075, 0.075, 0.145);
+  const damperStemGeo = new THREE.CylinderGeometry(0.006, 0.008, 0.18, 5);
+  const damperHeadGeo = new THREE.BoxGeometry(0.065, 0.045, 0.095);
+
+  // The rail supports individual dampers; upper C7–C8 are intentionally clear.
   box(6.5, 0.08, 0.22, mats.felt, g, 0, DIM.caseTopY - 0.06, 1.62);
-
-  // Hammer rest rail and a row of felted hammers angled toward the strings.
   box(6.6, 0.06, 0.08, mats.maple, g, 0, DIM.caseTopY - 0.09, 1.78);
-  for (let i = 0; i < 52; i++) {
-    const x = -3.05 + i * (6.1 / 51);
-    const shank = cyl(
-      0.011,
-      0.011,
-      0.34,
-      mats.maple,
-      g,
-      x,
-      DIM.caseTopY - 0.12,
-      1.72,
-      Math.PI / 2.4,
-      0,
-      "",
-      6,
+
+  for (let index = 0; index < layout.length; index++) {
+    const entry = layout[index];
+    const mechanism = new THREE.Group();
+    mechanism.position.x = entry.x;
+
+    // Rear linkage and wippen make the key → hammer relationship legible.
+    const capstan = new THREE.Mesh(capstanGeo, mats.bronze);
+    capstan.position.set(0, DIM.caseTopY - 0.025, 1.91);
+    capstan.castShadow = capstan.receiveShadow = true;
+    mechanism.add(capstan);
+    const wippen = new THREE.Mesh(wippenGeo, mats.maple);
+    wippen.position.set(0, DIM.caseTopY - 0.09, 1.78);
+    wippen.rotation.x = -0.28;
+    wippen.castShadow = wippen.receiveShadow = true;
+    mechanism.add(wippen);
+
+    const hammerPivot = new THREE.Group();
+    hammerPivot.position.set(0, DIM.actionPivotY, DIM.actionPivotZ);
+    hammerPivot.rotation.x = DIM.hammerRestAngle;
+    const shank = new THREE.Mesh(shankGeo, mats.maple);
+    shank.position.y = DIM.hammerShankLength / 2;
+    const hammerHead = new THREE.Mesh(hammerGeo, mats.hammerFelt);
+    hammerHead.position.set(0, DIM.hammerShankLength + 0.025, -0.035);
+    shank.castShadow = shank.receiveShadow = true;
+    hammerHead.castShadow = hammerHead.receiveShadow = true;
+    hammerPivot.add(shank, hammerHead);
+    mechanism.add(hammerPivot);
+
+    let damperPivot = null;
+    if (entry.midi <= DIM.damperCutoffMidi) {
+      damperPivot = new THREE.Group();
+      damperPivot.position.set(0, DIM.damperPivotY, DIM.damperPivotZ);
+      const stem = new THREE.Mesh(damperStemGeo, mats.blackSatin);
+      stem.position.y = 0.09;
+      const head = new THREE.Mesh(damperHeadGeo, mats.felt);
+      head.position.set(0, 0.19, -0.025);
+      stem.castShadow = stem.receiveShadow = true;
+      head.castShadow = head.receiveShadow = true;
+      damperPivot.add(stem, head);
+      mechanism.add(damperPivot);
+    }
+
+    mechanism.userData.stringRouteIndex = Math.round(
+      (index / (layout.length - 1)) * Math.max(0, stringRoutes.length - 1),
     );
-    const hammer = box(
-      0.07,
-      0.09,
-      0.16,
-      mats.hammerFelt,
-      g,
-      x,
-      DIM.caseTopY - 0.03,
-      1.58,
-    );
-    hammer.rotation.x = -0.32;
+    g.add(mechanism);
+    midiToMechanism.set(entry.midi, {
+      mechanism,
+      capstan,
+      wippen,
+      hammerPivot,
+      damperPivot,
+      stringRoute: stringRoutes[mechanism.userData.stringRouteIndex] || null,
+    });
   }
 
-  return tag(
+  tag(
     g,
     "Hammer action & dampers",
-    "A simplified visible action: felted hammers on maple shanks resting behind the keyboard with a damper felt rail. Each keystroke visually depresses its key.",
+    "Eighty-eight aligned actions show capstans, wippens, pivoting hammer shanks and individual dampers through B6. The undamped C7–C8 treble follows normal grand-piano practice.",
     "Action",
   );
+  return { group: g, midiToMechanism };
 }
 
 // ---------------------------------------------------------------------------
@@ -434,6 +474,7 @@ export function buildLegs(mats, stageTopY) {
 
 export function buildPedals(mats) {
   const g = new THREE.Group();
+  const pedalPivots = new Map();
   const topY = DIM.caseBottomY;
 
   // Two lyre posts descending from the underside of the keybed.
@@ -483,18 +524,45 @@ export function buildPedals(mats) {
     8,
   );
 
-  // Three pedals angled toward the player.
-  [-0.24, 0, 0.24].forEach((x, i) => {
-    const p = box(0.34, 0.05, 0.16, mats.gold, g, x, 0.34, 2.62);
-    p.rotation.y = i === 1 ? 0 : i === 0 ? -0.06 : 0.06;
+  // Separate, elongated brass pedals pivot at the rear and project +Z.
+  const pedalBodyGeo = new THREE.BoxGeometry(0.14, 0.045, 0.5);
+  const pedalToeGeo = new THREE.SphereGeometry(0.087, 10, 7);
+  [
+    { type: "soft", x: -0.22, label: "Soft pedal" },
+    { type: "sostenuto", x: 0, label: "Sostenuto pedal" },
+    { type: "sustain", x: 0.22, label: "Sustain pedal" },
+  ].forEach(({ type, x, label }) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, DIM.pedalPivotY, DIM.pedalPivotZ);
+    const body = new THREE.Mesh(pedalBodyGeo, mats.gold);
+    body.position.z = 0.27;
+    const toe = new THREE.Mesh(pedalToeGeo, mats.gold);
+    toe.scale.set(0.82, 0.36, 1.2);
+    toe.position.set(0, 0, 0.55);
+    body.castShadow = body.receiveShadow = true;
+    toe.castShadow = toe.receiveShadow = true;
+    for (const mesh of [body, toe]) {
+      mesh.userData.pedalType = type;
+      mesh.userData.partName = label;
+      mesh.userData.partText =
+        type === "sustain"
+          ? "Hold to lift the dampers and sustain released notes."
+          : `${label} geometry is inspectable and animated; its acoustic behavior is reserved for a later mechanics phase.`;
+      mesh.userData.partCategory = "Controls";
+      mesh.userData.inspectable = true;
+    }
+    pivot.add(body, toe);
+    g.add(pivot);
+    pedalPivots.set(type, pivot);
   });
 
-  return tag(
+  tag(
     g,
     "Pedal lyre",
     "Three pedals — soft, sostenuto and sustain — mounted on the decorative lyre that hangs centred beneath the keyboard and faces the player.",
     "Controls",
   );
+  return { group: g, pedalPivots };
 }
 
 // ---------------------------------------------------------------------------

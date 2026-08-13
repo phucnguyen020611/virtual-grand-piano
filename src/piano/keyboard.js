@@ -1,7 +1,6 @@
 import * as THREE from "three";
-import { DIM, tag } from "./geometry.js";
-
-const BLACK_PC = new Set([1, 3, 6, 8, 10]);
+import { tag } from "./geometry.js";
+import { createKeyboardLayout } from "./keyboardLayout.js";
 
 export function noteName(m) {
   const n = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
@@ -13,65 +12,43 @@ export function noteName(m) {
  * White keys sit on the keybed; black keys are shorter, higher and set back.
  * Returns the group plus lookup structures used by audio and interaction.
  */
-export function buildKeyboard(mats) {
+export function buildKeyboard(mats, layout = createKeyboardLayout()) {
   const group = new THREE.Group();
   const keyMeshes = [];
   const midiToKey = new Map();
+  const midiToMechanism = new Map();
+  const whiteGeo = new THREE.BoxGeometry(layout[0].width, 0.09, 1.02);
+  const blackGeo = new THREE.BoxGeometry(layout[0].width * 0.56, 0.12, 0.64);
 
-  const allMidis = Array.from({ length: 88 }, (_, i) => 21 + i);
-  const whiteW = DIM.keyboardWidth / 52;
-  const half = DIM.keyboardWidth / 2;
-
-  // Assign each white key an X slot; black keys interpolate between neighbours.
-  const whiteX = new Map();
-  let wi = 0;
-  for (const midi of allMidis) {
-    if (!BLACK_PC.has(midi % 12)) {
-      whiteX.set(midi, -half + whiteW / 2 + wi * whiteW);
-      wi++;
-    }
-  }
-
-  const whiteGeo = new THREE.BoxGeometry(whiteW * 0.92, 0.09, 1.02);
-  const blackGeo = new THREE.BoxGeometry(whiteW * 0.56, 0.12, 0.64);
-  const whiteFrontZ = 3.05; // key fronts overhang the case front edge
-  const blackFrontZ = 2.56;
-
-  for (const midi of allMidis) {
-    const isBlack = BLACK_PC.has(midi % 12);
-    let x;
-    if (!isBlack) x = whiteX.get(midi);
-    else {
-      let prev = midi - 1;
-      while (!whiteX.has(prev)) prev--;
-      let next = midi + 1;
-      while (!whiteX.has(next)) next++;
-      x = (whiteX.get(prev) + whiteX.get(next)) / 2;
-    }
-
+  for (const entry of layout) {
+    const pivot = new THREE.Group();
+    pivot.position.set(entry.x, entry.restY, entry.pivotZ);
     const key = new THREE.Mesh(
-      isBlack ? blackGeo : whiteGeo,
-      isBlack ? mats.ebony : mats.ivory,
+      entry.isBlack ? blackGeo : whiteGeo,
+      entry.isBlack ? mats.ebony : mats.ivory,
     );
-    const restY = isBlack ? DIM.blackKeyTopY : DIM.whiteKeyTopY;
-    const z = isBlack ? blackFrontZ - 0.32 : whiteFrontZ - 0.51;
-    key.position.set(x, restY, z);
+    key.position.z = entry.centerZ - entry.pivotZ;
     key.castShadow = key.receiveShadow = true;
     key.userData = {
       pianoKey: true,
-      midi,
-      isBlack,
-      restY,
+      midi: entry.midi,
+      isBlack: entry.isBlack,
       pressed: false,
-      partName: `${noteName(midi)} key`,
+      partName: `${noteName(entry.midi)} key`,
       partText:
         "Playable piano key. Click it or use the mapped computer keyboard.",
       partCategory: "Keyboard",
       inspectable: true,
     };
-    group.add(key);
+    pivot.add(key);
+    group.add(pivot);
     keyMeshes.push(key);
-    midiToKey.set(midi, key);
+    midiToKey.set(entry.midi, key);
+    midiToMechanism.set(entry.midi, {
+      pivot,
+      key,
+      travelRotation: entry.travelRotation,
+    });
   }
 
   tag(
@@ -81,5 +58,5 @@ export function buildKeyboard(mats) {
     "Interface",
   );
 
-  return { group, keyMeshes, midiToKey, whiteW };
+  return { group, keyMeshes, midiToKey, midiToMechanism, layout };
 }

@@ -63,6 +63,24 @@ export const DIM = {
   blackKeyTopY: 1.505, // resting centre Y of a black key
   keyboardWidth: 6.6, // total span of the 88 keys along X
 
+  // Action / damper --------------------------------------------------------
+  actionPivotY: 1.34,
+  actionPivotZ: 1.78,
+  hammerRestAngle: 0.33,
+  hammerStrikeAngle: -0.98,
+  hammerShankLength: 0.31,
+  damperPivotY: 1.37,
+  damperPivotZ: 1.61,
+  damperLiftAngle: -0.28,
+  // Modern grands normally leave the upper treble undamped. C7–C8 (96–108)
+  // remains clear here, keeping 21–95 individually damped and visible.
+  damperCutoffMidi: 95,
+
+  // Pedal lyre -------------------------------------------------------------
+  pedalPivotY: 0.37,
+  pedalPivotZ: 2.27,
+  pedalTravelAngle: 0.16,
+
   // Tail -------------------------------------------------------------------
   tailZ: -4.9,
 };
