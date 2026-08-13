@@ -253,6 +253,11 @@ export function createMaterials(maxAniso) {
     }),
 
     // String line materials
-    trebleLine: new THREE.LineBasicMaterial({ color: 0xd7d4c9 }),
+    trebleLine: new THREE.LineBasicMaterial({
+      color: 0x6f746f,
+      transparent: true,
+      opacity: 0.64,
+      depthWrite: false,
+    }),
   };
 }
