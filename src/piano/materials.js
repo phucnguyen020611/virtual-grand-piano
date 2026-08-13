@@ -16,57 +16,92 @@ export function makeCanvasTexture(draw, w, h, maxAniso = 1) {
 export function createWoodTexture(maxAniso) {
   const tex = makeCanvasTexture(
     (g, w, h) => {
-      g.fillStyle = "#3b2116";
+      const base = g.createLinearGradient(0, 0, 0, h);
+      base.addColorStop(0, "#2b190f");
+      base.addColorStop(0.5, "#3d2619");
+      base.addColorStop(1, "#24150f");
+      g.fillStyle = base;
       g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 170; i++) {
-        const y = Math.random() * h,
-          a = 0.05 + Math.random() * 0.11;
-        g.strokeStyle = `rgba(238,180,105,${a})`;
-        g.lineWidth = 0.5 + Math.random() * 2;
+      for (let i = 0; i < 118; i++) {
+        const y = (i / 118) * h + Math.sin(i * 11.7) * 7;
+        const a = 0.025 + ((i * 17) % 9) * 0.006;
+        g.strokeStyle = `rgba(193,137,83,${a})`;
+        g.lineWidth = 0.45 + ((i * 7) % 5) * 0.24;
         g.beginPath();
         g.moveTo(0, y);
         for (let x = 0; x < w; x += 28)
           g.lineTo(
             x,
-            y + Math.sin(x * 0.018 + i) * 2 + Math.sin(x * 0.003 + i) * 5,
+            y + Math.sin(x * 0.012 + i * 0.7) * 2.5 + Math.sin(x * 0.003) * 3,
           );
         g.stroke();
       }
-      for (let x = 0; x < w; x += 128) {
-        g.fillStyle = "rgba(0,0,0,.18)";
-        g.fillRect(x, 0, 2, h);
+      for (let y = 0; y < h; y += 106) {
+        g.fillStyle = "rgba(12,6,4,.32)";
+        g.fillRect(0, y, w, 3);
+        g.fillStyle = "rgba(116,72,45,.14)";
+        g.fillRect(0, y + 4, w, 1);
       }
     },
-    1400,
-    800,
+    1024,
+    1024,
     maxAniso,
   );
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(2.4, 1.4);
+  tex.repeat.set(2.8, 2.0);
   return tex;
 }
 
 export function createSpruceTexture(maxAniso) {
   const tex = makeCanvasTexture(
     (g, w, h) => {
-      g.fillStyle = "#d7ab63";
+      const base = g.createLinearGradient(0, 0, w, h);
+      base.addColorStop(0, "#c9a56f");
+      base.addColorStop(0.5, "#e1c58f");
+      base.addColorStop(1, "#c49c63");
+      g.fillStyle = base;
       g.fillRect(0, 0, w, h);
-      // Fine vertical spruce grain running along the soundboard.
-      for (let x = 0; x < w; x += 3) {
-        const a = 0.04 + Math.random() * 0.06;
-        g.strokeStyle = `rgba(120,78,34,${a})`;
-        g.lineWidth = 0.8 + Math.random() * 1.2;
+      // Fine, low-saturation longitudinal spruce grain.
+      for (let x = 0; x < w; x += 5) {
+        const a = 0.028 + ((x * 13) % 17) * 0.0024;
+        g.strokeStyle = `rgba(103,75,40,${a})`;
+        g.lineWidth = 0.45 + ((x * 3) % 4) * 0.2;
         g.beginPath();
         g.moveTo(x, 0);
-        g.lineTo(x + Math.sin(x * 0.02) * 3, h);
+        g.bezierCurveTo(
+          x + Math.sin(x * 0.028) * 4,
+          h * 0.34,
+          x + Math.sin(x * 0.012 + 2) * 5,
+          h * 0.68,
+          x + Math.sin(x * 0.02) * 3,
+          h,
+        );
         g.stroke();
       }
+      g.fillStyle = "rgba(88,58,28,.055)";
+      for (let y = 18; y < h; y += 120) g.fillRect(0, y, w, 1);
     },
     1024,
     1024,
     maxAniso,
   );
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function createLinearNoiseTexture(size = 128) {
+  const data = new Uint8Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const wave = Math.sin(x * 0.43 + y * 0.17) * 9;
+      const grain = ((x * 19 + y * 31) % 23) - 11;
+      data[y * size + x] = THREE.MathUtils.clamp(128 + wave + grain, 0, 255);
+    }
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RedFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(5, 5);
+  tex.needsUpdate = true;
   return tex;
 }
 
@@ -172,84 +207,107 @@ export function createSheetTexture(maxAniso) {
 export function createMaterials(maxAniso) {
   const woodTex = createWoodTexture(maxAniso);
   const spruceTex = createSpruceTexture(maxAniso);
+  const microRoughness = createLinearNoiseTexture();
 
   return {
     woodTex,
     spruceTex,
+    microRoughness,
     maxAniso,
 
     // Case / exterior
     blackLacquer: new THREE.MeshPhysicalMaterial({
-      color: 0x060607,
-      metalness: 0.16,
-      roughness: 0.055,
+      color: 0x08090a,
+      metalness: 0,
+      roughness: 0.115,
       clearcoat: 1,
-      clearcoatRoughness: 0.035,
+      clearcoatRoughness: 0.045,
+      ior: 1.5,
+      specularIntensity: 1,
+      envMapIntensity: 1.55,
     }),
-    blackSatin: new THREE.MeshStandardMaterial({
-      color: 0x0d0d0e,
-      metalness: 0.15,
-      roughness: 0.28,
+    blackSatin: new THREE.MeshPhysicalMaterial({
+      color: 0x0b0c0d,
+      metalness: 0,
+      roughness: 0.34,
+      clearcoat: 0.25,
+      clearcoatRoughness: 0.16,
+      envMapIntensity: 0.55,
     }),
     innerCase: new THREE.MeshStandardMaterial({
-      color: 0x161311,
-      metalness: 0.1,
-      roughness: 0.5,
+      color: 0x151210,
+      metalness: 0,
+      roughness: 0.68,
     }),
 
     // Metals
     gold: new THREE.MeshStandardMaterial({
-      color: 0xc69948,
-      metalness: 0.82,
-      roughness: 0.24,
+      color: 0x9c7539,
+      metalness: 0.9,
+      roughness: 0.22,
+      envMapIntensity: 1.15,
     }),
     plateGold: new THREE.MeshStandardMaterial({
-      color: 0xb98f42,
-      metalness: 0.7,
-      roughness: 0.36,
+      color: 0x6e633f,
+      metalness: 0.72,
+      roughness: 0.54,
+      roughnessMap: microRoughness,
+      envMapIntensity: 0.68,
     }),
     bronze: new THREE.MeshStandardMaterial({
-      color: 0x8b6333,
-      metalness: 0.72,
-      roughness: 0.32,
+      color: 0x735637,
+      metalness: 0.84,
+      roughness: 0.38,
+      envMapIntensity: 0.8,
     }),
     steel: new THREE.MeshStandardMaterial({
-      color: 0xc9c9c2,
-      metalness: 0.9,
-      roughness: 0.21,
+      color: 0x858d90,
+      metalness: 0.92,
+      roughness: 0.28,
+      envMapIntensity: 0.9,
     }),
     copper: new THREE.MeshStandardMaterial({
-      color: 0xb06a33,
-      metalness: 0.78,
-      roughness: 0.34,
+      color: 0x875034,
+      metalness: 0.82,
+      roughness: 0.4,
+      envMapIntensity: 0.8,
     }),
 
     // Timber
-    maple: new THREE.MeshStandardMaterial({ color: 0xa87945, roughness: 0.45 }),
-    spruce: new THREE.MeshStandardMaterial({
-      color: 0xd8b070,
-      roughness: 0.58,
-      map: spruceTex,
+    maple: new THREE.MeshStandardMaterial({
+      color: 0x8c623d,
+      roughness: 0.62,
     }),
-    bridge: new THREE.MeshStandardMaterial({ color: 0x7a4f2a, roughness: 0.5 }),
+    spruce: new THREE.MeshStandardMaterial({
+      color: 0xcaae78,
+      roughness: 0.7,
+      map: spruceTex,
+      roughnessMap: microRoughness,
+    }),
+    bridge: new THREE.MeshStandardMaterial({
+      color: 0x3f2112,
+      roughness: 0.6,
+    }),
 
     // Felt / keytops
-    felt: new THREE.MeshStandardMaterial({ color: 0x5a1115, roughness: 0.93 }),
+    felt: new THREE.MeshStandardMaterial({ color: 0x3d0d14, roughness: 0.98 }),
     hammerFelt: new THREE.MeshStandardMaterial({
-      color: 0xd8c8a8,
-      roughness: 0.88,
+      color: 0xbba68a,
+      roughness: 0.96,
     }),
     ivory: new THREE.MeshPhysicalMaterial({
-      color: 0xf1eee2,
-      roughness: 0.28,
-      clearcoat: 0.22,
-      clearcoatRoughness: 0.18,
+      color: 0xe9e1cf,
+      roughness: 0.34,
+      clearcoat: 0.14,
+      clearcoatRoughness: 0.2,
+      envMapIntensity: 0.45,
     }),
     ebony: new THREE.MeshPhysicalMaterial({
-      color: 0x070708,
-      roughness: 0.18,
-      clearcoat: 0.62,
-      clearcoatRoughness: 0.08,
+      color: 0x090a0c,
+      roughness: 0.28,
+      clearcoat: 0.35,
+      clearcoatRoughness: 0.12,
+      envMapIntensity: 0.75,
     }),
 
     // String line materials

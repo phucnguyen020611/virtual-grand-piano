@@ -553,8 +553,9 @@ export function buildMusicDesk(mats) {
 
   const sheetTex = createSheetTexture(mats.maxAniso);
   const sheetMat = new THREE.MeshStandardMaterial({
+    color: 0xd7cebb,
     map: sheetTex,
-    roughness: 0.82,
+    roughness: 0.9,
     side: THREE.DoubleSide,
   });
   const left = new THREE.Mesh(

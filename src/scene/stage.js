@@ -7,10 +7,12 @@ import * as THREE from "three";
 export function createStage(scene, mats) {
   const stage = new THREE.Mesh(
     new THREE.BoxGeometry(22, 0.55, 15),
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshPhysicalMaterial({
       map: mats.woodTex,
-      roughness: 0.46,
-      metalness: 0.02,
+      roughness: 0.8,
+      metalness: 0,
+      clearcoat: 0,
+      envMapIntensity: 0.03,
     }),
   );
   stage.position.y = -0.32;
@@ -20,8 +22,8 @@ export function createStage(scene, mats) {
   const edge = new THREE.Mesh(
     new THREE.BoxGeometry(22.15, 0.15, 15.15),
     new THREE.MeshStandardMaterial({
-      color: 0x150d09,
-      roughness: 0.35,
+      color: 0x140d09,
+      roughness: 0.5,
     }),
   );
   edge.position.y = -0.61;

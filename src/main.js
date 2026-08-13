@@ -6,6 +6,7 @@ import { createMaterials } from "./piano/materials.js";
 import { createPiano } from "./piano/createPiano.js";
 import { createStage } from "./scene/stage.js";
 import { createLighting } from "./scene/lighting.js";
+import { createReflectionEnvironment } from "./scene/environment.js";
 import { createAudioEngine } from "./audio/pianoAudio.js";
 import { createInspection } from "./interaction/inspection.js";
 import { createExplodedView } from "./interaction/explodedView.js";
@@ -13,7 +14,7 @@ import { createExplodedView } from "./interaction/explodedView.js";
 // --- Renderer / scene / camera ---------------------------------------------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x050506);
-scene.fog = new THREE.FogExp2(0x050506, 0.018);
+scene.fog = new THREE.FogExp2(0x050506, 0.007);
 
 const camera = new THREE.PerspectiveCamera(
   38,
@@ -33,7 +34,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 0.96;
 document.querySelector("#scene").appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -45,9 +46,11 @@ controls.maxDistance = 26;
 controls.maxPolarAngle = Math.PI * 0.49;
 
 // --- World -----------------------------------------------------------------
+const environment = createReflectionEnvironment(renderer);
+scene.environment = environment.texture;
 const mats = createMaterials(renderer.capabilities.getMaxAnisotropy());
 const { stageTopY } = createStage(scene, mats);
-createLighting(scene);
+const lighting = createLighting(scene);
 
 const piano = createPiano(mats, stageTopY);
 scene.add(piano.group);
@@ -55,7 +58,15 @@ const { keyMeshes, midiToKey, lidPivot, prop } = piano;
 
 // Dev-only inspection hook for geometry validation (stripped from production).
 if (import.meta.env.DEV) {
-  window.__vgp = { THREE, scene, piano, stageTopY };
+  window.__vgp = {
+    THREE,
+    scene,
+    piano,
+    stageTopY,
+    lighting,
+    mats,
+    environment,
+  };
 }
 
 // --- Audio -----------------------------------------------------------------
@@ -211,6 +222,7 @@ let lidOpen = true;
 function setExplodedMode(exploded) {
   inspection.setMode(exploded, { normalBtn, explodeBtn });
   explodedView.setExploded(exploded);
+  lighting.setExploded(exploded);
 }
 normalBtn.onclick = () => setExplodedMode(false);
 explodeBtn.onclick = () => setExplodedMode(true);
@@ -238,6 +250,7 @@ function animate() {
   controls.update();
 
   explodedView.update(dt);
+  lighting.update(dt);
 
   const targetLid = lidOpen ? 0.32 : 0;
   lidPivot.rotation.z = THREE.MathUtils.damp(
