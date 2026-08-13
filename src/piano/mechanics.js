@@ -62,6 +62,20 @@ export function createMechanics({
     pedalState.set(type, down);
   }
 
+  /** Development-oriented direct lookup for an action/string relationship. */
+  function inspectMidi(midi) {
+    const note = get(midi);
+    if (!note) return null;
+    return {
+      midi,
+      pressed: note.pressed,
+      action: note.action,
+      stringRoute: note.action?.stringRoute || null,
+      strikePoint: note.action?.strikePoint || null,
+      damperPoint: note.action?.damperPoint || null,
+    };
+  }
+
   function update(dt) {
     for (const note of notes.values()) {
       // Keys rotate around the rear pivot; positive X rotation lowers the
@@ -137,6 +151,7 @@ export function createMechanics({
     strike,
     setSustain,
     setPedal,
+    inspectMidi,
     update,
     get sustain() {
       return sustain;

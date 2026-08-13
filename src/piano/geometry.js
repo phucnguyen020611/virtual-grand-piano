@@ -64,13 +64,17 @@ export const DIM = {
   keyboardWidth: 6.6, // total span of the 88 keys along X
 
   // Action / damper --------------------------------------------------------
-  actionPivotY: 1.34,
-  actionPivotZ: 1.78,
-  hammerRestAngle: 0.33,
-  hammerStrikeAngle: -0.98,
+  // Hammer pivots are derived per note from its mapped string strike point.
+  hammerRestAngle: 1.05,
+  hammerStrikeAngle: -0.99,
   hammerShankLength: 0.31,
-  damperPivotY: 1.37,
-  damperPivotZ: 1.61,
+  hammerHeadOffset: 0.055,
+  hammerStringClearance: 0.038,
+  // The damper head is offset forward of its pivot so a small rotation
+  // visibly clears the representative string without exaggerated travel.
+  damperHeadOffsetY: 0.13,
+  damperHeadOffsetZ: 0.14,
+  damperStringClearance: 0.022,
   damperLiftAngle: -0.28,
   // Modern grands normally leave the upper treble undamped. C7–C8 (96–108)
   // remains clear here, keeping 21–95 individually damped and visible.
@@ -78,7 +82,7 @@ export const DIM = {
 
   // Pedal lyre -------------------------------------------------------------
   pedalPivotY: 0.37,
-  pedalPivotZ: 2.27,
+  pedalPivotZ: 2.1,
   pedalTravelAngle: 0.16,
 
   // Tail -------------------------------------------------------------------

@@ -330,6 +330,12 @@ export function buildPlate(mats) {
 export function buildAction(mats, layout, stringRoutes = []) {
   const g = new THREE.Group();
   const midiToMechanism = new Map();
+  const routeIndex = new Map(
+    stringRoutes.map((route, index) => [route, index]),
+  );
+  const routesByX = [...stringRoutes].sort(
+    (a, b) => a.frontBearingPoint.x - b.frontBearingPoint.x,
+  );
 
   const capstanGeo = new THREE.CylinderGeometry(0.018, 0.022, 0.09, 6);
   const wippenGeo = new THREE.BoxGeometry(0.055, 0.035, 0.24);
@@ -339,9 +345,29 @@ export function buildAction(mats, layout, stringRoutes = []) {
     DIM.hammerShankLength,
     6,
   );
-  const hammerGeo = new THREE.BoxGeometry(0.075, 0.075, 0.145);
+  // A short tapered felt roll reads more like a hammer than a rectangular block.
+  const hammerGeo = new THREE.CylinderGeometry(0.052, 0.038, 0.11, 8);
   const damperStemGeo = new THREE.CylinderGeometry(0.006, 0.008, 0.18, 5);
   const damperHeadGeo = new THREE.BoxGeometry(0.065, 0.045, 0.095);
+
+  function routeForKey(x) {
+    let nearest = routesByX[0] || null;
+    let distance = nearest
+      ? Math.abs(nearest.frontBearingPoint.x - x)
+      : Infinity;
+    for (let index = 1; index < routesByX.length; index++) {
+      const candidate = routesByX[index];
+      const candidateDistance = Math.abs(candidate.frontBearingPoint.x - x);
+      if (candidateDistance >= distance) break;
+      nearest = candidate;
+      distance = candidateDistance;
+    }
+    return nearest;
+  }
+
+  function pointOnSpeakingLength(route, amount) {
+    return route.frontBearingPoint.clone().lerp(route.bridgePoint, amount);
+  }
 
   // The rail supports individual dampers; upper C7–C8 are intentionally clear.
   box(6.5, 0.08, 0.22, mats.felt, g, 0, DIM.caseTopY - 0.06, 1.62);
@@ -351,6 +377,18 @@ export function buildAction(mats, layout, stringRoutes = []) {
     const entry = layout[index];
     const mechanism = new THREE.Group();
     mechanism.position.x = entry.x;
+    const stringRoute = routeForKey(entry.x);
+    const strikePoint = stringRoute
+      ? pointOnSpeakingLength(
+          stringRoute,
+          stringRoute.zone === "bass" ? 0.1 : 0.13,
+        )
+      : new THREE.Vector3(entry.x, DIM.stringY, DIM.frontBearingZ - 0.25);
+    const damperPoint = stringRoute
+      ? pointOnSpeakingLength(stringRoute, 0.065)
+      : strikePoint.clone();
+    const hammerHeadY = DIM.hammerShankLength + DIM.hammerHeadOffset;
+    const hammerHeadCenterY = strikePoint.y - DIM.hammerStringClearance;
 
     // Rear linkage and wippen make the key → hammer relationship legible.
     const capstan = new THREE.Mesh(capstanGeo, mats.bronze);
@@ -358,48 +396,66 @@ export function buildAction(mats, layout, stringRoutes = []) {
     capstan.castShadow = capstan.receiveShadow = true;
     mechanism.add(capstan);
     const wippen = new THREE.Mesh(wippenGeo, mats.maple);
-    wippen.position.set(0, DIM.caseTopY - 0.09, 1.78);
+    wippen.position.set(
+      (strikePoint.x - entry.x) * 0.35,
+      DIM.caseTopY - 0.09,
+      strikePoint.z + 0.5,
+    );
     wippen.rotation.x = -0.28;
     wippen.castShadow = wippen.receiveShadow = true;
     mechanism.add(wippen);
 
     const hammerPivot = new THREE.Group();
-    hammerPivot.position.set(0, DIM.actionPivotY, DIM.actionPivotZ);
+    hammerPivot.position.set(
+      strikePoint.x - entry.x,
+      hammerHeadCenterY - Math.cos(DIM.hammerStrikeAngle) * hammerHeadY,
+      strikePoint.z - Math.sin(DIM.hammerStrikeAngle) * hammerHeadY,
+    );
     hammerPivot.rotation.x = DIM.hammerRestAngle;
     const shank = new THREE.Mesh(shankGeo, mats.maple);
     shank.position.y = DIM.hammerShankLength / 2;
     const hammerHead = new THREE.Mesh(hammerGeo, mats.hammerFelt);
-    hammerHead.position.set(0, DIM.hammerShankLength + 0.025, -0.035);
+    hammerHead.position.y = hammerHeadY;
+    hammerHead.rotation.z = Math.PI / 2;
+    hammerHead.scale.set(0.65, 0.72, 1.18);
     shank.castShadow = shank.receiveShadow = true;
     hammerHead.castShadow = hammerHead.receiveShadow = true;
     hammerPivot.add(shank, hammerHead);
     mechanism.add(hammerPivot);
 
     let damperPivot = null;
+    let damperHead = null;
     if (entry.midi <= DIM.damperCutoffMidi) {
       damperPivot = new THREE.Group();
-      damperPivot.position.set(0, DIM.damperPivotY, DIM.damperPivotZ);
+      damperPivot.position.set(
+        damperPoint.x - entry.x,
+        damperPoint.y - DIM.damperStringClearance - DIM.damperHeadOffsetY,
+        damperPoint.z - DIM.damperHeadOffsetZ,
+      );
       const stem = new THREE.Mesh(damperStemGeo, mats.blackSatin);
-      stem.position.y = 0.09;
-      const head = new THREE.Mesh(damperHeadGeo, mats.felt);
-      head.position.set(0, 0.19, -0.025);
+      stem.position.y = 0.055;
+      damperHead = new THREE.Mesh(damperHeadGeo, mats.felt);
+      damperHead.position.set(0, DIM.damperHeadOffsetY, DIM.damperHeadOffsetZ);
       stem.castShadow = stem.receiveShadow = true;
-      head.castShadow = head.receiveShadow = true;
-      damperPivot.add(stem, head);
+      damperHead.castShadow = damperHead.receiveShadow = true;
+      damperPivot.add(stem, damperHead);
       mechanism.add(damperPivot);
     }
 
-    mechanism.userData.stringRouteIndex = Math.round(
-      (index / (layout.length - 1)) * Math.max(0, stringRoutes.length - 1),
-    );
+    mechanism.userData.midi = entry.midi;
+    mechanism.userData.stringRouteIndex = routeIndex.get(stringRoute) ?? -1;
     g.add(mechanism);
     midiToMechanism.set(entry.midi, {
       mechanism,
       capstan,
       wippen,
       hammerPivot,
+      hammerHead,
       damperPivot,
-      stringRoute: stringRoutes[mechanism.userData.stringRouteIndex] || null,
+      damperHead,
+      stringRoute,
+      strikePoint,
+      damperPoint,
     });
   }
 
@@ -506,8 +562,8 @@ export function buildPedals(mats) {
     "",
     14,
   );
-  // Lyre base block.
-  box(0.72, 0.12, 0.34, mats.blackLacquer, g, 0, 0.34, 2.4);
+  // A compact lyre base leaves the brass pedal arms visibly clear in front.
+  box(0.64, 0.1, 0.24, mats.blackLacquer, g, 0, 0.36, 2.1);
   // A back stay connecting the lyre to the case.
   const stay = cyl(
     0.03,
@@ -525,8 +581,8 @@ export function buildPedals(mats) {
   );
 
   // Separate, elongated brass pedals pivot at the rear and project +Z.
-  const pedalBodyGeo = new THREE.BoxGeometry(0.14, 0.045, 0.5);
-  const pedalToeGeo = new THREE.SphereGeometry(0.087, 10, 7);
+  const pedalBodyGeo = new THREE.BoxGeometry(0.115, 0.035, 0.72);
+  const pedalToeGeo = new THREE.CapsuleGeometry(0.07, 0.16, 4, 8);
   [
     { type: "soft", x: -0.22, label: "Soft pedal" },
     { type: "sostenuto", x: 0, label: "Sostenuto pedal" },
@@ -535,10 +591,11 @@ export function buildPedals(mats) {
     const pivot = new THREE.Group();
     pivot.position.set(x, DIM.pedalPivotY, DIM.pedalPivotZ);
     const body = new THREE.Mesh(pedalBodyGeo, mats.gold);
-    body.position.z = 0.27;
+    body.position.z = 0.39;
     const toe = new THREE.Mesh(pedalToeGeo, mats.gold);
-    toe.scale.set(0.82, 0.36, 1.2);
-    toe.position.set(0, 0, 0.55);
+    toe.rotation.x = Math.PI / 2;
+    toe.scale.set(1.08, 0.3, 1);
+    toe.position.set(0, 0, 0.86);
     body.castShadow = body.receiveShadow = true;
     toe.castShadow = toe.receiveShadow = true;
     for (const mesh of [body, toe]) {

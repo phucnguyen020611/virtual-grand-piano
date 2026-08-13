@@ -9,6 +9,7 @@ import * as THREE from "three";
  * @param dom       { partName, partText, partMeta, labelRoot }
  * @param onPlayKey callback(midi) when a playable key is clicked
  * @param onPedal callback(type, down) while a pedal is pointer-held
+ * @param controls OrbitControls instance, temporarily paused for pedal holds
  */
 export function createInspection(
   renderer,
@@ -17,6 +18,7 @@ export function createInspection(
   dom,
   onPlayKey,
   onPedal = () => {},
+  controls = null,
 ) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -44,6 +46,7 @@ export function createInspection(
     let p = o;
     while (p) {
       if (p.userData?.pianoKey) return p;
+      if (p.userData?.pedalType) return p;
       if (p.userData?.owner) return p.userData.owner;
       if (p.userData?.inspectable) return p;
       p = p.parent;
@@ -111,24 +114,53 @@ export function createInspection(
 
   let down = { x: 0, y: 0 };
   let activePedal = null;
-  renderer.domElement.addEventListener("pointerdown", (e) => {
-    down = { x: e.clientX, y: e.clientY };
-    pointerNDC(e);
-    raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(piano.parts.children, true)[0];
-    activePedal = hit ? pedalOf(hit.object) : null;
-    if (activePedal) {
-      e.preventDefault();
-      renderer.domElement.setPointerCapture?.(e.pointerId);
-      onPedal(activePedal, true);
-      selectPart(hit.object);
+  let activePedalPointerId = null;
+  let controlsEnabledBeforePedal = true;
+
+  function finishPedal(e) {
+    if (!activePedal) return;
+    if (e && activePedalPointerId !== e.pointerId) return;
+    onPedal(activePedal, false);
+    if (controls) controls.enabled = controlsEnabledBeforePedal;
+    if (e?.pointerId != null) {
+      try {
+        renderer.domElement.releasePointerCapture(e.pointerId);
+      } catch {
+        // The browser may already have released capture after a cancellation.
+      }
     }
-  });
+    activePedal = null;
+    activePedalPointerId = null;
+  }
+
+  // Capture wins over OrbitControls' canvas listener, then controls remains
+  // disabled until this pointer is released or cancelled.
+  renderer.domElement.addEventListener(
+    "pointerdown",
+    (e) => {
+      down = { x: e.clientX, y: e.clientY };
+      pointerNDC(e);
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(piano.parts.children, true)[0];
+      activePedal = hit ? pedalOf(hit.object) : null;
+      if (activePedal) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        activePedalPointerId = e.pointerId;
+        controlsEnabledBeforePedal = controls?.enabled ?? true;
+        if (controls) controls.enabled = false;
+        renderer.domElement.setPointerCapture?.(e.pointerId);
+        onPedal(activePedal, true);
+        selectPart(hit.object);
+      }
+    },
+    { capture: true },
+  );
   renderer.domElement.addEventListener("pointerup", (e) => {
     if (activePedal) {
       e.preventDefault();
-      onPedal(activePedal, false);
-      activePedal = null;
+      e.stopImmediatePropagation();
+      finishPedal(e);
       return;
     }
     if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) return; // ignore drags
@@ -142,12 +174,18 @@ export function createInspection(
       selectPart(o);
     } else selectPart(o);
   });
-  renderer.domElement.addEventListener("pointercancel", () => {
-    if (!activePedal) return;
-    onPedal(activePedal, false);
-    activePedal = null;
+  renderer.domElement.addEventListener("pointercancel", (e) => {
+    finishPedal(e);
+  });
+  renderer.domElement.addEventListener("lostpointercapture", (e) => {
+    finishPedal(e);
   });
   renderer.domElement.addEventListener("pointermove", (e) => {
+    if (activePedal && activePedalPointerId === e.pointerId) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
     pointerNDC(e);
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster.intersectObjects(piano.parts.children, true)[0];

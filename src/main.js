@@ -99,6 +99,7 @@ const inspection = createInspection(
     if (type === "sustain") pianoPerformance.setSustain(down);
     else mechanics.setPedal(type, down);
   },
+  controls,
 );
 const explodedView = createExplodedView({ piano, camera, controls });
 if (import.meta.env.DEV) window.__vgp.explodedView = explodedView;
@@ -134,7 +135,12 @@ addEventListener("keydown", (e) => {
   if (e.repeat || !keyboardMap[e.code] || e.metaKey || e.ctrlKey) return;
   e.preventDefault();
   held.add(e.code);
-  pianoPerformance.noteOn(keyboardMap[e.code], 0.72, "computer-keyboard");
+  pianoPerformance.noteOn(
+    keyboardMap[e.code],
+    0.72,
+    `keyboard:${e.code}`,
+    "keyboard",
+  );
 });
 addEventListener("keyup", (e) => {
   if (e.code === "Space") {
@@ -144,7 +150,7 @@ addEventListener("keyup", (e) => {
   }
   if (!keyboardMap[e.code]) return;
   held.delete(e.code);
-  pianoPerformance.noteOff(keyboardMap[e.code], "computer-keyboard");
+  pianoPerformance.noteOff(keyboardMap[e.code], `keyboard:${e.code}`);
 });
 
 // --- Für Elise autoplay (public-domain composition, simplified) ------------
@@ -209,7 +215,7 @@ function stopAutoplay() {
   autoTimers.forEach(clearTimeout);
   autoTimers = [];
   autoBtn.textContent = "▶ Für Elise";
-  pianoPerformance.stopAll();
+  pianoPerformance.stopSource("autoplay");
   progressEl.style.width = "0%";
 }
 function startAutoplay() {
