@@ -13,9 +13,13 @@ export function createInspection(renderer, camera, piano, dom, onPlayKey) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const v3 = new THREE.Vector3();
+  const cameraForward = new THREE.Vector3();
+  const cameraToAnchor = new THREE.Vector3();
   const labelBounds = new THREE.Box3();
   const placedLabels = [];
-  const highlightedMaterials = new Map();
+  const originalMaterials = new Map();
+  const temporaryMaterials = new Map();
+  const labelOffsets = [0, 18, -18, 36, -36, 54, -54];
   let exploded = false;
   let hovered = null;
 
@@ -56,10 +60,12 @@ export function createInspection(renderer, camera, piano, dom, onPlayKey) {
 
   function setHover(target) {
     if (hovered === target) return;
-    highlightedMaterials.forEach((intensity, material) => {
-      material.emissiveIntensity = intensity;
+    originalMaterials.forEach((material, mesh) => {
+      mesh.material = material;
     });
-    highlightedMaterials.clear();
+    temporaryMaterials.forEach((material) => material.dispose());
+    originalMaterials.clear();
+    temporaryMaterials.clear();
     labels.forEach(({ component, el }) => {
       el.classList.toggle("emphasis", component.object === target);
     });
@@ -67,14 +73,22 @@ export function createInspection(renderer, camera, piano, dom, onPlayKey) {
     if (!target || target.userData?.pianoKey) return;
     target.traverse((child) => {
       if (!child.isMesh) return;
-      const materials = Array.isArray(child.material)
-        ? child.material
-        : [child.material];
-      materials.forEach((material) => {
-        if (!material?.emissive || highlightedMaterials.has(material)) return;
-        highlightedMaterials.set(material, material.emissiveIntensity);
-        material.emissiveIntensity = material.emissiveIntensity + 0.13;
+      const source = child.material;
+      const materials = Array.isArray(source) ? source : [source];
+      const highlighted = materials.map((material) => {
+        if (!material) return material;
+        let clone = temporaryMaterials.get(material);
+        if (!clone) {
+          clone = material.clone();
+          if (clone.emissive) {
+            clone.emissiveIntensity = (clone.emissiveIntensity || 0) + 0.13;
+          }
+          temporaryMaterials.set(material, clone);
+        }
+        return clone;
       });
+      originalMaterials.set(child, source);
+      child.material = Array.isArray(source) ? highlighted : highlighted[0];
     });
   }
 
@@ -102,6 +116,10 @@ export function createInspection(renderer, camera, piano, dom, onPlayKey) {
     renderer.domElement.style.cursor = target ? "pointer" : "grab";
     setHover(target);
   });
+  renderer.domElement.addEventListener("pointerleave", () => {
+    renderer.domElement.style.cursor = "grab";
+    setHover(null);
+  });
 
   function setMode(v, btns) {
     exploded = v;
@@ -120,13 +138,27 @@ export function createInspection(renderer, camera, piano, dom, onPlayKey) {
 
   function updateLabels() {
     placedLabels.length = 0;
+    camera.getWorldDirection(cameraForward);
     const ordered = [...labels].sort(
-      (a, b) => b.component.priority - a.component.priority,
+      (a, b) =>
+        b.component.priority - a.component.priority ||
+        (a.component.id < b.component.id ? -1 : 1),
     );
     for (const { component, el } of ordered) {
       labelBounds.setFromObject(component.object);
       labelBounds.getCenter(v3);
       v3.y = labelBounds.max.y + 0.16;
+      cameraToAnchor.subVectors(v3, camera.position);
+      const anchorDistance = cameraToAnchor.length();
+      const inFront = cameraToAnchor.dot(cameraForward) > 0;
+      if (
+        !inFront ||
+        anchorDistance < camera.near ||
+        anchorDistance > camera.far
+      ) {
+        el.style.display = "none";
+        continue;
+      }
       v3.project(camera);
       const visible =
         v3.z < 1 &&
@@ -138,10 +170,12 @@ export function createInspection(renderer, camera, piano, dom, onPlayKey) {
       el.style.display = visible ? "block" : "none";
       if (!visible) continue;
       const x = (v3.x * 0.5 + 0.5) * innerWidth;
-      let y = (-v3.y * 0.5 + 0.5) * innerHeight;
+      const preferredY = (-v3.y * 0.5 + 0.5) * innerHeight;
       const width = el.offsetWidth || 88;
       const height = el.offsetHeight || 24;
-      for (let attempt = 0; attempt < 5; attempt++) {
+      let placed = null;
+      for (const offset of labelOffsets) {
+        const y = preferredY + offset;
         const rect = {
           left: x - width / 2,
           right: x + width / 2,
@@ -155,14 +189,24 @@ export function createInspection(renderer, camera, piano, dom, onPlayKey) {
             rect.top < placed.bottom &&
             rect.bottom > placed.top,
         );
-        if (!collision) {
-          placedLabels.push(rect);
+        const onScreen =
+          rect.left >= 0 &&
+          rect.right <= innerWidth &&
+          rect.top >= 0 &&
+          rect.bottom <= innerHeight;
+        if (!collision && onScreen) {
+          placed = { rect, y };
           break;
         }
-        y += attempt % 2 ? -18 : 18;
       }
+      if (!placed) {
+        el.style.display = "none";
+        continue;
+      }
+      placedLabels.push(placed.rect);
+      el.style.display = "block";
       el.style.left = `${x}px`;
-      el.style.top = `${y}px`;
+      el.style.top = `${placed.y}px`;
     }
   }
 

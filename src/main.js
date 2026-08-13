@@ -216,9 +216,8 @@ normalBtn.onclick = () => setExplodedMode(false);
 explodeBtn.onclick = () => setExplodedMode(true);
 autoBtn.onclick = startAutoplay;
 document.querySelector("#resetBtn").onclick = () => {
-  camera.position.set(9.2, 6.4, 11.5);
-  controls.target.set(0, 1.25, -0.4);
-  controls.update();
+  explodedView.cancelCameraAssist();
+  explodedView.resetCamera();
 };
 lidBtn.onclick = () => {
   lidOpen = !lidOpen;
@@ -273,4 +272,5 @@ addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  explodedView.handleResize();
 });
