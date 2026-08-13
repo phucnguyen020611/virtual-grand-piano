@@ -3,7 +3,6 @@ import {
   buildCaseRim,
   buildSoundboard,
   buildPlate,
-  buildStrings,
   buildAction,
   buildLegs,
   buildPedals,
@@ -11,6 +10,7 @@ import {
   buildMusicDesk,
 } from "./anatomy.js";
 import { buildKeyboard } from "./keyboard.js";
+import { buildStringSystem, createStringLayout } from "./strings.js";
 
 /**
  * Assemble the full procedural grand piano from its anatomy modules and wire
@@ -20,11 +20,12 @@ import { buildKeyboard } from "./keyboard.js";
  */
 export function createPiano(mats, stageTopY) {
   const group = new THREE.Group();
+  const stringLayout = createStringLayout();
 
   const caseRim = buildCaseRim(mats);
-  const soundboard = buildSoundboard(mats);
+  const soundboard = buildSoundboard(mats, stringLayout);
   const plate = buildPlate(mats);
-  const strings = buildStrings(mats);
+  const strings = buildStringSystem(mats, stringLayout);
   const action = buildAction(mats);
   const legs = buildLegs(mats, stageTopY);
   const pedals = buildPedals(mats);

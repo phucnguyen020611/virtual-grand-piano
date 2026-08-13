@@ -3,12 +3,12 @@ import {
   DIM,
   box,
   cyl,
-  cylBetween,
   extrudeFlat,
   tag,
   outerFootprint,
   cavityPath,
   cavityShape,
+  hitchRailCurve,
   plateRingShape,
 } from "./geometry.js";
 import { createLogoTexture, createSheetTexture } from "./materials.js";
@@ -147,7 +147,7 @@ export function buildCaseRim(mats) {
 // Soundboard, ribs, bridge --------------------------------------------------
 // ---------------------------------------------------------------------------
 
-export function buildSoundboard(mats) {
+export function buildSoundboard(mats, stringLayout) {
   const g = new THREE.Group();
 
   const board = extrudeFlat(
@@ -170,21 +170,11 @@ export function buildSoundboard(mats) {
     rib.rotation.y = -0.2;
   }
 
-  // Curved main (long) bridge sweeping across the board.
-  const mainCurve = new THREE.QuadraticBezierCurve3(
-    new THREE.Vector3(2.55, DIM.bridgeTopY - 0.05, 0.55),
-    new THREE.Vector3(1.1, DIM.bridgeTopY - 0.05, -0.7),
-    new THREE.Vector3(-1.15, DIM.bridgeTopY - 0.05, -1.65),
-  );
-  addBridge(g, mainCurve, mats.bridge, 10, 0.06);
-
-  // Shorter bass bridge, offset toward the spine (overstrung layout).
-  const bassCurve = new THREE.QuadraticBezierCurve3(
-    new THREE.Vector3(-0.7, DIM.bridgeTopY - 0.05, -1.4),
-    new THREE.Vector3(-1.7, DIM.bridgeTopY - 0.05, -2.35),
-    new THREE.Vector3(-2.4, DIM.bridgeTopY - 0.05, -3.15),
-  );
-  addBridge(g, bassCurve, mats.bridge, 6, 0.055);
+  // Continuous low, rounded hardwood bridges. The string layout samples the
+  // same curves, so every route lands on the corresponding bridge crown.
+  addBridge(g, stringLayout.mainBridge, mats.bridge, DIM.bridgeRadius);
+  addBridge(g, stringLayout.bassBridge, mats.bridge, DIM.bridgeRadius * 0.92);
+  addBridgePins(g, stringLayout.routes, mats.bronze);
 
   return tag(
     g,
@@ -194,11 +184,113 @@ export function buildSoundboard(mats) {
   );
 }
 
-function addBridge(group, curve, mat, segments, radius) {
-  const pts = curve.getPoints(segments);
-  for (let i = 0; i < pts.length - 1; i++) {
-    group.add(cylBetween(pts[i], pts[i + 1], radius, mat, 8));
-  }
+function addBridge(group, curve, mat, radius) {
+  const bridge = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 44, radius, 8, false),
+    mat,
+  );
+  bridge.position.y = DIM.bridgeCenterY;
+  bridge.castShadow = bridge.receiveShadow = true;
+  group.add(bridge);
+}
+
+function addBridgePins(group, routes, mat) {
+  const pins = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.012, 0.009, DIM.bridgePinHeight, 7),
+    mat,
+    routes.length,
+  );
+  const matrix = new THREE.Matrix4();
+  routes.forEach((route, index) => {
+    matrix.makeTranslation(
+      route.bridgePoint.x,
+      route.bridgePoint.y - DIM.bridgePinHeight / 2,
+      route.bridgePoint.z,
+    );
+    pins.setMatrixAt(index, matrix);
+  });
+  pins.instanceMatrix.needsUpdate = true;
+  pins.castShadow = pins.receiveShadow = true;
+  group.add(pins);
+}
+
+function addRefinedPlateStructure(group, mats) {
+  box(
+    6.2,
+    DIM.plateThickness + 0.04,
+    0.62,
+    mats.plateGold,
+    group,
+    0,
+    DIM.plateY + (DIM.plateThickness + 0.04) / 2,
+    1.35,
+    "Tuning-pin block",
+  );
+  box(6.0, 0.055, 0.08, mats.gold, group, 0, DIM.frontBearingY - 0.027, 1.02);
+
+  const braces = [
+    { a: [-2.7, 0.95], b: [-2.22, -3.2], root: 0.42, tip: 0.19 },
+    { a: [-1.45, 0.95], b: [-1.25, -3.75], root: 0.34, tip: 0.16 },
+    { a: [-0.1, 0.95], b: [0.2, -4.05], root: 0.38, tip: 0.17 },
+    { a: [1.25, 0.86], b: [1.85, -2.85], root: 0.32, tip: 0.15 },
+    { a: [2.48, 0.55], b: [2.76, -1.55], root: 0.3, tip: 0.14 },
+  ];
+  braces.forEach((brace) =>
+    addTaperedBrace(
+      group,
+      brace.a,
+      brace.b,
+      brace.root,
+      brace.tip,
+      mats.plateGold,
+    ),
+  );
+
+  const hitchRail = new THREE.Mesh(
+    new THREE.TubeGeometry(hitchRailCurve(), 36, 0.07, 8, false),
+    mats.plateGold,
+  );
+  hitchRail.position.y = DIM.plateY + DIM.plateThickness * 0.65;
+  hitchRail.castShadow = hitchRail.receiveShadow = true;
+  group.add(hitchRail);
+
+  addTaperedBrace(
+    group,
+    [-2.72, -3.35],
+    [-1.3, -4.02],
+    0.3,
+    0.16,
+    mats.plateGold,
+  );
+  addTaperedBrace(
+    group,
+    [1.7, -2.78],
+    [0.35, -4.12],
+    0.28,
+    0.14,
+    mats.plateGold,
+  );
+}
+
+function addTaperedBrace(group, a, b, rootWidth, tipWidth, mat) {
+  const dx = b[0] - a[0];
+  const dz = b[1] - a[1];
+  const length = Math.hypot(dx, dz);
+  const nx = -dz / length;
+  const nz = dx / length;
+  const shape = new THREE.Shape();
+  const points = [
+    [a[0] + nx * rootWidth * 0.5, a[1] + nz * rootWidth * 0.5],
+    [a[0] - nx * rootWidth * 0.5, a[1] - nz * rootWidth * 0.5],
+    [b[0] - nx * tipWidth * 0.5, b[1] - nz * tipWidth * 0.5],
+    [b[0] + nx * tipWidth * 0.5, b[1] + nz * tipWidth * 0.5],
+  ];
+  shape.moveTo(points[0][0], -points[0][1]);
+  points.slice(1).forEach(([x, z]) => shape.lineTo(x, -z));
+  shape.closePath();
+  const brace = extrudeFlat(shape, DIM.plateBraceThickness, mat, 0.014);
+  brace.position.y = DIM.plateBraceY;
+  group.add(brace);
 }
 
 // ---------------------------------------------------------------------------
@@ -218,133 +310,12 @@ export function buildPlate(mats) {
   ring.position.y = DIM.plateY;
   g.add(ring);
 
-  // Front pinblock cap — solid band carrying the tuning pins.
-  box(
-    6.2,
-    DIM.plateThickness + 0.02,
-    0.5,
-    mats.plateGold,
-    g,
-    0,
-    DIM.plateY + 0.03,
-    1.35,
-    "Tuning-pin block",
-  );
-  // Capo bar across the front where the speaking length begins.
-  box(6.0, 0.05, 0.08, mats.gold, g, 0, DIM.plateY + 0.06, 1.05);
-
-  // Structural braces radiating across the opening.
-  const struts = [
-    { x: -0.5, z: -0.2, ry: -0.16, len: 3.4 },
-    { x: 0.7, z: -0.6, ry: 0.18, len: 3.2 },
-    { x: 1.75, z: 0.1, ry: 0.5, len: 2.4 },
-  ];
-  for (const s of struts) {
-    const b = box(
-      0.26,
-      0.06,
-      s.len,
-      mats.plateGold,
-      g,
-      s.x,
-      DIM.plateY + 0.02,
-      s.z,
-    );
-    b.rotation.y = s.ry;
-  }
-
-  // Hitch-pin rail hugging the tail curve.
-  const hitchCurve = new THREE.QuadraticBezierCurve3(
-    new THREE.Vector3(1.9, DIM.plateY + 0.03, -0.4),
-    new THREE.Vector3(0.4, DIM.plateY + 0.03, -4.2),
-    new THREE.Vector3(-2.6, DIM.plateY + 0.03, -3.4),
-  );
-  const hpts = hitchCurve.getPoints(14);
-  for (let i = 0; i < hpts.length - 1; i++)
-    g.add(cylBetween(hpts[i], hpts[i + 1], 0.05, mats.plateGold, 8));
-
-  // Tuning pins standing on the pinblock (kept just under the rim top).
-  for (let i = 0; i < 40; i++) {
-    const x = -2.9 + i * (5.8 / 39);
-    cyl(
-      0.026,
-      0.026,
-      0.11,
-      mats.bronze,
-      g,
-      x,
-      DIM.plateY + 0.05,
-      1.48 + (i % 2) * 0.12,
-      0,
-      0,
-      "",
-      8,
-    );
-  }
-
+  addRefinedPlateStructure(g, mats);
   return tag(
     g,
     "Cast-iron plate / harp",
-    "A gold cast frame — perimeter ring, tuning-pin block, radiating braces and a tail hitch rail — with large open windows revealing the soundboard beneath. It braces the string field and transfers its load into the case.",
+    "An open structural cast frame with a thick perimeter, pinblock web, five tapered braces, raised window bosses and a heavy tail rail. Large openings keep the spruce soundboard visibly active beneath the string field.",
     "Structure",
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Strings -------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-
-export function buildStrings(mats) {
-  const g = new THREE.Group();
-  const N = 82;
-  const bassCount = 16;
-  const trebleVerts = [];
-  const y = DIM.stringY;
-
-  for (let i = 0; i < N; i++) {
-    const t = i / (N - 1);
-    const frontX = THREE.MathUtils.lerp(-3.0, 3.0, t);
-    const backX = THREE.MathUtils.lerp(-1.8, 2.2, t);
-    const backZ = THREE.MathUtils.lerp(-4.2, -0.3, Math.pow(t, 0.8));
-    const front = new THREE.Vector3(frontX, y, 1.5);
-    const back = new THREE.Vector3(backX, y, backZ);
-
-    if (i < bassCount) {
-      // Thick, warm copper-wound bass strings.
-      g.add(cylBetween(front, back, 0.022, mats.copper, 6));
-    } else {
-      trebleVerts.push(front.x, front.y, front.z, back.x, back.y, back.z);
-    }
-    // Hitch pins at the tail end of every other course.
-    if (i % 2 === 0)
-      cyl(
-        0.03,
-        0.036,
-        0.09,
-        mats.bronze,
-        g,
-        backX,
-        y - 0.02,
-        backZ,
-        0,
-        0,
-        "",
-        6,
-      );
-  }
-
-  const trebleGeo = new THREE.BufferGeometry();
-  trebleGeo.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(trebleVerts, 3),
-  );
-  g.add(new THREE.LineSegments(trebleGeo, mats.trebleLine));
-
-  return tag(
-    g,
-    "String field & tuning system",
-    "Copper-wound bass strings run thick and warm toward the tail; thin steel treble strings fan across the front. Each course runs from the tuning-pin block, over the bridge, to a hitch pin — sitting just above the plate.",
-    "Acoustics",
   );
 }
 

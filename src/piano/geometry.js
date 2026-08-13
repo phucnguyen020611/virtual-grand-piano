@@ -25,10 +25,23 @@ export const DIM = {
   ribY: 1.06, // ribs sit just under the soundboard
   soundboardTopY: 1.12, // top face of the thin spruce soundboard
   soundboardThickness: 0.05,
-  bridgeTopY: 1.205, // curved bridge crowns the soundboard
-  plateY: 1.235, // cast-iron plate frame plane
-  plateThickness: 0.06,
-  stringY: 1.3, // string plane, just above the plate & bridge
+  // The bridge projects just above the plate frame, while the string paths
+  // dip onto its crown before rising again to their terminations.
+  bridgeCenterY: 1.19,
+  bridgeRadius: 0.06,
+  bridgeTopY: 1.25,
+  plateY: 1.155,
+  plateThickness: 0.07,
+  plateBraceY: 1.225,
+  plateBraceThickness: 0.035,
+  stringY: 1.31,
+  tuningPointY: 1.34,
+  frontBearingY: 1.315,
+  bridgeContactY: 1.258,
+  hitchPointY: 1.285,
+  tuningPinHeight: 0.12,
+  hitchPinHeight: 0.1,
+  bridgePinHeight: 0.055,
 
   // Front / keyboard -------------------------------------------------------
   frontEdgeZ: 2.4, // world Z of the straight front (case) edge
@@ -189,4 +202,30 @@ export function plateRingShape() {
   hole.lineTo(-2.86, -1.05);
   s.holes.push(hole);
   return s;
+}
+
+/** Continuous bridge paths shared by the bridge meshes and string routing. */
+export function mainBridgeCurve(y = 0) {
+  return new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(2.55, y, 0.55),
+    new THREE.Vector3(1.1, y, -0.7),
+    new THREE.Vector3(-1.15, y, -1.65),
+  );
+}
+
+export function bassBridgeCurve(y = 0) {
+  return new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(-0.7, y, -1.4),
+    new THREE.Vector3(-1.7, y, -2.35),
+    new THREE.Vector3(-2.4, y, -3.15),
+  );
+}
+
+/** The tail rail that carries the hitch-pin field. */
+export function hitchRailCurve(y = 0) {
+  return new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(1.9, y, -0.4),
+    new THREE.Vector3(0.4, y, -4.2),
+    new THREE.Vector3(-2.6, y, -3.4),
+  );
 }
