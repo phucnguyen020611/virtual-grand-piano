@@ -55,9 +55,9 @@ export const DIM = {
   hitchPinHeight: 0.07,
   hitchPinRadius: 0.019,
   bridgePinHeight: 0.042,
-  // Kept below the peak resonance excursion (see stringResonance.js) so a
-  // vibrating bass course swings clear of its own static tube.
-  bassStringRadius: 0.006,
+  // Restrained visual radius for the wound bass strings; kept thin enough that
+  // the separate resonance overlay stays readable through its natural decay.
+  bassStringRadius: 0.003,
 
   // Front / keyboard -------------------------------------------------------
   frontEdgeZ: 2.4, // world Z of the straight front (case) edge
