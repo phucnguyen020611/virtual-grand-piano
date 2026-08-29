@@ -291,7 +291,13 @@ export function buildStringSystem(mats, layout) {
     }
   }
 
-  addCylinderInstances(group, bassSegments, 0.016, mats.copper, 6);
+  addCylinderInstances(
+    group,
+    bassSegments,
+    DIM.bassStringRadius,
+    mats.copper,
+    6,
+  );
   const steelGeometry = new THREE.BufferGeometry();
   steelGeometry.setAttribute(
     "position",
