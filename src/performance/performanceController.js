@@ -86,6 +86,7 @@ export function createPerformanceController(audio, mechanics, resonance) {
     sustain = down;
     mechanics.setSustain(down);
     resonance.setSustain(down);
+    audio.setSustain(down);
     if (down) return;
     for (const midi of [...sustainedReleasedNotes]) {
       if (physicallyHeldNotes.has(midi)) continue;
@@ -152,6 +153,7 @@ export function createPerformanceController(audio, mechanics, resonance) {
     sustain = false;
     mechanics.setSustain(false);
     resonance.setSustain(false);
+    audio.setSustain(false);
   }
 
   return {

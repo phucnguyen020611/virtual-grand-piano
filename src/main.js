@@ -88,6 +88,7 @@ if (import.meta.env.DEV)
     mechanics,
     performance: pianoPerformance,
     resonance: piano.resonance,
+    audio,
   });
 
 // --- Inspection / interaction ----------------------------------------------
