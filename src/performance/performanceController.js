@@ -1,8 +1,14 @@
 /**
  * Routes every note source through one audio + visual-mechanics state model.
  * A MIDI remains physically held until its final source token releases it.
+ *
+ * String resonance is driven from the same ownership model: it never tracks
+ * tokens itself, it only mirrors the damper decisions made here. One
+ * consequence is that stopSource("autoplay") while the pedal is physically
+ * held leaves already-sustained courses ringing until the pedal is released,
+ * which is what a real instrument does.
  */
-export function createPerformanceController(audio, mechanics) {
+export function createPerformanceController(audio, mechanics, resonance) {
   const activeSourceTokensByMidi = new Map();
   const physicallyHeldNotes = new Set();
   const sustainedReleasedNotes = new Set();
@@ -33,10 +39,12 @@ export function createPerformanceController(audio, mechanics) {
     if (sustain && midi <= mechanics.damperCutoffMidi && !force) {
       sustainedReleasedNotes.add(midi);
       mechanics.setDamperLifted(midi, true);
+      resonance.setDamperOpen(midi, true);
       return;
     }
     sustainedReleasedNotes.delete(midi);
     mechanics.setDamperLifted(midi, false);
+    resonance.setDamperOpen(midi, false);
     audio.noteOff(
       midi,
       force ? 0.25 : 0.45,
@@ -63,6 +71,8 @@ export function createPerformanceController(audio, mechanics) {
     mechanics.setNoteHeld(midi, true);
     mechanics.setDamperLifted(midi, true);
     mechanics.strike(midi, velocity);
+    resonance.setDamperOpen(midi, true);
+    resonance.strike(midi, velocity);
     audio.noteOn(midi, velocity);
   }
 
@@ -75,11 +85,13 @@ export function createPerformanceController(audio, mechanics) {
     if (sustain === down) return;
     sustain = down;
     mechanics.setSustain(down);
+    resonance.setSustain(down);
     if (down) return;
     for (const midi of [...sustainedReleasedNotes]) {
       if (physicallyHeldNotes.has(midi)) continue;
       sustainedReleasedNotes.delete(midi);
       mechanics.setDamperLifted(midi, false);
+      resonance.setDamperOpen(midi, false);
       audio.noteOff(midi, 0.65, "sustain-release");
     }
   }
@@ -125,11 +137,13 @@ export function createPerformanceController(audio, mechanics) {
     for (const midi of [...sustainedReleasedNotes]) {
       sustainedReleasedNotes.delete(midi);
       mechanics.setDamperLifted(midi, false);
+      resonance.setDamperOpen(midi, false);
       audio.noteOff(midi, 0.25, "stop");
     }
     for (const midi of [...audio.activeVoices.keys()]) {
       mechanics.setNoteHeld(midi, false);
       mechanics.setDamperLifted(midi, false);
+      resonance.setDamperOpen(midi, false);
       audio.noteOff(midi, 0.25, "stop");
     }
     physicallyHeldNotes.clear();
@@ -137,6 +151,7 @@ export function createPerformanceController(audio, mechanics) {
     sourceGroups.clear();
     sustain = false;
     mechanics.setSustain(false);
+    resonance.setSustain(false);
   }
 
   return {
@@ -146,7 +161,10 @@ export function createPerformanceController(audio, mechanics) {
     setSustain,
     stopSource,
     stopAll,
-    update: (dt) => mechanics.update(dt),
+    update: (dt) => {
+      mechanics.update(dt);
+      resonance.update(dt);
+    },
     activeSourceTokensByMidi,
     physicallyHeldNotes,
     sustainedReleasedNotes,

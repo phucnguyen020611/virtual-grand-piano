@@ -12,6 +12,7 @@ import {
 import { buildKeyboard } from "./keyboard.js";
 import { createKeyboardLayout } from "./keyboardLayout.js";
 import { buildStringSystem, createStringLayout } from "./strings.js";
+import { createStringResonance } from "./stringResonance.js";
 
 /**
  * Assemble the full procedural grand piano and expose component metadata for
@@ -33,6 +34,12 @@ export function createPiano(mats, stageTopY) {
     keyboardLayout,
     stringLayout.routes,
   );
+  // Parented to the Strings component so exploded transforms carry it along.
+  const resonance = createStringResonance({
+    stringGroup: strings,
+    stringLayout,
+    actionMechanisms,
+  });
   const legs = buildLegs(mats, stageTopY);
   const { group: pedals, pedalPivots } = buildPedals(mats);
   const musicDesk = buildMusicDesk(mats);
@@ -83,6 +90,7 @@ export function createPiano(mats, stageTopY) {
     keyboardLayout,
     midiToMechanism,
     actionMechanisms,
+    resonance,
     pedalPivots,
     lidPivot,
     prop,

@@ -78,9 +78,17 @@ if (import.meta.env.DEV) {
 // --- Audio and mechanical performance --------------------------------------
 const audio = createAudioEngine();
 const mechanics = createMechanics(piano);
-const pianoPerformance = createPerformanceController(audio, mechanics);
+const pianoPerformance = createPerformanceController(
+  audio,
+  mechanics,
+  piano.resonance,
+);
 if (import.meta.env.DEV)
-  Object.assign(window.__vgp, { mechanics, performance: pianoPerformance });
+  Object.assign(window.__vgp, {
+    mechanics,
+    performance: pianoPerformance,
+    resonance: piano.resonance,
+  });
 
 // --- Inspection / interaction ----------------------------------------------
 const dom = {
