@@ -134,22 +134,40 @@ export function createPerformanceController(audio, mechanics, resonance) {
     return sourceToken;
   }
 
-  /** Stop only one input family, preserving unrelated held notes and pedals. */
-  function stopSource(sourceGroup) {
+  /**
+   * Release one input family with ordinary piano semantics. Input cleanup uses
+   * this path, so another source's pedal can keep its newly released notes
+   * ringing. Optional token scoping supports channel-local MIDI CC120.
+   */
+  function releaseSource(
+    sourceGroup,
+    { force = false, tokens = null, releaseSustain = true } = {},
+  ) {
     for (const [token, timed] of [...timedNotes]) {
-      if (timed.sourceGroup !== sourceGroup) continue;
+      if (timed.sourceGroup !== sourceGroup || (tokens && !tokens.has(token)))
+        continue;
       clearTimeout(timed.timer);
       timedNotes.delete(token);
     }
     for (const [midi, owners] of [...activeSourceTokensByMidi]) {
       for (const token of [...owners]) {
-        if (sourceGroups.get(token) === sourceGroup)
-          releaseToken(midi, token, { force: true });
+        if (
+          sourceGroups.get(token) === sourceGroup &&
+          (!tokens || tokens.has(token))
+        )
+          releaseToken(midi, token, { force });
       }
     }
-    for (const [token, group] of [...sustainSourceGroups]) {
-      if (group === sourceGroup) setSustainForSource(token, false, group);
+    if (releaseSustain) {
+      for (const [token, group] of [...sustainSourceGroups]) {
+        if (group === sourceGroup) setSustainForSource(token, false, group);
+      }
     }
+  }
+
+  /** Explicit source-scoped transport stop: force-close this source's notes. */
+  function stopSource(sourceGroup) {
+    releaseSource(sourceGroup, { force: true });
   }
 
   function stopAll() {
@@ -186,6 +204,7 @@ export function createPerformanceController(audio, mechanics, resonance) {
     playMidi,
     setSustain,
     setSustainForSource,
+    releaseSource,
     stopSource,
     stopAll,
     addObserver(observer) {

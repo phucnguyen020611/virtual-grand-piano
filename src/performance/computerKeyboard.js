@@ -64,23 +64,23 @@ export function createComputerKeyboard({
       minMidi: baseMidi,
       maxMidi: baseMidi + MAX_OFFSET,
       octave: Math.floor(baseMidi / 12) - 1,
+      canShiftDown: baseMidi - 12 >= MIN_MIDI,
+      canShiftUp: baseMidi + 12 + MAX_OFFSET <= MAX_MIDI,
     });
   }
 
   function shiftOctave(direction) {
-    const next = Math.max(
-      MIN_MIDI,
-      Math.min(MAX_MIDI - MAX_OFFSET, baseMidi + direction * 12),
-    );
-    if (next === baseMidi) return;
+    const next = baseMidi + direction * 12;
+    if (next < MIN_MIDI || next + MAX_OFFSET > MAX_MIDI) return false;
     baseMidi = next;
     notifyRange();
+    return true;
   }
 
   function releaseAll() {
     activeCodes.clear();
     spaceHeld = false;
-    controller.stopSource("computer");
+    controller.releaseSource("computer");
   }
 
   function onKeyDown(event) {
@@ -136,6 +136,12 @@ export function createComputerKeyboard({
     activeTokens: () => [...activeCodes.values()].map(({ token }) => token),
     get range() {
       return { minMidi: baseMidi, maxMidi: baseMidi + MAX_OFFSET };
+    },
+    get canShiftDown() {
+      return baseMidi - 12 >= MIN_MIDI;
+    },
+    get canShiftUp() {
+      return baseMidi + 12 + MAX_OFFSET <= MAX_MIDI;
     },
   };
 }

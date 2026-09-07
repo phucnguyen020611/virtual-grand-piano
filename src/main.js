@@ -230,14 +230,24 @@ let lidOpen = true;
 
 const computerKeyboard = createComputerKeyboard({
   controller: pianoPerformance,
-  onRangeChange: ({ minMidi, maxMidi }) => {
+  onRangeChange: ({ minMidi, maxMidi, canShiftDown, canShiftUp }) => {
     octaveLabel.textContent = `MIDI ${minMidi}–${maxMidi}`;
+    octaveDownBtn.disabled = !canShiftDown;
+    octaveUpBtn.disabled = !canShiftUp;
   },
 });
 const midiInput = createMidiInput({
   controller: pianoPerformance,
   onStatus: ({ status, supported, selectedId, selectedName, inputs }) => {
     midiSelect.replaceChildren();
+    if (inputs.length > 1 && !selectedId) {
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Select MIDI input…";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      midiSelect.appendChild(placeholder);
+    }
     for (const input of inputs) {
       const option = document.createElement("option");
       option.value = input.id;
@@ -251,11 +261,13 @@ const midiInput = createMidiInput({
         ? `MIDI: ${selectedName}`
         : status === "no-devices"
           ? "MIDI: No devices"
-          : status === "denied"
-            ? "MIDI: Denied"
-            : supported
-              ? "MIDI: Connect"
-              : "MIDI: Unavailable";
+          : status === "select-device"
+            ? "MIDI: Select device"
+            : status === "denied"
+              ? "MIDI: Denied"
+              : supported
+                ? "MIDI: Connect"
+                : "MIDI: Unavailable";
   },
 });
 
@@ -281,7 +293,9 @@ autoBtn.onclick = startAutoplay;
 octaveDownBtn.onclick = () => computerKeyboard.shiftOctave(-1);
 octaveUpBtn.onclick = () => computerKeyboard.shiftOctave(1);
 midiBtn.onclick = () => midiInput.connect();
-midiSelect.onchange = () => midiInput.select(midiSelect.value);
+midiSelect.onchange = () => {
+  if (midiSelect.value) midiInput.select(midiSelect.value);
+};
 recordBtn.onclick = () => {
   if (recorder.state().recording) recorder.stop();
   else recorder.start();

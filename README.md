@@ -180,8 +180,12 @@ The computer keyboard exposes roughly 2½ octaves at once, beginning at C3 by
 default. Lower-row `Z–/` and upper-row `Q–[` provide the white-key layout;
 nearby number/letter keys fill the black keys. Arrow keys or the compact octave
 buttons move the range in 12-semitone steps without changing notes already held.
+At either physical-range boundary the unavailable octave control is disabled,
+so the range never makes a partial, non-octave shift.
 Space is the sustain pedal unless a focused button, link, or form control owns
-that key.
+that key. Browser focus loss and MIDI disconnects perform normal musical
+releases, while the Autoplay and Recording Stop controls intentionally use
+source-scoped force-stop behavior.
 
 Pointer and touch keys use pointer capture: releasing, cancelling, or losing
 capture releases only that pointer's token. A held pointer can glide across

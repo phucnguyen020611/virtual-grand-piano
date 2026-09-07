@@ -12,6 +12,14 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
     return `midi:${id}`;
   }
 
+  function availableInputs() {
+    return access
+      ? [...access.inputs.values()].filter(
+          (input) => input.state !== "disconnected",
+        )
+      : [];
+  }
+
   function updateStatus(status) {
     onStatus({
       status,
@@ -19,7 +27,7 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
       selectedId,
       selectedName: selectedInput?.name || null,
       inputs: access
-        ? [...access.inputs.values()].map((input) => ({
+        ? availableInputs().map((input) => ({
             id: input.id,
             name: input.name || "MIDI input",
             state: input.state,
@@ -30,7 +38,7 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
 
   function releaseDevice(id) {
     heldTokens.delete(id);
-    controller.stopSource(deviceGroup(id));
+    controller.releaseSource(deviceGroup(id));
   }
 
   function releaseChannel(id, channel) {
@@ -41,11 +49,20 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
       notes.delete(token);
       controller.noteOff(midi, token);
     }
-    controller.setSustainForSource(
-      `${deviceGroup(id)}:${channel}:cc64`,
-      false,
-      deviceGroup(id),
+  }
+
+  function forceReleaseChannel(id, channel) {
+    const notes = heldTokens.get(id);
+    if (!notes) return;
+    const tokens = new Set(
+      [...notes.keys()].filter((token) => token.includes(`:${channel}:`)),
     );
+    for (const token of tokens) notes.delete(token);
+    controller.releaseSource(deviceGroup(id), {
+      force: true,
+      tokens,
+      releaseSustain: false,
+    });
   }
 
   function onMessage(event) {
@@ -78,13 +95,19 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
         value >= 64,
         group,
       );
-    } else if (note === 123 || note === 120) {
+    } else if (note === 123) {
       releaseChannel(id, channel);
+    } else if (note === 120) {
+      forceReleaseChannel(id, channel);
     }
   }
 
   function select(id) {
     if (!access) return;
+    if (!id) {
+      updateStatus(availableInputs().length ? "select-device" : "no-devices");
+      return;
+    }
     if (selectedInput) {
       selectedInput.onmidimessage = null;
       if (selectedInput.id !== id) releaseDevice(selectedInput.id);
@@ -97,14 +120,16 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
 
   function refresh() {
     if (!access) return;
-    if (selectedId && !access.inputs.has(selectedId)) {
-      releaseDevice(selectedId);
+    const inputs = availableInputs();
+    if (!inputs.some((input) => input.id === selectedId)) {
+      if (selectedId) releaseDevice(selectedId);
+      if (selectedInput) selectedInput.onmidimessage = null;
       selectedId = null;
       selectedInput = null;
     }
-    if (!selectedId && access.inputs.size === 1)
-      select(access.inputs.values().next().value.id);
-    else updateStatus(access.inputs.size ? "select-device" : "no-devices");
+    if (selectedInput) updateStatus("connected");
+    else if (inputs.length === 1) select(inputs[0].id);
+    else updateStatus(inputs.length ? "select-device" : "no-devices");
   }
 
   function handleStateChange(event) {
@@ -113,6 +138,7 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
       event.port.state === "disconnected" &&
       event.port.id === selectedId
     ) {
+      if (selectedInput) selectedInput.onmidimessage = null;
       releaseDevice(selectedId);
       selectedId = null;
       selectedInput = null;
@@ -138,8 +164,7 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
   return {
     connect,
     select,
-    connectedInputs: () =>
-      access ? [...access.inputs.values()].map((input) => input.name) : [],
+    connectedInputs: () => availableInputs().map((input) => input.name),
     selectedInput: () => selectedInput?.name || null,
     get supported() {
       return "requestMIDIAccess" in navigator;
