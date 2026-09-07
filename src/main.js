@@ -237,6 +237,9 @@ const helpPanel = document.querySelector("#helpPanel");
 const helpCloseBtn = document.querySelector("#helpCloseBtn");
 const secondaryControls = document.querySelector("#secondaryControls");
 const secondarySummary = secondaryControls.querySelector("summary");
+const gatedInterface = document.querySelectorAll(
+  "#app, .topbar, #pianoControls, #inspector",
+);
 let lidOpen = true;
 let audioStatus = "Ready";
 let midiStatus = "";
@@ -438,16 +441,17 @@ document.querySelector("#enterBtn").onclick = () => {
   prepareAudio();
   audioGate.classList.add("hidden");
   audioGate.setAttribute("aria-hidden", "true");
+  gatedInterface.forEach((element) => element.removeAttribute("inert"));
   requestAnimationFrame(() =>
     renderer.domElement.focus({ preventScroll: true }),
   );
 };
 
-function setHelpOpen(open) {
+function setHelpOpen(open, { restoreFocus = true } = {}) {
   helpPanel.hidden = !open;
   helpBtn.setAttribute("aria-expanded", String(open));
   if (open) helpCloseBtn.focus();
-  else helpBtn.focus();
+  else if (restoreFocus) helpBtn.focus();
 }
 
 helpBtn.onclick = () => setHelpOpen(helpPanel.hidden);
@@ -461,7 +465,7 @@ document.addEventListener("click", (event) => {
     !helpPanel.contains(event.target) &&
     event.target !== helpBtn
   )
-    setHelpOpen(false);
+    setHelpOpen(false, { restoreFocus: false });
 });
 updateRecordingUi();
 if (import.meta.env.DEV)

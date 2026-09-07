@@ -229,6 +229,8 @@ PCM reserved for a cold load or a failed recorded asset.
 CC BY 3.0.” The compact local Ogg/Opus assets are format/channel/bitrate
 conversions of the source recordings. See [third-party audio attribution](THIRD_PARTY_AUDIO.md)
 for source URLs, licence details, source velocity layers, and modifications.
+The repository's MIT licence covers this project's code; the included recorded
+sample derivatives remain available under their CC BY 3.0 attribution terms.
 
 **Mapping.** Each MIDI note picks its nearest root and plays it at
 `2^((midi - rootMidi) / 12)`. The measured full-range transposition bound is
@@ -277,6 +279,52 @@ https://phucnguyen020611.github.io/virtual-grand-piano/
 ### Dependency maintenance
 
 Dependabot checks npm packages and GitHub Actions weekly. Update pull requests should be reviewed and validated by CI before merging.
+
+## Release readiness
+
+### QA matrix
+
+Record each release candidate with the result categories **PASS**, **FAIL**,
+**PARTIAL**, or **NOT AVAILABLE**. Do not infer hardware coverage from browser
+emulation.
+
+| Area              | Release-candidate coverage                                                                                             |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Desktop           | Chromium/Chrome-class; Firefox; Safari/WebKit where available                                                          |
+| Mobile and tablet | iOS/WebKit, Android/Chromium, and responsive portrait/landscape checks                                                 |
+| Input             | Mouse, computer keyboard, touch, multi-touch, and Web MIDI hardware where available                                    |
+| Core flows        | Audio unlock/warmup/fallback, sustain, autoplay, recording/playback, inspection, lid, camera, help, and responsive HUD |
+| Production        | Console, asset/base-path requests, CI, Pages, and deployed smoke test                                                  |
+
+### Browser and device support
+
+- **Recommended:** current Chromium-based browsers. Release-candidate desktop
+  smoke testing covers audio unlock, recorded-sample warmup, keyboard input,
+  recording/playback, autoplay, inspection, and the responsive HUD.
+- **Firefox and Safari/WebKit:** supported targets that require a release-candidate
+  smoke test on the intended browser before broad compatibility is claimed.
+  Safari/WebKit verification is especially important because the recorded assets
+  are Ogg/Opus.
+- **Touch:** pointer-based touch interaction is supported. Verify multi-touch and
+  orientation behavior on representative hardware for each release.
+- **Web MIDI:** optional and browser/device-dependent. The piano remains fully
+  playable without it; a denied or unavailable MIDI request is surfaced in the
+  HUD.
+- **Audio:** a user gesture is required to start audio. During a cold load or a
+  failed sample request, a generated fallback responds immediately while local
+  recorded samples warm up.
+
+### Release checklist
+
+- Run `npm ci --no-audit --no-fund`, `npm run format:check`, `npm run build`,
+  and `npm run preview` from the committed lockfile.
+- Confirm CI and GitHub Pages succeed for the exact release SHA.
+- Smoke-test the deployed Pages URL, including audio unlock, one keyboard note,
+  recording/playback, autoplay, inspection, and browser console/network errors.
+- Check keyboard focus, help dismissal, reduced motion, and responsive layouts
+  at desktop, tablet, and mobile dimensions.
+- Confirm audio attribution remains in [THIRD_PARTY_AUDIO.md](THIRD_PARTY_AUDIO.md)
+  when audio assets change.
 
 ### Performance guidance
 

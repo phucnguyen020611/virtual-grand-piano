@@ -20,12 +20,12 @@
     <title>Virtual Grand Piano — Interactive 3D Piano</title>
   </head>
   <body>
-    <div id="app">
+    <div id="app" inert>
       <div id="scene"></div>
       <div class="grain" aria-hidden="true"></div>
     </div>
 
-    <header class="topbar">
+    <header class="topbar" inert>
       <div class="brand">
         <div class="eyebrow">Interactive instrument</div>
         <div class="title">Virtual Grand Piano</div>
@@ -36,7 +36,7 @@
       </div>
     </header>
 
-    <main class="hud" aria-label="Piano controls">
+    <main id="pianoControls" class="hud" aria-label="Piano controls" inert>
       <div class="controlDeck">
         <section class="controlGroup performanceGroup" aria-label="Performance">
           <span class="groupLabel">Performance</span>
@@ -142,7 +142,7 @@
       </div>
     </aside>
 
-    <section class="inspector" aria-labelledby="partName">
+    <section id="inspector" class="inspector" aria-labelledby="partName" inert>
       <div class="meta" id="partMeta">Piano anatomy</div>
       <div class="part" id="partName">Select a piano part to inspect it.</div>
       <p id="partText">
