@@ -40,10 +40,12 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.96;
+renderer.domElement.tabIndex = 0;
+renderer.domElement.setAttribute("aria-label", "Piano performance surface");
 document.querySelector("#scene").appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -186,7 +188,8 @@ function stopAutoplay() {
   autoplay = false;
   autoTimers.forEach(clearTimeout);
   autoTimers = [];
-  autoBtn.textContent = "▶ Für Elise";
+  autoBtn.textContent = "Play Für Elise";
+  autoBtn.setAttribute("aria-pressed", "false");
   pianoPerformance.stopSource("autoplay");
   progressEl.style.width = "0%";
 }
@@ -195,9 +198,10 @@ function startAutoplay() {
     stopAutoplay();
     return;
   }
-  audio.ensureAudio();
+  prepareAudio();
   autoplay = true;
-  autoBtn.textContent = "■ Stop";
+  autoBtn.textContent = "Stop Für Elise";
+  autoBtn.setAttribute("aria-pressed", "true");
   const tempo = 0.9;
   let t = 0;
   songLength = furElise.reduce((a, n) => a + n[1] * tempo, 0);
@@ -226,12 +230,100 @@ const midiBtn = document.querySelector("#midiBtn");
 const midiSelect = document.querySelector("#midiSelect");
 const recordBtn = document.querySelector("#recordBtn");
 const playRecordingBtn = document.querySelector("#playRecordingBtn");
+const statusText = document.querySelector("#statusText");
+const audioGate = document.querySelector("#audioGate");
+const helpBtn = document.querySelector("#helpBtn");
+const helpPanel = document.querySelector("#helpPanel");
+const helpCloseBtn = document.querySelector("#helpCloseBtn");
+const secondaryControls = document.querySelector("#secondaryControls");
+const secondarySummary = secondaryControls.querySelector("summary");
 let lidOpen = true;
+let audioStatus = "Ready";
+let midiStatus = "";
+let recordingStartedAt = 0;
+let recordingTimer = null;
+
+function setStatus(message) {
+  if (statusText.textContent !== message) statusText.textContent = message;
+}
+
+function updateStatus() {
+  const { recording, playback } = recorder.state();
+  if (recording) setStatus("Recording");
+  else if (playback) setStatus("Playing recording");
+  else if (audioStatus === "Loading piano…") setStatus(audioStatus);
+  else setStatus(midiStatus || audioStatus);
+}
+
+function prepareAudio() {
+  try {
+    audio.ensureAudio();
+    if (audio.ready) {
+      audioStatus = "Piano ready";
+      updateStatus();
+    } else if (audioStatus !== "Loading piano…") {
+      audioStatus = "Loading piano…";
+      updateStatus();
+      audio.whenReady().then(() => {
+        audioStatus = audio.ready
+          ? "Piano ready"
+          : "Piano ready · fallback audio";
+        updateStatus();
+      });
+    }
+  } catch {
+    audioStatus = "Audio could not start";
+    updateStatus();
+  }
+}
+
+function midiToNoteName(midi) {
+  const names = [
+    "C",
+    "C♯",
+    "D",
+    "D♯",
+    "E",
+    "F",
+    "F♯",
+    "G",
+    "G♯",
+    "A",
+    "A♯",
+    "B",
+  ];
+  return `${names[midi % 12]}${Math.floor(midi / 12) - 1}`;
+}
+
+function formatRecordingTime(elapsedMs) {
+  const seconds = Math.floor(elapsedMs / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function updateRecordingTimer(recording) {
+  if (recording && !recordingTimer) {
+    recordingTimer = setInterval(updateRecordingUi, 250);
+  } else if (!recording && recordingTimer) {
+    clearInterval(recordingTimer);
+    recordingTimer = null;
+  }
+}
+
+const compactControls = matchMedia("(max-width: 880px)");
+function syncSecondaryControls() {
+  secondaryControls.open = !compactControls.matches;
+  secondarySummary.setAttribute(
+    "aria-hidden",
+    String(!compactControls.matches),
+  );
+}
+compactControls.addEventListener("change", syncSecondaryControls);
+syncSecondaryControls();
 
 const computerKeyboard = createComputerKeyboard({
   controller: pianoPerformance,
   onRangeChange: ({ minMidi, maxMidi, canShiftDown, canShiftUp }) => {
-    octaveLabel.textContent = `MIDI ${minMidi}–${maxMidi}`;
+    octaveLabel.textContent = `${midiToNoteName(minMidi)}–${midiToNoteName(maxMidi)}`;
     octaveDownBtn.disabled = !canShiftDown;
     octaveUpBtn.disabled = !canShiftUp;
   },
@@ -252,6 +344,7 @@ const midiInput = createMidiInput({
       const option = document.createElement("option");
       option.value = input.id;
       option.textContent = input.name;
+      option.title = input.name;
       option.selected = input.id === selectedId;
       midiSelect.appendChild(option);
     }
@@ -260,25 +353,46 @@ const midiInput = createMidiInput({
       status === "connected"
         ? `MIDI: ${selectedName}`
         : status === "no-devices"
-          ? "MIDI: No devices"
+          ? "No MIDI devices"
           : status === "select-device"
-            ? "MIDI: Select device"
+            ? "Select MIDI device"
             : status === "denied"
-              ? "MIDI: Denied"
+              ? "MIDI permission denied"
               : supported
-                ? "MIDI: Connect"
-                : "MIDI: Unavailable";
+                ? "Connect MIDI"
+                : "MIDI unavailable";
+    midiBtn.disabled = !supported;
+    midiBtn.title = selectedName || "";
+    midiStatus =
+      status === "connected"
+        ? `MIDI: ${selectedName}`
+        : status === "denied"
+          ? "MIDI permission denied"
+          : status === "unavailable"
+            ? "MIDI unavailable"
+            : "";
+    updateStatus();
   },
 });
 
 function updateRecordingUi() {
   const { recording, playback, eventCount } = recorder.state();
-  recordBtn.textContent = recording ? "■ Stop Recording" : "● Record";
-  recordBtn.classList.toggle("active", recording);
+  const elapsed = recording ? performance.now() - recordingStartedAt : 0;
+  recordBtn.textContent = recording
+    ? `Recording ${formatRecordingTime(elapsed)}`
+    : "Record";
+  recordBtn.setAttribute(
+    "aria-label",
+    recording
+      ? `Stop recording, ${formatRecordingTime(elapsed)}`
+      : "Start recording",
+  );
+  recordBtn.setAttribute("aria-pressed", String(recording));
   playRecordingBtn.disabled = !eventCount && !playback;
-  playRecordingBtn.textContent = playback
-    ? "■ Stop Recording"
-    : "Play Recording";
+  playRecordingBtn.textContent = playback ? "Stop playback" : "Play recording";
+  playRecordingBtn.setAttribute("aria-pressed", String(playback));
+  updateRecordingTimer(recording);
+  updateStatus();
 }
 recorder.subscribe(updateRecordingUi);
 
@@ -286,6 +400,8 @@ function setExplodedMode(exploded) {
   inspection.setMode(exploded, { normalBtn, explodeBtn });
   explodedView.setExploded(exploded);
   lighting.setExploded(exploded);
+  normalBtn.setAttribute("aria-pressed", String(!exploded));
+  explodeBtn.setAttribute("aria-pressed", String(exploded));
 }
 normalBtn.onclick = () => setExplodedMode(false);
 explodeBtn.onclick = () => setExplodedMode(true);
@@ -298,7 +414,10 @@ midiSelect.onchange = () => {
 };
 recordBtn.onclick = () => {
   if (recorder.state().recording) recorder.stop();
-  else recorder.start();
+  else {
+    recordingStartedAt = performance.now();
+    recorder.start();
+  }
   updateRecordingUi();
 };
 playRecordingBtn.onclick = () => {
@@ -312,13 +431,38 @@ document.querySelector("#resetBtn").onclick = () => {
 };
 lidBtn.onclick = () => {
   lidOpen = !lidOpen;
-  lidBtn.textContent = lidOpen ? "Close Lid" : "Open Lid";
+  lidBtn.textContent = lidOpen ? "Close lid" : "Open lid";
+  lidBtn.setAttribute("aria-pressed", String(lidOpen));
 };
 document.querySelector("#enterBtn").onclick = () => {
-  audio.ensureAudio();
-  document.querySelector("#audioGate").classList.add("hidden");
-  document.querySelector("#statusText").textContent = "Audio enabled · 88 keys";
+  prepareAudio();
+  audioGate.classList.add("hidden");
+  audioGate.setAttribute("aria-hidden", "true");
+  requestAnimationFrame(() =>
+    renderer.domElement.focus({ preventScroll: true }),
+  );
 };
+
+function setHelpOpen(open) {
+  helpPanel.hidden = !open;
+  helpBtn.setAttribute("aria-expanded", String(open));
+  if (open) helpCloseBtn.focus();
+  else helpBtn.focus();
+}
+
+helpBtn.onclick = () => setHelpOpen(helpPanel.hidden);
+helpCloseBtn.onclick = () => setHelpOpen(false);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !helpPanel.hidden) setHelpOpen(false);
+});
+document.addEventListener("click", (event) => {
+  if (
+    !helpPanel.hidden &&
+    !helpPanel.contains(event.target) &&
+    event.target !== helpBtn
+  )
+    setHelpOpen(false);
+});
 updateRecordingUi();
 if (import.meta.env.DEV)
   Object.assign(window.__vgp, {
@@ -326,11 +470,13 @@ if (import.meta.env.DEV)
   });
 
 // --- Animation loop ---------------------------------------------------------
-const clock = new THREE.Clock();
+const timer = new THREE.Timer();
+timer.connect(document);
 
-function animate() {
+function animate(timestamp) {
   requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.035);
+  timer.update(timestamp);
+  const dt = Math.min(timer.getDelta(), 0.035);
   controls.update();
 
   explodedView.update(dt);
@@ -357,7 +503,7 @@ function animate() {
 
   renderer.render(scene, camera);
 }
-animate();
+requestAnimationFrame(animate);
 
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;

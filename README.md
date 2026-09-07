@@ -47,23 +47,23 @@ The current model is procedural and intentionally lightweight. Future releases c
 
 ## Controls
 
-| Action                  | Control                                           |
-| ----------------------- | ------------------------------------------------- |
-| Orbit camera            | Left-drag / one-finger drag                       |
-| Zoom                    | Mouse wheel / pinch                               |
-| Pan                     | Right-drag / two-finger drag                      |
-| Play visible key        | Press, tap, or drag across piano keys             |
-| Play mapped notes       | `Z–/`, `Q–[`, and nearby number-row black keys    |
-| Shift keyboard range    | `←` / `→` or **Oct −** / **Oct +**                |
-| Sustain                 | `Space` (when a UI control is not focused)        |
-| MIDI input              | **MIDI: Connect**, then choose an input if needed |
-| Record performance      | **Record**, then **Play Recording**               |
-| Inspect component       | Click a piano component                           |
-| Separate systems        | **Exploded Parts**                                |
-| Restore assembled piano | **Normal Inspect**                                |
-| Toggle lid              | **Open Lid / Close Lid**                          |
-| Autoplay                | **Für Elise**                                     |
-| Restore camera          | **Reset View**                                    |
+| Action                  | Control                                          |
+| ----------------------- | ------------------------------------------------ |
+| Orbit camera            | Left-drag / one-finger drag                      |
+| Zoom                    | Mouse wheel / pinch                              |
+| Pan                     | Right-drag / two-finger drag                     |
+| Play visible key        | Press, tap, or drag across piano keys            |
+| Play mapped notes       | `Z–/`, `Q–[`, and nearby number-row black keys   |
+| Shift keyboard range    | `←` / `→` or **Oct −** / **Oct +**               |
+| Sustain                 | `Space` (when a UI control is not focused)       |
+| MIDI input              | **Connect MIDI**, then choose an input if needed |
+| Record performance      | **Record**, then **Play recording**              |
+| Inspect component       | Click a piano component                          |
+| Separate systems        | **Exploded**                                     |
+| Restore assembled piano | **Normal**                                       |
+| Toggle lid              | **Open Lid / Close Lid**                         |
+| Autoplay                | **Für Elise**                                    |
+| Restore camera          | **Reset View**                                   |
 
 ## Tech stack
 
@@ -131,8 +131,10 @@ virtual-grand-piano/
 ### Install
 
 ```bash
-npm install
+npm ci
 ```
+
+The committed lockfile keeps local, CI, and deployment installs reproducible.
 
 ### Run locally
 
@@ -192,7 +194,7 @@ capture releases only that pointer's token. A held pointer can glide across
 keys, and independent touch pointers can form chords. Pen/touch pressure is
 used conservatively when available; mouse clicks use a stable velocity.
 
-Web MIDI is requested only from **MIDI: Connect**, without SysEx. The selected
+Web MIDI is requested only from **Connect MIDI**, without SysEx. The selected
 input supports all channels, note-on velocity 1–127, both standard note-off
 forms, CC64 sustain, and device-scoped CC120/CC123 cleanup. Unsupported
 browsers show an unavailable state; denied permission leaves the instrument
@@ -297,7 +299,6 @@ When adding production assets:
 - [ ] Visible string vibration and resonance feedback
 - [ ] More accurate duplex scaling, agraffes, tuning pins, and bridge geometry
 - [ ] Multiple classical autoplay pieces
-- [ ] MIDI input support
 - [ ] Optional guided anatomy tour
 - [ ] Performance quality presets for desktop and mobile GPUs
 
