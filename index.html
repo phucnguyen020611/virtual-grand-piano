@@ -42,23 +42,28 @@
       <button id="resetBtn">Reset View</button>
     </div>
 
+    <div class="performanceBar" aria-label="Performance controls">
+      <button id="octaveDownBtn" aria-label="Lower keyboard octave">
+        Oct −
+      </button>
+      <span id="octaveLabel" aria-live="polite">C3–F5</span>
+      <button id="octaveUpBtn" aria-label="Raise keyboard octave">Oct +</button>
+      <button id="midiBtn">MIDI: Connect</button>
+      <select id="midiSelect" aria-label="MIDI input" hidden></select>
+      <button id="recordBtn" class="gold">● Record</button>
+      <button id="playRecordingBtn" disabled>Play Recording</button>
+    </div>
+
     <div class="bottom">
       <div class="card help">
         <h3>Play & inspect</h3>
         <p>
-          Drag to orbit · wheel to zoom · right-drag to pan · click any piano
-          part to identify it · click keys to play · Space = Sustain.
+          Drag to orbit · click or drag across keys to play · Space = Sustain.
+          Arrow keys shift octaves. MIDI and recording controls are above.
         </p>
         <div class="keys">
-          <span class="kbd">A</span><span class="kbd">W</span
-          ><span class="kbd">S</span><span class="kbd">E</span>
-          <span class="kbd">D</span><span class="kbd">F</span
-          ><span class="kbd">T</span><span class="kbd">G</span>
-          <span class="kbd">Y</span><span class="kbd">H</span
-          ><span class="kbd">U</span><span class="kbd">J</span>
-          <span class="kbd">K</span><span class="kbd">O</span
-          ><span class="kbd">L</span><span class="kbd">P</span
-          ><span class="kbd">;</span>
+          <span class="kbd">Z–/</span><span class="kbd">Q–[</span
+          ><span class="kbd">1–0</span><span class="kbd">←/→ octave</span>
         </div>
       </div>
       <div class="card inspector">

@@ -10,6 +10,9 @@ import { createReflectionEnvironment } from "./scene/environment.js";
 import { createAudioEngine } from "./audio/pianoAudio.js";
 import { createMechanics } from "./piano/mechanics.js";
 import { createPerformanceController } from "./performance/performanceController.js";
+import { createComputerKeyboard } from "./performance/computerKeyboard.js";
+import { createMidiInput } from "./performance/midiInput.js";
+import { createPerformanceRecorder } from "./performance/performanceRecorder.js";
 import { createInspection } from "./interaction/inspection.js";
 import {
   createExplodedView,
@@ -83,6 +86,7 @@ const pianoPerformance = createPerformanceController(
   mechanics,
   piano.resonance,
 );
+const recorder = createPerformanceRecorder(pianoPerformance);
 if (import.meta.env.DEV)
   Object.assign(window.__vgp, {
     mechanics,
@@ -103,64 +107,23 @@ const inspection = createInspection(
   camera,
   piano,
   dom,
-  (midi) => pianoPerformance.playMidi(midi, 0.8, 0.72, "pointer"),
+  (midi, pointerId, velocity) =>
+    pianoPerformance.noteOn(midi, velocity, `pointer:${pointerId}`, "pointer"),
+  (pointerId) => {
+    const token = `pointer:${pointerId}`;
+    for (const [midi, owners] of pianoPerformance.activeSourceTokensByMidi) {
+      if (owners.has(token)) pianoPerformance.noteOff(midi, token);
+    }
+  },
   (type, down) => {
-    if (type === "sustain") pianoPerformance.setSustain(down);
+    if (type === "sustain")
+      pianoPerformance.setSustainForSource("pointer:pedal", down, "pointer");
     else mechanics.setPedal(type, down);
   },
   controls,
 );
 const explodedView = createExplodedView({ piano, camera, controls });
 if (import.meta.env.DEV) window.__vgp.explodedView = explodedView;
-
-// --- Computer-keyboard performance -----------------------------------------
-const keyboardMap = {
-  KeyA: 60,
-  KeyW: 61,
-  KeyS: 62,
-  KeyE: 63,
-  KeyD: 64,
-  KeyF: 65,
-  KeyT: 66,
-  KeyG: 67,
-  KeyY: 68,
-  KeyH: 69,
-  KeyU: 70,
-  KeyJ: 71,
-  KeyK: 72,
-  KeyO: 73,
-  KeyL: 74,
-  KeyP: 75,
-  Semicolon: 76,
-  Quote: 77,
-};
-const held = new Set();
-addEventListener("keydown", (e) => {
-  if (e.code === "Space") {
-    e.preventDefault();
-    if (!e.repeat) pianoPerformance.setSustain(true);
-    return;
-  }
-  if (e.repeat || !keyboardMap[e.code] || e.metaKey || e.ctrlKey) return;
-  e.preventDefault();
-  held.add(e.code);
-  pianoPerformance.noteOn(
-    keyboardMap[e.code],
-    0.72,
-    `keyboard:${e.code}`,
-    "keyboard",
-  );
-});
-addEventListener("keyup", (e) => {
-  if (e.code === "Space") {
-    e.preventDefault();
-    pianoPerformance.setSustain(false);
-    return;
-  }
-  if (!keyboardMap[e.code]) return;
-  held.delete(e.code);
-  pianoPerformance.noteOff(keyboardMap[e.code], `keyboard:${e.code}`);
-});
 
 // --- Für Elise autoplay (public-domain composition, simplified) ------------
 const furElise = [
@@ -256,7 +219,56 @@ function startAutoplay() {
 const normalBtn = document.querySelector("#normalBtn");
 const explodeBtn = document.querySelector("#explodeBtn");
 const lidBtn = document.querySelector("#lidBtn");
+const octaveLabel = document.querySelector("#octaveLabel");
+const octaveDownBtn = document.querySelector("#octaveDownBtn");
+const octaveUpBtn = document.querySelector("#octaveUpBtn");
+const midiBtn = document.querySelector("#midiBtn");
+const midiSelect = document.querySelector("#midiSelect");
+const recordBtn = document.querySelector("#recordBtn");
+const playRecordingBtn = document.querySelector("#playRecordingBtn");
 let lidOpen = true;
+
+const computerKeyboard = createComputerKeyboard({
+  controller: pianoPerformance,
+  onRangeChange: ({ minMidi, maxMidi }) => {
+    octaveLabel.textContent = `MIDI ${minMidi}–${maxMidi}`;
+  },
+});
+const midiInput = createMidiInput({
+  controller: pianoPerformance,
+  onStatus: ({ status, supported, selectedId, selectedName, inputs }) => {
+    midiSelect.replaceChildren();
+    for (const input of inputs) {
+      const option = document.createElement("option");
+      option.value = input.id;
+      option.textContent = input.name;
+      option.selected = input.id === selectedId;
+      midiSelect.appendChild(option);
+    }
+    midiSelect.hidden = inputs.length < 2;
+    midiBtn.textContent =
+      status === "connected"
+        ? `MIDI: ${selectedName}`
+        : status === "no-devices"
+          ? "MIDI: No devices"
+          : status === "denied"
+            ? "MIDI: Denied"
+            : supported
+              ? "MIDI: Connect"
+              : "MIDI: Unavailable";
+  },
+});
+
+function updateRecordingUi() {
+  const { recording, playback, eventCount } = recorder.state();
+  recordBtn.textContent = recording ? "■ Stop Recording" : "● Record";
+  recordBtn.classList.toggle("active", recording);
+  playRecordingBtn.disabled = !eventCount && !playback;
+  playRecordingBtn.textContent = playback
+    ? "■ Stop Recording"
+    : "Play Recording";
+}
+recorder.subscribe(updateRecordingUi);
 
 function setExplodedMode(exploded) {
   inspection.setMode(exploded, { normalBtn, explodeBtn });
@@ -266,6 +278,20 @@ function setExplodedMode(exploded) {
 normalBtn.onclick = () => setExplodedMode(false);
 explodeBtn.onclick = () => setExplodedMode(true);
 autoBtn.onclick = startAutoplay;
+octaveDownBtn.onclick = () => computerKeyboard.shiftOctave(-1);
+octaveUpBtn.onclick = () => computerKeyboard.shiftOctave(1);
+midiBtn.onclick = () => midiInput.connect();
+midiSelect.onchange = () => midiInput.select(midiSelect.value);
+recordBtn.onclick = () => {
+  if (recorder.state().recording) recorder.stop();
+  else recorder.start();
+  updateRecordingUi();
+};
+playRecordingBtn.onclick = () => {
+  if (recorder.state().playback) recorder.stopPlayback();
+  else recorder.play();
+  updateRecordingUi();
+};
 document.querySelector("#resetBtn").onclick = () => {
   explodedView.cancelCameraAssist();
   explodedView.resetCamera();
@@ -279,6 +305,11 @@ document.querySelector("#enterBtn").onclick = () => {
   document.querySelector("#audioGate").classList.add("hidden");
   document.querySelector("#statusText").textContent = "Audio enabled · 88 keys";
 };
+updateRecordingUi();
+if (import.meta.env.DEV)
+  Object.assign(window.__vgp, {
+    input: { computerKeyboard, midi: midiInput, recorder },
+  });
 
 // --- Animation loop ---------------------------------------------------------
 const clock = new THREE.Clock();

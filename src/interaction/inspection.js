@@ -7,7 +7,8 @@ import * as THREE from "three";
  * @param camera    active camera
  * @param piano     { parts, explodedComponents } from createPiano
  * @param dom       { partName, partText, partMeta, labelRoot }
- * @param onPlayKey callback(midi) when a playable key is clicked
+ * @param onPlayKey callback(midi, pointerId, velocity) when a key is pressed
+ * @param onReleaseKey callback(pointerId) when a pointer leaves/releases a key
  * @param onPedal callback(type, down) while a pedal is pointer-held
  * @param controls OrbitControls instance, temporarily paused for pedal holds
  */
@@ -17,6 +18,7 @@ export function createInspection(
   piano,
   dom,
   onPlayKey,
+  onReleaseKey = () => {},
   onPedal = () => {},
   controls = null,
 ) {
@@ -58,6 +60,15 @@ export function createInspection(
     let p = o;
     while (p) {
       if (p.userData?.pedalType) return p.userData.pedalType;
+      p = p.parent;
+    }
+    return null;
+  }
+
+  function keyOf(o) {
+    let p = o;
+    while (p) {
+      if (p.userData?.pianoKey) return p;
       p = p.parent;
     }
     return null;
@@ -116,6 +127,38 @@ export function createInspection(
   let activePedal = null;
   let activePedalPointerId = null;
   let controlsEnabledBeforePedal = true;
+  const activeKeys = new Map();
+  let controlsEnabledBeforeKeys = true;
+
+  function hitAt(event) {
+    pointerNDC(event);
+    raycaster.setFromCamera(pointer, camera);
+    return raycaster.intersectObjects(piano.parts.children, true)[0] || null;
+  }
+
+  function pointerVelocity(event) {
+    // Mouse commonly reports pressure .5, which is not expressive pressure.
+    if (
+      (event.pointerType === "pen" || event.pointerType === "touch") &&
+      event.pressure > 0
+    )
+      return Math.max(0.2, Math.min(1, 0.28 + event.pressure * 0.72));
+    return 0.72;
+  }
+
+  function finishKey(event) {
+    if (!activeKeys.has(event.pointerId)) return false;
+    activeKeys.delete(event.pointerId);
+    onReleaseKey(event.pointerId);
+    try {
+      renderer.domElement.releasePointerCapture(event.pointerId);
+    } catch {
+      // Capture may already have been released by a cancelled touch gesture.
+    }
+    if (!activeKeys.size && controls)
+      controls.enabled = controlsEnabledBeforeKeys;
+    return true;
+  }
 
   function finishPedal(e) {
     if (!activePedal) return;
@@ -139,9 +182,20 @@ export function createInspection(
     "pointerdown",
     (e) => {
       down = { x: e.clientX, y: e.clientY };
-      pointerNDC(e);
-      raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObjects(piano.parts.children, true)[0];
+      const hit = hitAt(e);
+      const key = hit ? keyOf(hit.object) : null;
+      if (key) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (!activeKeys.size)
+          controlsEnabledBeforeKeys = controls?.enabled ?? true;
+        if (controls) controls.enabled = false;
+        activeKeys.set(e.pointerId, key.userData.midi);
+        renderer.domElement.setPointerCapture?.(e.pointerId);
+        onPlayKey(key.userData.midi, e.pointerId, pointerVelocity(e));
+        selectPart(key);
+        return;
+      }
       activePedal = hit ? pedalOf(hit.object) : null;
       if (activePedal) {
         e.preventDefault();
@@ -157,6 +211,11 @@ export function createInspection(
     { capture: true },
   );
   renderer.domElement.addEventListener("pointerup", (e) => {
+    if (finishKey(e)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
     if (activePedal) {
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -164,9 +223,7 @@ export function createInspection(
       return;
     }
     if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) return; // ignore drags
-    pointerNDC(e);
-    raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(piano.parts.children, true)[0];
+    const hit = hitAt(e);
     if (!hit) return;
     const o = hit.object;
     if (o.userData.pianoKey) {
@@ -175,20 +232,36 @@ export function createInspection(
     } else selectPart(o);
   });
   renderer.domElement.addEventListener("pointercancel", (e) => {
+    finishKey(e);
     finishPedal(e);
   });
   renderer.domElement.addEventListener("lostpointercapture", (e) => {
+    finishKey(e);
     finishPedal(e);
   });
   renderer.domElement.addEventListener("pointermove", (e) => {
+    if (activeKeys.has(e.pointerId)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const hit = hitAt(e);
+      const key = hit ? keyOf(hit.object) : null;
+      const midi = key?.userData.midi;
+      if (midi !== activeKeys.get(e.pointerId)) {
+        onReleaseKey(e.pointerId);
+        if (midi === undefined) activeKeys.set(e.pointerId, null);
+        else {
+          activeKeys.set(e.pointerId, midi);
+          onPlayKey(midi, e.pointerId, pointerVelocity(e));
+        }
+      }
+      return;
+    }
     if (activePedal && activePedalPointerId === e.pointerId) {
       e.preventDefault();
       e.stopImmediatePropagation();
       return;
     }
-    pointerNDC(e);
-    raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(piano.parts.children, true)[0];
+    const hit = hitAt(e);
     const target = hit ? ownerOf(hit.object) : null;
     renderer.domElement.style.cursor = target ? "pointer" : "grab";
     setHover(target);

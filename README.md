@@ -47,19 +47,23 @@ The current model is procedural and intentionally lightweight. Future releases c
 
 ## Controls
 
-| Action                  | Control                             |
-| ----------------------- | ----------------------------------- |
-| Orbit camera            | Left-drag / one-finger drag         |
-| Zoom                    | Mouse wheel / pinch                 |
-| Pan                     | Right-drag / two-finger drag        |
-| Play visible key        | Click / tap a piano key             |
-| Play mapped notes       | `A W S E D F T G Y H U J K O L P ;` |
-| Inspect component       | Click a piano component             |
-| Separate systems        | **Exploded Parts**                  |
-| Restore assembled piano | **Normal Inspect**                  |
-| Toggle lid              | **Open Lid / Close Lid**            |
-| Autoplay                | **Für Elise**                       |
-| Restore camera          | **Reset View**                      |
+| Action                  | Control                                           |
+| ----------------------- | ------------------------------------------------- |
+| Orbit camera            | Left-drag / one-finger drag                       |
+| Zoom                    | Mouse wheel / pinch                               |
+| Pan                     | Right-drag / two-finger drag                      |
+| Play visible key        | Press, tap, or drag across piano keys             |
+| Play mapped notes       | `Z–/`, `Q–[`, and nearby number-row black keys    |
+| Shift keyboard range    | `←` / `→` or **Oct −** / **Oct +**                |
+| Sustain                 | `Space` (when a UI control is not focused)        |
+| MIDI input              | **MIDI: Connect**, then choose an input if needed |
+| Record performance      | **Record**, then **Play Recording**               |
+| Inspect component       | Click a piano component                           |
+| Separate systems        | **Exploded Parts**                                |
+| Restore assembled piano | **Normal Inspect**                                |
+| Toggle lid              | **Open Lid / Close Lid**                          |
+| Autoplay                | **Für Elise**                                     |
+| Restore camera          | **Reset View**                                    |
 
 ## Tech stack
 
@@ -98,6 +102,10 @@ virtual-grand-piano/
 │   ├── audio/
 │   │   ├── pianoAudio.js       # sampler voices, buses, reverb, sustain, pedal noise
 │   │   └── pianoSamples.js     # sample manifest + offline sample/IR rendering
+│   ├── performance/
+│   │   ├── computerKeyboard.js # physical-key layout, octave shift, focus safety
+│   │   ├── midiInput.js        # selected Web MIDI input + CC64 handling
+│   │   └── performanceRecorder.js # in-memory musical event recording/playback
 │   ├── interaction/
 │   │   └── inspection.js       # raycasting selection, labels, mode switching
 │   └── style.css
@@ -163,7 +171,36 @@ The implementation is split into focused modules so each system can evolve indep
 2. **Procedural piano** (`piano/`) builds the instrument from a shared dimension table. The case is a **hollow curved rim** (an extruded outer contour with an inner cavity hole) rather than a solid plate; the soundboard, cast plate, strings, and action stack in a physically believable vertical order below the rim top so the internal anatomy stays visible. Each major part is a separate, individually selectable Three.js group.
 3. **Interaction** (`interaction/inspection.js`) uses raycasting for mouse/touch selection, drives the exploded-view labels, and manages `OrbitControls` for free inspection.
 4. **Audio** (`audio/`) is a recorded-sample piano engine with a generated PCM fallback. `pianoSamples.js` owns the manifest and fallback renderer; `pianoAudio.js` owns the voice manager and shared output bus. See [Audio engine](#audio-engine).
-5. **Animation** (`main.js` render loop) interpolates key travel, lid movement, component separation, labels, and autoplay state.
+5. **Performance input** (`performance/`) maps computer keys, pointer/touch gestures, Web MIDI, and event-recording playback through the same ownership-aware controller.
+6. **Animation** (`main.js` render loop) interpolates key travel, lid movement, component separation, labels, and autoplay state.
+
+## Performance input
+
+The computer keyboard exposes roughly 2½ octaves at once, beginning at C3 by
+default. Lower-row `Z–/` and upper-row `Q–[` provide the white-key layout;
+nearby number/letter keys fill the black keys. Arrow keys or the compact octave
+buttons move the range in 12-semitone steps without changing notes already held.
+Space is the sustain pedal unless a focused button, link, or form control owns
+that key.
+
+Pointer and touch keys use pointer capture: releasing, cancelling, or losing
+capture releases only that pointer's token. A held pointer can glide across
+keys, and independent touch pointers can form chords. Pen/touch pressure is
+used conservatively when available; mouse clicks use a stable velocity.
+
+Web MIDI is requested only from **MIDI: Connect**, without SysEx. The selected
+input supports all channels, note-on velocity 1–127, both standard note-off
+forms, CC64 sustain, and device-scoped CC120/CC123 cleanup. Unsupported
+browsers show an unavailable state; denied permission leaves the instrument
+fully playable. MIDI messages and recordings stay in the browser and are never
+sent anywhere.
+
+**Recording** stores a small in-memory JSON-like event sequence (`version`,
+`durationMs`, note on/off IDs, velocity, and sustain transitions), not audio.
+It records computer, pointer, and MIDI performance only—never autoplay or its
+own playback. Playback uses the regular `recording` source, so it coexists with
+live performance and can be stopped without affecting other sources. Recordings
+are intentionally not persisted across page reloads.
 
 The geometry is intentionally procedural; higher-fidelity glTF meshes and PBR textures can replace individual modules without changing the overall product concept.
 
