@@ -20,26 +20,10 @@ import {
  *
  * Signal path (one shared tail for the whole instrument, never per voice):
  *
- *   voice -> voiceGain -> voiceFilter -> dry --+-> master -> limiter -> ceiling
- *                                              +-> room send   -> convolver -+
- *                                              +-> resonance   -> convolver -+
+ *   voice -> voiceGain -> voiceFilter -> dry ----> master -> limiter -> ceiling
+ *                                              +-> room send       -> convolver -+
+ *                                              +-> resonance send  -> convolver -+
  */
-
-/**
- * Yield to the event loop without the ~1s clamp browsers apply to timers in a
- * background tab, so the sample set finishes rendering even if the player
- * switches away mid-load.
- */
-function yieldToEventLoop() {
-  return new Promise((resolve) => {
-    const channel = new MessageChannel();
-    channel.port1.onmessage = () => {
-      channel.port1.close();
-      resolve();
-    };
-    channel.port2.postMessage(0);
-  });
-}
 
 /**
  * Final safety ceiling. Linear below the knee, so ordinary playing and even a
@@ -67,11 +51,22 @@ const MAX_VOICES_PER_NOTE = 4;
 const velocityGain = (velocity) => 0.06 + 0.94 * Math.pow(velocity, 1.7);
 
 /** Damper closure is quicker in the treble than in the bass. */
-function releaseSeconds(midi) {
-  if (midi < 40) return 0.55;
-  if (midi < 60) return 0.4;
-  if (midi < 84) return 0.28;
-  return 0.22;
+function releaseSeconds(midi, velocity, age, reason) {
+  const registerBase =
+    midi < 40 ? 0.62 : midi < 60 ? 0.45 : midi < 84 ? 0.3 : 0.2;
+  const energy = velocity * Math.exp(-age / (midi < 40 ? 5.5 : 3.2));
+  // A forte bass string needs a little longer felt closure. Pedal-released
+  // notes are normally older and therefore close with a quieter, softer tail.
+  const ageShape = age < 0.18 ? 0.86 : age > 3 ? 0.9 : 1;
+  const pedalShape = reason === "sustain-release" ? 1.14 : 1;
+  return registerBase * (0.82 + 0.35 * energy) * ageShape * pedalShape;
+}
+
+const MAX_DECODED_BYTES = 56 * 1024 * 1024;
+const CORE_ROOTS = new Set([51, 57, 63, 69, 75, 81]);
+
+function bufferBytes(buffer) {
+  return buffer.length * buffer.numberOfChannels * 4;
 }
 
 export function createAudioEngine() {
@@ -81,13 +76,22 @@ export function createAudioEngine() {
   let limiter = null;
   let roomGain = null;
   let resonanceGain = null;
+  let resonanceExcitationGain = null;
+  let resonanceInput = null;
   let pedalGain = null;
   let pedalBuffers = null;
   let analyser = null; // DEV-only output tap for headroom checks
   let disposed = false;
 
-  const recordedBuffers = new Map(); // `${rootMidi}:${layer}` -> AudioBuffer
-  const fallbackBuffers = new Map(); // generated PCM only when recordings are unavailable
+  // Entries retain only decoded working-set buffers. Active AudioBufferSource
+  // nodes retain their own references, so eviction never interrupts a note.
+  const recordedBuffers = new Map(); // `${rootMidi}:${layer}` -> cache entry
+  const fallbackBuffers = new Map(); // generated PCM cache entries
+  const pendingLoads = new Map();
+  const failedLoads = new Set();
+  let cacheEvictions = 0;
+  let cacheHits = 0;
+  let cacheMisses = 0;
   const manifest = createSampleManifest();
   const manifestByKey = new Map(
     manifest.map((entry) => [`${entry.rootMidi}:${entry.layer}`, entry]),
@@ -137,20 +141,26 @@ export function createAudioEngine() {
     room.buffer = createImpulseResponse(ctx, "room");
     roomGain = ctx.createGain();
     // The close-miked recordings already carry a little natural space.
-    roomGain.gain.value = 0.13;
+    roomGain.gain.value = 0.1;
 
     const resonance = ctx.createConvolver();
     resonance.buffer = createImpulseResponse(ctx, "resonance");
     resonanceGain = ctx.createGain();
-    // Mirror a pedal that may have been held before the first audio unlock.
-    resonanceGain.gain.value = sustain ? 0.14 : 0;
+    resonanceGain.gain.value = 0.105;
+    resonanceInput = ctx.createGain();
+    resonanceInput.gain.value = 1;
+    resonanceExcitationGain = ctx.createGain();
+    // Opening the pedal admits new string energy. Closing it stops new input
+    // while the convolver's already-excited tail is allowed to decay.
+    resonanceExcitationGain.gain.value = sustain ? 1 : 0;
 
     pedalGain = ctx.createGain();
     pedalGain.gain.value = 0.055;
 
     dry.connect(master);
     dry.connect(room);
-    dry.connect(resonance);
+    resonanceInput.connect(resonanceExcitationGain);
+    resonanceExcitationGain.connect(resonance);
     room.connect(roomGain);
     roomGain.connect(master);
     resonance.connect(resonanceGain);
@@ -179,37 +189,23 @@ export function createAudioEngine() {
   }
 
   /**
-   * Decode recorded assets off the realtime path. Midrange arrives first; a
-   * missing or not-yet-arrived recording falls back to generated PCM.
+   * Decode the pinned C3-C6 working set off the realtime path. Outer registers
+   * are requested only after they are played, leaving mobile memory for the
+   * common keyboard range.
    */
   function loadSamples() {
     if (loading) return loading;
-    const ordered = [...manifest].sort(
-      (a, b) => Math.abs(a.rootMidi - 64) - Math.abs(b.rootMidi - 64),
+    const orderedRoots = [...CORE_ROOTS].sort(
+      (a, b) => Math.abs(a - 63) - Math.abs(b - 63),
     );
     loading = (async () => {
-      let sliceStart = performance.now();
-      for (const entry of ordered) {
+      for (const rootMidi of orderedRoots) {
         if (disposed) return;
-        try {
-          const buffer = await fetchSample(entry.url);
-          recordedBuffers.set(`${entry.rootMidi}:${entry.layer}`, buffer);
-        } catch (error) {
-          const key = `${entry.rootMidi}:${entry.layer}`;
-          fallbackBuffers.set(key, renderFallbackBuffer(entry));
-          if (import.meta.env.DEV)
-            console.warn(
-              "Recorded piano sample unavailable, using generated fallback.",
-              entry,
-              error,
-            );
-        }
-        // Yield on a time budget rather than per entry: background tabs clamp
-        // timers to ~1s, and one yield per sample stretched the render out.
-        if (performance.now() - sliceStart > 50) {
-          await yieldToEventLoop();
-          sliceStart = performance.now();
-        }
+        await Promise.all(
+          manifest
+            .filter((entry) => entry.rootMidi === rootMidi)
+            .map((entry) => queueRecordedLoad(entry)),
+        );
         ready = recordedBuffers.size > 0;
       }
       ready = recordedBuffers.size > 0;
@@ -228,6 +224,80 @@ export function createAudioEngine() {
     return ctx.decodeAudioData(await response.arrayBuffer());
   }
 
+  function cacheBytes() {
+    return [...recordedBuffers.values(), ...fallbackBuffers.values()].reduce(
+      (sum, entry) => sum + entry.bytes,
+      0,
+    );
+  }
+
+  function evictCache() {
+    while (cacheBytes() > MAX_DECODED_BYTES) {
+      const candidates = [
+        ...[...recordedBuffers.entries()]
+          .filter(([, entry]) => !entry.pinned)
+          .map(([key, entry]) => ({ key, entry, cache: recordedBuffers })),
+        ...[...fallbackBuffers.entries()].map(([key, entry]) => ({
+          key,
+          entry,
+          cache: fallbackBuffers,
+        })),
+      ].sort((a, b) => a.entry.lastUsed - b.entry.lastUsed);
+      const victim = candidates[0];
+      if (!victim) return; // The pinned core is intentionally the floor.
+      victim.cache.delete(victim.key);
+      cacheEvictions++;
+    }
+  }
+
+  function touch(entry) {
+    entry.lastUsed = performance.now();
+    return entry;
+  }
+
+  function queueRecordedLoad(entry) {
+    const key = `${entry.rootMidi}:${entry.layer}`;
+    const cached = recordedBuffers.get(key);
+    if (cached) {
+      cacheHits++;
+      return Promise.resolve(touch(cached).buffer);
+    }
+    const pending = pendingLoads.get(key);
+    if (pending) {
+      cacheHits++;
+      return pending;
+    }
+    if (failedLoads.has(key)) return Promise.resolve(null);
+    cacheMisses++;
+    const promise = fetchSample(entry.url)
+      .then((buffer) => {
+        if (disposed) return null;
+        recordedBuffers.set(key, {
+          buffer,
+          bytes: bufferBytes(buffer),
+          lastUsed: performance.now(),
+          pinned: CORE_ROOTS.has(entry.rootMidi),
+        });
+        // A generated version is unnecessary once a real recording is warm.
+        fallbackBuffers.delete(key);
+        evictCache();
+        return buffer;
+      })
+      .catch((error) => {
+        failedLoads.add(key);
+        if (import.meta.env.DEV)
+          console.warn(
+            "Recorded piano sample unavailable, using generated fallback.",
+            entry,
+            error,
+          );
+        return null;
+      })
+      .finally(() => pendingLoads.delete(key));
+    pendingLoads.set(key, promise);
+    return promise;
+  }
+
   function renderFallbackBuffer(entry) {
     const pcm = renderFallbackSample(entry, ctx.sampleRate);
     const buffer = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
@@ -235,12 +305,38 @@ export function createAudioEngine() {
     return buffer;
   }
 
+  function fallbackFor(entry) {
+    const key = `${entry.rootMidi}:${entry.layer}`;
+    const cached = fallbackBuffers.get(key);
+    if (cached) return touch(cached).buffer;
+    const buffer = renderFallbackBuffer(entry);
+    fallbackBuffers.set(key, {
+      buffer,
+      bytes: bufferBytes(buffer),
+      lastUsed: performance.now(),
+    });
+    evictCache();
+    return buffer;
+  }
+
   function bufferForLayer(root, layer) {
     const key = `${root}:${layer}`;
     const recorded = recordedBuffers.get(key);
-    if (recorded) return { buffer: recorded, root, layer, backend: "recorded" };
+    if (recorded)
+      return {
+        buffer: touch(recorded).buffer,
+        root,
+        layer,
+        backend: "recorded",
+      };
     const fallback = fallbackBuffers.get(key);
-    if (fallback) return { buffer: fallback, root, layer, backend: "fallback" };
+    if (fallback)
+      return {
+        buffer: touch(fallback).buffer,
+        root,
+        layer,
+        backend: "fallback",
+      };
     return null;
   }
 
@@ -248,6 +344,11 @@ export function createAudioEngine() {
     const root = rootForMidi.get(midi);
     if (root === undefined) return null;
     const weights = velocityLayerWeights(velocity);
+    // Request all desired recorded layers, but never await them on noteOn.
+    for (const { layer } of weights) {
+      const entry = manifestByKey.get(`${root}:${layer}`);
+      if (entry) queueRecordedLoad(entry);
+    }
     const recorded = weights
       .map(({ layer, weight }) => ({ ...bufferForLayer(root, layer), weight }))
       .filter((sample) => sample.buffer && sample.backend === "recorded");
@@ -263,8 +364,7 @@ export function createAudioEngine() {
       const preferred = weights.at(-1).layer;
       const key = `${root}:${preferred}`;
       const entry = manifestByKey.get(key);
-      const fallback = renderFallbackBuffer(entry);
-      fallbackBuffers.set(key, fallback);
+      const fallback = fallbackFor(entry);
       return [
         {
           buffer: fallback,
@@ -295,6 +395,7 @@ export function createAudioEngine() {
     try {
       voice.output.disconnect();
       voice.filter.disconnect();
+      voice.resonanceSend.disconnect();
       voice.layerGains.forEach((gain) => gain.disconnect());
     } catch {
       /* already torn down */
@@ -366,6 +467,7 @@ export function createAudioEngine() {
 
     const output = ctx.createGain();
     const filter = ctx.createBiquadFilter();
+    const resonanceSend = ctx.createGain();
     filter.type = "lowpass";
     // Continuous brightness across the whole velocity range, so the boundary
     // between two sample layers is never heard as a step.
@@ -403,6 +505,14 @@ export function createAudioEngine() {
     }
     filter.connect(output);
     output.connect(dry);
+    // The shared convolver remains bounded; each voice merely controls how
+    // much of its own strike excites the undamped-string bed.
+    resonanceSend.gain.setValueAtTime(
+      0.012 + 0.052 * Math.pow(level, 1.35),
+      now,
+    );
+    output.connect(resonanceSend);
+    resonanceSend.connect(resonanceInput);
 
     const voice = {
       midi,
@@ -410,6 +520,7 @@ export function createAudioEngine() {
       layerGains,
       output,
       filter,
+      resonanceSend,
       startedAt: now,
       velocity: level,
       released: false,
@@ -442,11 +553,23 @@ export function createAudioEngine() {
     // C7-C8 carry no dampers, so a key release must not mute them; they simply
     // keep decaying. DIM is the same cutoff the mechanics use.
     const undamped = midi > DIM.damperCutoffMidi;
-    const seconds = undamped
-      ? Math.max(release, 3.5)
-      : Math.max(0.08, Math.min(release, releaseSeconds(midi)));
+    const now = ctx.currentTime;
     for (const voice of [...set]) {
       if (voice.released) continue;
+      const seconds = undamped
+        ? Math.max(release, 3.5)
+        : Math.max(
+            0.08,
+            Math.min(
+              release,
+              releaseSeconds(
+                midi,
+                voice.velocity,
+                now - voice.startedAt,
+                reason,
+              ),
+            ),
+          );
       endVoice(voice, seconds);
       if (!undamped) damperContact(voice, reason);
     }
@@ -459,13 +582,15 @@ export function createAudioEngine() {
   function damperContact(voice, reason) {
     if (!pedalBuffers || reason === "source-stop") return;
     const age = ctx.currentTime - voice.startedAt;
-    const energy = voice.velocity * Math.exp(-age / 3);
+    const energy = voice.velocity * Math.exp(-age / (voice.midi < 40 ? 5 : 3));
     if (energy < 0.05) return;
     const source = ctx.createBufferSource();
     source.buffer = pedalBuffers.up;
-    source.playbackRate.value = 1.4 + (voice.midi - 60) / 60;
+    source.playbackRate.value = 1.28 + (voice.midi - 60) / 75;
     const gain = ctx.createGain();
-    gain.gain.value = 0.02 * energy * (voice.midi < 60 ? 1.4 : 0.8);
+    const heldShape = age < 0.18 ? 1.22 : age > 3 ? 0.55 : 1;
+    const registerShape = voice.midi < 40 ? 1.25 : voice.midi < 72 ? 1 : 0.62;
+    gain.gain.value = 0.014 * energy * heldShape * registerShape;
     source.connect(gain);
     gain.connect(dry);
     source.start(ctx.currentTime);
@@ -482,11 +607,11 @@ export function createAudioEngine() {
     sustain = down;
     if (!ctx) return;
     const now = ctx.currentTime;
-    resonanceGain.gain.cancelScheduledValues(now);
-    resonanceGain.gain.setTargetAtTime(
-      down ? 0.14 : 0,
+    resonanceExcitationGain.gain.cancelScheduledValues(now);
+    resonanceExcitationGain.gain.setTargetAtTime(
+      down ? 1 : 0,
       now,
-      down ? 0.08 : 0.25,
+      down ? 0.04 : 0.035,
     );
     // Guard against pedal spam building up noise voices.
     if (now - lastPedalAt < 0.06) return;
@@ -514,6 +639,8 @@ export function createAudioEngine() {
     voiceCount = 0;
     recordedBuffers.clear();
     fallbackBuffers.clear();
+    pendingLoads.clear();
+    failedLoads.clear();
     ctx.close();
     ctx = null;
   }
@@ -543,24 +670,62 @@ export function createAudioEngine() {
       return MAX_VOICES;
     },
     sampleForMidi(midi, velocity = 0.75) {
-      const samples = sourcesFor(midi, velocity);
-      if (!samples) return null;
+      const rootMidi = rootForMidi.get(midi);
+      if (rootMidi === undefined) return null;
+      const desired = velocityLayerWeights(velocity);
+      const recorded = desired
+        .map(({ layer }) => recordedBuffers.get(`${rootMidi}:${layer}`))
+        .filter(Boolean);
+      const backend =
+        recorded.length === desired.length
+          ? "recorded"
+          : recorded.length
+            ? "recorded-single-layer"
+            : "fallback";
       return {
         midi,
-        rootMidi: samples[0].root,
-        layerWeights: samples.map((sample) => ({
-          layer: VELOCITY_LAYERS[sample.layer].name,
-          weight: +sample.weight.toFixed(3),
+        rootMidi,
+        desiredLayers: desired.map(({ layer, weight }) => ({
+          layer: VELOCITY_LAYERS[layer].name,
+          weight: +weight.toFixed(3),
         })),
-        backend: samples.every((sample) => sample.backend === "recorded")
-          ? "recorded"
-          : "fallback",
-        urls: samples.map(
-          (sample) => manifestByKey.get(`${sample.root}:${sample.layer}`).url,
+        recordedReady: recorded.length === desired.length,
+        backendIfPlayedNow: backend,
+        urls: desired.map(
+          ({ layer }) => manifestByKey.get(`${rootMidi}:${layer}`).url,
         ),
-        semitoneShift: midi - samples[0].root,
-        playbackRate: Math.pow(2, (midi - samples[0].root) / 12),
-        seconds: samples.map((sample) => +sample.buffer.duration.toFixed(2)),
+        semitoneShift: midi - rootMidi,
+        playbackRate: Math.pow(2, (midi - rootMidi) / 12),
+      };
+    },
+    cacheStats() {
+      return {
+        decodedBuffers: recordedBuffers.size + fallbackBuffers.size,
+        decodedBytes: cacheBytes(),
+        cacheLimitBytes: MAX_DECODED_BYTES,
+        pendingLoads: pendingLoads.size,
+        evictions: cacheEvictions,
+        hits: cacheHits,
+        misses: cacheMisses,
+      };
+    },
+    resonanceStats() {
+      return {
+        sustain,
+        targetGain: sustain ? 1 : 0,
+        currentGain: resonanceExcitationGain
+          ? +resonanceExcitationGain.gain.value.toFixed(3)
+          : 0,
+        excitationLevel: resonanceGain
+          ? +resonanceGain.gain.value.toFixed(3)
+          : 0,
+      };
+    },
+    pedalStats() {
+      return {
+        sustain,
+        rateLimited: Boolean(ctx && ctx.currentTime - lastPedalAt < 0.06),
+        lastPedalAt,
       };
     },
     /** DEV only: absolute peak of the current output block, 1.0 = full scale. */
@@ -592,15 +757,12 @@ export function createAudioEngine() {
         loadedSamples: recordedBuffers.size,
         fallbackSamples: fallbackBuffers.size,
         totalSamples: manifest.length,
-        decodedMB: +(
-          [...recordedBuffers.values()].reduce(
-            (sum, b) => sum + b.length * b.numberOfChannels * 4,
-            0,
-          ) / 1048576
-        ).toFixed(1),
+        decodedMB: +(cacheBytes() / 1048576).toFixed(1),
         coverage,
-        resonanceGain: resonanceGain ? +resonanceGain.gain.value.toFixed(3) : 0,
-        dspSustain: Boolean(resonanceGain && sustain),
+        resonanceGain: resonanceExcitationGain
+          ? +resonanceExcitationGain.gain.value.toFixed(3)
+          : 0,
+        dspSustain: Boolean(resonanceExcitationGain && sustain),
       };
     },
     whenReady: () => loading ?? Promise.resolve(),

@@ -24,7 +24,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 - Full 88-key keyboard geometry
 - Mouse/touch key interaction
 - Computer-keyboard performance controls
-- Simplified synthesized piano audio
+- Recorded acoustic piano samples with a bounded generated fallback
 - Autoplay demonstration using the opening theme of _Für Elise_
 - Free orbit, zoom, and pan inspection camera
 - Normal inspection mode
@@ -67,7 +67,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | ------------------ | -------------- | ----------------------------------------------------------------------- |
 | 3D / WebGL         | Three.js       | Scene graph, geometry, materials, lighting, raycasting, camera controls |
 | Build tooling      | Vite           | Fast local development and optimized production builds                  |
-| Audio              | Web Audio API  | Lightweight synthesized note playback and autoplay                      |
+| Audio              | Web Audio API  | Recorded-sample piano playback, acoustic buses, and autoplay            |
 | UI                 | HTML + CSS     | Responsive controls and inspector overlays                              |
 | CI                 | GitHub Actions | Build verification on pushes and pull requests                          |
 | Deployment         | GitHub Pages   | Static production hosting from the `main` branch                        |
@@ -179,7 +179,7 @@ PCM reserved for a cold load or a failed recorded asset.
 | Root samples       | 16, from A0 through C8                                  |
 | Velocity layers    | 3 real captures (original layers 4 / 9 / 14) = 48 files |
 | Shipped asset size | 3.56 MiB Ogg/Opus, mono 48 kHz                          |
-| Decoded memory     | ~119.4 MiB after all 48 mono files decode               |
+| Decoded cache      | 56 MiB bounded working set (about 48 MiB pinned core)   |
 | Polyphony          | 64 voices                                               |
 
 **Attribution.** “Salamander Grand Piano V3 by Alexander Holm, licensed under
@@ -194,16 +194,24 @@ from velocity 0.30–0.46; medium↔forte does the same from 0.64–0.80. The bl
 uses equal-power gains, so it is one logical voice even when it has two sample
 source nodes.
 
-**Asset loading.** The data-driven manifest uses public assets beneath
+**Lazy decode and cache.** The data-driven manifest uses public assets beneath
 `${import.meta.env.BASE_URL}audio/salamander/`, which works under both local
-development and the GitHub Pages repository base path. AudioBuffers are fetched
-and decoded once, never during `noteOn`, with midrange recording assets loaded
-first.
+development and the GitHub Pages repository base path. The C3–C6 mapped range
+(roots D♯3 through A5, all three layers) is pinned and decoded first; this is
+about 48 MiB of mono 48 kHz PCM. Bass and high-register captures load only when
+played. Recorded and fallback buffers share a 56 MiB LRU-like decoded cache:
+unpinned recorded entries are evicted first, then generated fallbacks, while an
+active `AudioBufferSourceNode` continues safely after its cache entry is gone.
+Concurrent requests for one root/layer share one fetch/decode promise.
 
 **Fallback.** If a recording fails to load, or no recording has reached the
-requested note yet during cold load, the engine generates and caches additive
-PCM for that root/layer. It is explicitly a synthetic fallback, not a recorded
-sample; DEV diagnostics identify the active backend per MIDI note.
+requested note yet during cold load, the engine immediately generates an
+additive PCM fallback for that attack and queues the recording for a later
+attack. It never crossfades synthetic and recorded layers in one note. Once a
+recording is ready it wins for future notes and replaces its fallback cache
+entry. The DEV audio hook offers side-effect-free `sampleForMidi()`, bounded
+cache `cacheStats()`, plus `voiceStats()`, `resonanceStats()`, and
+`pedalStats()` diagnostics before or after audio initialization.
 
 ## Operations
 

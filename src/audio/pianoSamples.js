@@ -273,8 +273,8 @@ export function renderFallbackSample(entry, sampleRate) {
  */
 export function createImpulseResponse(context, kind) {
   const isRoom = kind === "room";
-  const seconds = isRoom ? 1.5 : 2.6;
-  const decay = isRoom ? 3.2 : 2.1;
+  const seconds = isRoom ? 1.15 : 2.2;
+  const decay = isRoom ? 3.9 : 1.8;
   const length = Math.floor(seconds * context.sampleRate);
   const buffer = context.createBuffer(2, length, context.sampleRate);
   let seed = isRoom ? 12345 : 67890;
@@ -284,16 +284,22 @@ export function createImpulseResponse(context, kind) {
     for (let i = 0; i < length; i++) {
       seed = (seed * 9301 + 49297) % 233280;
       const white = (seed / 233280) * 2 - 1;
-      // The resonance bus is deliberately duller than the room.
-      lp += (isRoom ? 0.55 : 0.16) * (white - lp);
-      data[i] = lp * Math.pow(1 - i / length, decay);
+      // The resonance bus is darker and retains a low-level tail, which reads
+      // as undamped strings rather than a second generic room.
+      lp += (isRoom ? 0.48 : 0.105) * (white - lp);
+      const progress = i / length;
+      const envelope = isRoom
+        ? Math.pow(1 - progress, decay)
+        : 0.68 * Math.pow(1 - progress, 1.25) +
+          0.32 * Math.pow(1 - progress, 4.6);
+      data[i] = lp * envelope;
     }
     // A couple of early reflections stop the room sounding like a noise cloud.
     if (isRoom) {
       for (const [delay, gain] of [
-        [0.011, 0.5],
-        [0.023, 0.36],
-        [0.037, 0.24],
+        [0.009, 0.42],
+        [0.019, 0.28],
+        [0.031, 0.16],
       ]) {
         const offset = Math.floor(delay * context.sampleRate) + channel * 17;
         if (offset < length) data[offset] += gain;
@@ -305,7 +311,7 @@ export function createImpulseResponse(context, kind) {
 
 /** Short filtered noise used for the sustain pedal's felt and linkage. */
 export function createPedalNoise(context, kind) {
-  const seconds = kind === "down" ? 0.11 : 0.08;
+  const seconds = kind === "down" ? 0.09 : 0.065;
   const length = Math.floor(seconds * context.sampleRate);
   const buffer = context.createBuffer(1, length, context.sampleRate);
   const data = buffer.getChannelData(0);
@@ -314,13 +320,14 @@ export function createPedalNoise(context, kind) {
   for (let i = 0; i < length; i++) {
     seed = (seed * 9301 + 49297) % 233280;
     const white = (seed / 233280) * 2 - 1;
-    lp += (kind === "down" ? 0.16 : 0.28) * (white - lp);
+    lp += (kind === "down" ? 0.1 : 0.22) * (white - lp);
     const t = i / length;
-    // Pedal-down thumps; pedal-up is a shorter, brighter felt release.
+    // Pedal down is a soft rail/felt lift; pedal up is shorter and firmer as
+    // dampers return. Both stay well beneath a medium piano note.
     const envelope =
       kind === "down"
-        ? Math.exp(-t * 7) * (1 - Math.exp(-t * 60))
-        : Math.exp(-t * 12);
+        ? Math.exp(-t * 8.5) * (1 - Math.exp(-t * 80))
+        : Math.exp(-t * 16) * (1 - Math.exp(-t * 120));
     data[i] = lp * envelope;
   }
   return buffer;
