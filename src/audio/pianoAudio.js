@@ -5,7 +5,9 @@ import {
   createPedalNoise,
   createSampleManifest,
   midiToFrequency,
-  renderSample,
+  renderFallbackSample,
+  validateSampleCoverage,
+  velocityLayerWeights,
 } from "./pianoSamples.js";
 
 /**
@@ -84,8 +86,13 @@ export function createAudioEngine() {
   let analyser = null; // DEV-only output tap for headroom checks
   let disposed = false;
 
-  const buffers = new Map(); // `${rootMidi}:${layer}` -> AudioBuffer
+  const recordedBuffers = new Map(); // `${rootMidi}:${layer}` -> AudioBuffer
+  const fallbackBuffers = new Map(); // generated PCM only when recordings are unavailable
   const manifest = createSampleManifest();
+  const manifestByKey = new Map(
+    manifest.map((entry) => [`${entry.rootMidi}:${entry.layer}`, entry]),
+  );
+  const coverage = validateSampleCoverage(manifest);
   const roots = [...new Set(manifest.map((entry) => entry.rootMidi))].sort(
     (a, b) => a - b,
   );
@@ -129,12 +136,14 @@ export function createAudioEngine() {
     const room = ctx.createConvolver();
     room.buffer = createImpulseResponse(ctx, "room");
     roomGain = ctx.createGain();
-    roomGain.gain.value = 0.19; // restrained: attacks stay dry and precise
+    // The close-miked recordings already carry a little natural space.
+    roomGain.gain.value = 0.13;
 
     const resonance = ctx.createConvolver();
     resonance.buffer = createImpulseResponse(ctx, "resonance");
     resonanceGain = ctx.createGain();
-    resonanceGain.gain.value = 0;
+    // Mirror a pedal that may have been held before the first audio unlock.
+    resonanceGain.gain.value = sustain ? 0.14 : 0;
 
     pedalGain = ctx.createGain();
     pedalGain.gain.value = 0.055;
@@ -170,10 +179,8 @@ export function createAudioEngine() {
   }
 
   /**
-   * Render the sample set off the realtime path. The exposed midrange is built
-   * first so the first note a player reaches for is ready soonest; the work is
-   * yielded between entries so the render loop keeps running. Until an entry
-   * exists the fallback voice covers it, so no keypress is ever silent.
+   * Decode recorded assets off the realtime path. Midrange arrives first; a
+   * missing or not-yet-arrived recording falls back to generated PCM.
    */
   function loadSamples() {
     if (loading) return loading;
@@ -185,16 +192,14 @@ export function createAudioEngine() {
       for (const entry of ordered) {
         if (disposed) return;
         try {
-          const pcm = entry.url
-            ? await fetchSample(entry.url)
-            : renderSample(entry, ctx.sampleRate);
-          const buffer = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
-          buffer.getChannelData(0).set(pcm);
-          buffers.set(`${entry.rootMidi}:${entry.layer}`, buffer);
+          const buffer = await fetchSample(entry.url);
+          recordedBuffers.set(`${entry.rootMidi}:${entry.layer}`, buffer);
         } catch (error) {
+          const key = `${entry.rootMidi}:${entry.layer}`;
+          fallbackBuffers.set(key, renderFallbackBuffer(entry));
           if (import.meta.env.DEV)
             console.warn(
-              "Piano sample unavailable, using fallback voice.",
+              "Recorded piano sample unavailable, using generated fallback.",
               entry,
               error,
             );
@@ -205,12 +210,12 @@ export function createAudioEngine() {
           await yieldToEventLoop();
           sliceStart = performance.now();
         }
-        ready = buffers.size > 0;
+        ready = recordedBuffers.size > 0;
       }
-      ready = buffers.size > 0;
+      ready = recordedBuffers.size > 0;
       if (import.meta.env.DEV && !ready)
         console.warn(
-          "No piano samples rendered; the engine stays on fallback voices.",
+          "No recorded piano samples loaded; the engine stays on generated fallback PCM.",
         );
     })();
     return loading;
@@ -218,31 +223,63 @@ export function createAudioEngine() {
 
   /** Vite resolves BASE_URL, so recorded assets keep working on GitHub Pages. */
   async function fetchSample(url) {
-    const response = await fetch(new URL(url, import.meta.env.BASE_URL).href);
+    const response = await fetch(`${import.meta.env.BASE_URL}${url}`);
     if (!response.ok) throw new Error(`${response.status} ${url}`);
-    const decoded = await ctx.decodeAudioData(await response.arrayBuffer());
-    return decoded.getChannelData(0);
+    return ctx.decodeAudioData(await response.arrayBuffer());
   }
 
-  function layerFor(velocity) {
-    let layer = 0;
-    for (let i = 0; i < VELOCITY_LAYERS.length; i++) {
-      if (velocity >= VELOCITY_LAYERS[i].threshold) layer = i;
-    }
-    return layer;
+  function renderFallbackBuffer(entry) {
+    const pcm = renderFallbackSample(entry, ctx.sampleRate);
+    const buffer = ctx.createBuffer(1, pcm.length, ctx.sampleRate);
+    buffer.getChannelData(0).set(pcm);
+    return buffer;
   }
 
-  function bufferFor(midi, velocity) {
+  function bufferForLayer(root, layer) {
+    const key = `${root}:${layer}`;
+    const recorded = recordedBuffers.get(key);
+    if (recorded) return { buffer: recorded, root, layer, backend: "recorded" };
+    const fallback = fallbackBuffers.get(key);
+    if (fallback) return { buffer: fallback, root, layer, backend: "fallback" };
+    return null;
+  }
+
+  function sourcesFor(midi, velocity) {
     const root = rootForMidi.get(midi);
     if (root === undefined) return null;
-    const wanted = layerFor(velocity);
-    // Fall back through neighbouring layers so a partially rendered set still
-    // plays the right pitch rather than dropping to the synth.
-    for (const layer of [wanted, wanted - 1, wanted + 1, 0]) {
-      const buffer = buffers.get(`${root}:${layer}`);
-      if (buffer) return { buffer, root, layer };
+    const weights = velocityLayerWeights(velocity);
+    const recorded = weights
+      .map(({ layer, weight }) => ({ ...bufferForLayer(root, layer), weight }))
+      .filter((sample) => sample.buffer && sample.backend === "recorded");
+    const available = recorded.length
+      ? recorded
+      : weights
+          .map(({ layer, weight }) => ({
+            ...bufferForLayer(root, layer),
+            weight,
+          }))
+          .filter((sample) => sample.buffer);
+    if (!available.length) {
+      const preferred = weights.at(-1).layer;
+      const key = `${root}:${preferred}`;
+      const entry = manifestByKey.get(key);
+      const fallback = renderFallbackBuffer(entry);
+      fallbackBuffers.set(key, fallback);
+      return [
+        {
+          buffer: fallback,
+          root,
+          layer: preferred,
+          weight: 1,
+          backend: "fallback",
+        },
+      ];
     }
-    return null;
+    const energy = Math.hypot(...available.map((sample) => sample.weight));
+    return available.map((sample) => ({
+      ...sample,
+      weight: sample.weight / energy,
+    }));
   }
 
   /** Free the voice's slot. Idempotent; leaves the nodes alone. */
@@ -257,6 +294,8 @@ export function createAudioEngine() {
     unregister(voice);
     try {
       voice.output.disconnect();
+      voice.filter.disconnect();
+      voice.layerGains.forEach((gain) => gain.disconnect());
     } catch {
       /* already torn down */
     }
@@ -297,10 +336,12 @@ export function createAudioEngine() {
       now,
     );
     voice.output.gain.exponentialRampToValueAtTime(1e-4, now + seconds);
-    try {
-      voice.source.stop(now + seconds + 0.02);
-    } catch {
-      /* already stopped */
+    for (const source of voice.sources) {
+      try {
+        source.stop(now + seconds + 0.02);
+      } catch {
+        /* already stopped */
+      }
     }
     voice.released = true;
   }
@@ -316,7 +357,10 @@ export function createAudioEngine() {
     // hogging voices.
     const existing = activeVoices.get(midi);
     if (existing && existing.size >= MAX_VOICES_PER_NOTE) {
-      endVoice([...existing][0], 0.12);
+      const victim =
+        [...existing].find((voice) => voice.released) || [...existing][0];
+      endVoice(victim, 0.08);
+      unregister(victim);
     }
     while (voiceCount >= MAX_VOICES && stealVoice());
 
@@ -331,40 +375,55 @@ export function createAudioEngine() {
     );
     filter.Q.value = 0.4;
 
-    const sample = bufferFor(midi, level);
-    let source;
-    if (sample) {
-      source = ctx.createBufferSource(); // one-shot: never reused
-      source.buffer = sample.buffer;
-      source.playbackRate.value = Math.pow(2, (midi - sample.root) / 12);
-    } else {
-      source = createFallbackSource(midi, level, now);
-    }
+    const samples = sourcesFor(midi, level);
+    if (!samples?.length) return now;
 
     const peak = velocityGain(level) * 0.5;
-    output.gain.setValueAtTime(0.0001, now);
-    // Harder strikes reach peak marginally faster, softer ones bloom in.
-    output.gain.exponentialRampToValueAtTime(
-      peak,
-      now + 0.004 + 0.008 * (1 - level),
-    );
+    const recorded = samples.some((sample) => sample.backend === "recorded");
+    output.gain.setValueAtTime(recorded ? peak : 0.0001, now);
+    // Preserve real hammer transients; generated fallback can use a gentle ramp.
+    if (!recorded)
+      output.gain.exponentialRampToValueAtTime(
+        peak,
+        now + 0.004 + 0.008 * (1 - level),
+      );
 
-    source.connect(filter);
+    const sources = [];
+    const layerGains = [];
+    for (const sample of samples) {
+      const source = ctx.createBufferSource(); // one-shot: never reused
+      const layerGain = ctx.createGain();
+      source.buffer = sample.buffer;
+      source.playbackRate.value = Math.pow(2, (midi - sample.root) / 12);
+      layerGain.gain.setValueAtTime(sample.weight, now);
+      source.connect(layerGain);
+      layerGain.connect(filter);
+      sources.push(source);
+      layerGains.push(layerGain);
+    }
     filter.connect(output);
     output.connect(dry);
-    source.start(now);
 
     const voice = {
       midi,
-      source,
+      sources,
+      layerGains,
       output,
       filter,
       startedAt: now,
       velocity: level,
       released: false,
-      sampled: Boolean(sample),
+      sampled: recorded,
+      backends: samples.map((sample) => sample.backend),
+      pendingSources: sources.length,
     };
-    source.onended = () => removeVoice(voice);
+    for (const source of sources) {
+      source.onended = () => {
+        voice.pendingSources--;
+        if (voice.pendingSources === 0) removeVoice(voice);
+      };
+      source.start(now);
+    }
     let set = activeVoices.get(midi);
     if (!set) activeVoices.set(midi, (set = new Set()));
     set.add(voice);
@@ -438,45 +497,13 @@ export function createAudioEngine() {
     source.start(now);
   }
 
-  /** Compact oscillator voice, used only until a sample exists for the note. */
-  function createFallbackSource(midi, velocity, now) {
-    const merger = ctx.createGain();
-    const f = midiToFrequency(midi);
-    for (const [mul, type, level] of [
-      [1, "triangle", 0.34],
-      [2, "sine", 0.08],
-      [3, "sine", 0.03],
-    ]) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type;
-      osc.frequency.value = f * mul;
-      gain.gain.setValueAtTime(level, now);
-      gain.gain.setTargetAtTime(level * 0.25, now, 0.9);
-      osc.connect(gain);
-      gain.connect(merger);
-      osc.start(now);
-      merger._oscillators = (merger._oscillators || []).concat(osc);
-    }
-    merger.start = () => {};
-    merger.stop = (when) =>
-      merger._oscillators.forEach((osc) => osc.stop(when));
-    Object.defineProperty(merger, "onended", {
-      set(handler) {
-        merger._oscillators.at(-1).onended = handler;
-      },
-      configurable: true,
-    });
-    return merger;
-  }
-
   function dispose() {
     disposed = true;
     if (!ctx) return;
     for (const set of [...activeVoices.values()]) {
       for (const voice of [...set]) {
         try {
-          voice.source.stop();
+          voice.sources.forEach((source) => source.stop());
         } catch {
           /* already stopped */
         }
@@ -485,7 +512,8 @@ export function createAudioEngine() {
     }
     activeVoices.clear();
     voiceCount = 0;
-    buffers.clear();
+    recordedBuffers.clear();
+    fallbackBuffers.clear();
     ctx.close();
     ctx = null;
   }
@@ -509,21 +537,30 @@ export function createAudioEngine() {
       return voiceCount;
     },
     get loadedSampleCount() {
-      return buffers.size;
+      return recordedBuffers.size;
     },
     get maxVoices() {
       return MAX_VOICES;
     },
     sampleForMidi(midi, velocity = 0.75) {
-      const sample = bufferFor(midi, velocity);
-      if (!sample) return null;
+      const samples = sourcesFor(midi, velocity);
+      if (!samples) return null;
       return {
         midi,
-        rootMidi: sample.root,
-        layer: VELOCITY_LAYERS[sample.layer].name,
-        semitoneShift: midi - sample.root,
-        playbackRate: Math.pow(2, (midi - sample.root) / 12),
-        seconds: +sample.buffer.duration.toFixed(2),
+        rootMidi: samples[0].root,
+        layerWeights: samples.map((sample) => ({
+          layer: VELOCITY_LAYERS[sample.layer].name,
+          weight: +sample.weight.toFixed(3),
+        })),
+        backend: samples.every((sample) => sample.backend === "recorded")
+          ? "recorded"
+          : "fallback",
+        urls: samples.map(
+          (sample) => manifestByKey.get(`${sample.root}:${sample.layer}`).url,
+        ),
+        semitoneShift: midi - samples[0].root,
+        playbackRate: Math.pow(2, (midi - samples[0].root) / 12),
+        seconds: samples.map((sample) => +sample.buffer.duration.toFixed(2)),
       };
     },
     /** DEV only: absolute peak of the current output block, 1.0 = full scale. */
@@ -552,12 +589,18 @@ export function createAudioEngine() {
         notes: activeVoices.size,
         maxVoices: MAX_VOICES,
         sustain,
-        loadedSamples: buffers.size,
+        loadedSamples: recordedBuffers.size,
+        fallbackSamples: fallbackBuffers.size,
         totalSamples: manifest.length,
         decodedMB: +(
-          [...buffers.values()].reduce((sum, b) => sum + b.length * 4, 0) /
-          1048576
+          [...recordedBuffers.values()].reduce(
+            (sum, b) => sum + b.length * b.numberOfChannels * 4,
+            0,
+          ) / 1048576
         ).toFixed(1),
+        coverage,
+        resonanceGain: resonanceGain ? +resonanceGain.gain.value.toFixed(3) : 0,
+        dspSustain: Boolean(resonanceGain && sustain),
       };
     },
     whenReady: () => loading ?? Promise.resolve(),

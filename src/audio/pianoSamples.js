@@ -1,25 +1,36 @@
 /**
  * Sample set for the piano engine.
  *
- * The manifest is data: each entry names a root MIDI note and a velocity
- * layer. Entries may carry a `url`, in which case the loader fetches and
- * decodes that file; entries without one are rendered offline into the same
- * AudioBuffer shape. Swapping in recorded samples is therefore a data change,
- * not an engine change.
- *
- * The bundled set is rendered rather than recorded, so the repository carries
- * no third-party audio and no licence obligations. Rendering happens once, off
- * the realtime path, which buys a far richer partial structure than the
- * per-voice synthesis it replaces: inharmonic partial series, per-partial
- * decay rates, the piano's characteristic double decay, unison beating and a
- * hammer transient.
+ * The default manifest names compact local derivatives of real Salamander
+ * Grand Piano V3 recordings. The engine fetches and decodes those assets once.
+ * `renderFallbackSample()` remains a generated additive PCM fallback for a
+ * missing asset, a network failure, or a cold load before a recording arrives.
  */
 
-// Root notes every five semitones, so no key is transposed more than ~2.5
-// semitones. A0 and C8 are pinned so the extremes are never extrapolated.
+// Six-semitone root spacing bounds the measured range to +3 / -2 semitones.
+// A0 and C8 are pinned so the extremes are never extrapolated.
 const ROOT_MIDI = [
-  21, 26, 31, 36, 41, 46, 51, 56, 61, 66, 71, 76, 81, 86, 91, 96, 101, 108,
+  21, 27, 33, 39, 45, 51, 57, 63, 69, 75, 81, 87, 93, 99, 105, 108,
 ];
+
+const ROOT_FILE_STEMS = new Map([
+  [21, "A0"],
+  [27, "D1s"],
+  [33, "A1"],
+  [39, "D2s"],
+  [45, "A2"],
+  [51, "D3s"],
+  [57, "A3"],
+  [63, "D4s"],
+  [69, "A4"],
+  [75, "D5s"],
+  [81, "A5"],
+  [87, "D6s"],
+  [93, "A6"],
+  [99, "D7s"],
+  [105, "A7"],
+  [108, "C8"],
+]);
 
 /**
  * Velocity layers. `threshold` is the lower bound of the layer's region; the
@@ -27,18 +38,83 @@ const ROOT_MIDI = [
  * two different instruments.
  */
 export const VELOCITY_LAYERS = [
-  { name: "soft", threshold: 0, brightness: 0.42, partials: 14, noise: 0.1 },
+  {
+    name: "soft",
+    threshold: 0,
+    sourceVelocity: 4,
+    brightness: 0.42,
+    partials: 14,
+    noise: 0.1,
+  },
   {
     name: "medium",
     threshold: 0.38,
+    sourceVelocity: 9,
     brightness: 0.72,
     partials: 22,
     noise: 0.3,
   },
-  { name: "forte", threshold: 0.72, brightness: 1, partials: 30, noise: 0.62 },
+  {
+    name: "forte",
+    threshold: 0.72,
+    sourceVelocity: 14,
+    brightness: 1,
+    partials: 30,
+    noise: 0.62,
+  },
 ];
 
 export const midiToFrequency = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+
+/** Equal-power gain weights for the soft/medium and medium/forte overlaps. */
+export function velocityLayerWeights(velocity) {
+  if (velocity <= 0.3) return [{ layer: 0, weight: 1 }];
+  if (velocity < 0.46) {
+    const t = (velocity - 0.3) / 0.16;
+    return [
+      { layer: 0, weight: Math.cos((Math.PI * t) / 2) },
+      { layer: 1, weight: Math.sin((Math.PI * t) / 2) },
+    ];
+  }
+  if (velocity <= 0.64) return [{ layer: 1, weight: 1 }];
+  if (velocity < 0.8) {
+    const t = (velocity - 0.64) / 0.16;
+    return [
+      { layer: 1, weight: Math.cos((Math.PI * t) / 2) },
+      { layer: 2, weight: Math.sin((Math.PI * t) / 2) },
+    ];
+  }
+  return [{ layer: 2, weight: 1 }];
+}
+
+/** Measure the actual nearest-root mapping instead of trusting root spacing. */
+export function validateSampleCoverage(manifest = createSampleManifest()) {
+  const roots = [...new Set(manifest.map((entry) => entry.rootMidi))].sort(
+    (a, b) => a - b,
+  );
+  let maximumPositive = -Infinity;
+  let maximumNegative = Infinity;
+  const positiveMidi = [];
+  const negativeMidi = [];
+  for (let midi = 21; midi <= 108; midi++) {
+    let root = roots[0];
+    for (const candidate of roots) {
+      if (Math.abs(candidate - midi) < Math.abs(root - midi)) root = candidate;
+    }
+    const shift = midi - root;
+    if (shift > maximumPositive) {
+      maximumPositive = shift;
+      positiveMidi.length = 0;
+    }
+    if (shift === maximumPositive) positiveMidi.push(midi);
+    if (shift < maximumNegative) {
+      maximumNegative = shift;
+      negativeMidi.length = 0;
+    }
+    if (shift === maximumNegative) negativeMidi.push(midi);
+  }
+  return { maximumPositive, maximumNegative, positiveMidi, negativeMidi };
+}
 
 /** Longer, darker tails at the bottom; short and bright at the top. */
 function sampleSeconds(midi) {
@@ -61,7 +137,7 @@ function inharmonicity(midi) {
   );
 }
 
-/** The manifest: one entry per root note per velocity layer. */
+/** The recorded manifest: one local Ogg/Opus file per root and velocity layer. */
 export function createSampleManifest() {
   const entries = [];
   for (const rootMidi of ROOT_MIDI) {
@@ -70,7 +146,7 @@ export function createSampleManifest() {
         rootMidi,
         layer,
         seconds: sampleSeconds(rootMidi),
-        // url: `piano/${rootMidi}-${VELOCITY_LAYERS[layer].name}.ogg`
+        url: `audio/salamander/${ROOT_FILE_STEMS.get(rootMidi)}-v${VELOCITY_LAYERS[layer].sourceVelocity}.ogg`,
       });
     }
   }
@@ -84,7 +160,7 @@ export function createSampleManifest() {
  * secondary slow tail (the piano's double decay), three slightly detuned
  * unison strings for beating, and a short filtered hammer noise burst.
  */
-export function renderSample(entry, sampleRate) {
+export function renderFallbackSample(entry, sampleRate) {
   const layer = VELOCITY_LAYERS[entry.layer];
   const f0 = midiToFrequency(entry.rootMidi);
   const length = Math.floor(entry.seconds * sampleRate);
