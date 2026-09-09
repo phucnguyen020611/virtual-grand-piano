@@ -63,7 +63,7 @@ function releaseSeconds(midi, velocity, age, reason) {
 }
 
 const MAX_DECODED_BYTES = 56 * 1024 * 1024;
-const CORE_ROOTS = new Set([51, 57, 63, 69, 75, 81]);
+const CORE_ROOTS = new Set([45, 51, 57, 63, 69, 75, 81]);
 
 function bufferBytes(buffer) {
   return buffer.length * buffer.numberOfChannels * 4;
@@ -88,7 +88,7 @@ export function createAudioEngine() {
   const recordedBuffers = new Map(); // `${rootMidi}:${layer}` -> cache entry
   const fallbackBuffers = new Map(); // generated PCM cache entries
   const pendingLoads = new Map();
-  const failedLoads = new Set();
+  const failedLoads = new Map();
   let cacheEvictions = 0;
   let cacheHits = 0;
   let cacheMisses = 0;
@@ -112,14 +112,19 @@ export function createAudioEngine() {
 
   const activeVoices = new Map(); // midi -> Set<voice>, consumed by the controller
   let voiceCount = 0;
+  let physicalSourceCount = 0;
   let sustain = false;
   let ready = false;
   let loading = null;
   let lastPedalAt = -1;
+  let fallbackWarmup = null;
 
   function ensureAudio() {
     if (ctx) return ctx;
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx = new (window.AudioContext || window.webkitAudioContext)({
+      latencyHint: "interactive",
+      sampleRate: 48000,
+    });
 
     master = ctx.createGain();
     // Staged so even a 64-voice fortissimo cluster stays under full scale; the
@@ -219,9 +224,17 @@ export function createAudioEngine() {
 
   /** Vite resolves BASE_URL, so recorded assets keep working on GitHub Pages. */
   async function fetchSample(url) {
-    const response = await fetch(`${import.meta.env.BASE_URL}${url}`);
-    if (!response.ok) throw new Error(`${response.status} ${url}`);
-    return ctx.decodeAudioData(await response.arrayBuffer());
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL}${url}`, {
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`${response.status} ${url}`);
+      return await ctx.decodeAudioData(await response.arrayBuffer());
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   function cacheBytes() {
@@ -267,16 +280,21 @@ export function createAudioEngine() {
       cacheHits++;
       return pending;
     }
-    if (failedLoads.has(key)) return Promise.resolve(null);
+    const failedAt = failedLoads.get(key);
+    if (failedAt !== undefined && performance.now() - failedAt < 30000)
+      return Promise.resolve(null);
     cacheMisses++;
     const promise = fetchSample(entry.url)
       .then((buffer) => {
         if (disposed) return null;
+        failedLoads.delete(key);
         recordedBuffers.set(key, {
           buffer,
           bytes: bufferBytes(buffer),
           lastUsed: performance.now(),
-          pinned: CORE_ROOTS.has(entry.rootMidi),
+          // Keep the default keyboard blend resident; soft captures remain
+          // evictable so A0 and C8 can coexist without evicting each other.
+          pinned: CORE_ROOTS.has(entry.rootMidi) && entry.layer > 0,
         });
         // A generated version is unnecessary once a real recording is warm.
         fallbackBuffers.delete(key);
@@ -284,7 +302,7 @@ export function createAudioEngine() {
         return buffer;
       })
       .catch((error) => {
-        failedLoads.add(key);
+        failedLoads.set(key, performance.now());
         if (import.meta.env.DEV)
           console.warn(
             "Recorded piano sample unavailable, using generated fallback.",
@@ -317,6 +335,21 @@ export function createAudioEngine() {
     });
     evictCache();
     return buffer;
+  }
+
+  // Pay for the default first key and extreme-register fallbacks during entry,
+  // not a musical attack. Yield between buffers so the loading UI can paint.
+  function warmFallbacks() {
+    if (fallbackWarmup) return fallbackWarmup;
+    fallbackWarmup = (async () => {
+      for (const root of [45, 21, 108]) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        if (disposed || !ctx) return;
+        const key = `${root}:2`;
+        if (!recordedBuffers.has(key)) fallbackFor(manifestByKey.get(key));
+      }
+    })();
+    return fallbackWarmup;
   }
 
   function bufferForLayer(root, layer) {
@@ -448,9 +481,13 @@ export function createAudioEngine() {
   }
 
   function noteOn(midi, velocity = 0.75) {
-    ensureAudio();
-    if (ctx.state === "suspended") ctx.resume();
-    if (!Number.isFinite(midi)) return ctx.currentTime;
+    if (!rootForMidi.has(midi) || !Number.isFinite(velocity)) return null;
+    try {
+      ensureAudio();
+    } catch {
+      return null;
+    }
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
     const level = Math.max(0, Math.min(1, velocity));
     const now = ctx.currentTime;
 
@@ -465,6 +502,9 @@ export function createAudioEngine() {
     }
     while (voiceCount >= MAX_VOICES && stealVoice());
 
+    const samples = sourcesFor(midi, level);
+    if (!samples?.length) return now;
+
     const output = ctx.createGain();
     const filter = ctx.createBiquadFilter();
     const resonanceSend = ctx.createGain();
@@ -476,9 +516,6 @@ export function createAudioEngine() {
       900 + midiToFrequency(midi) * (3 + 9 * Math.pow(level, 1.3)),
     );
     filter.Q.value = 0.4;
-
-    const samples = sourcesFor(midi, level);
-    if (!samples?.length) return now;
 
     const peak = velocityGain(level) * 0.5;
     const recorded = samples.some((sample) => sample.backend === "recorded");
@@ -529,7 +566,9 @@ export function createAudioEngine() {
       pendingSources: sources.length,
     };
     for (const source of sources) {
+      physicalSourceCount++;
       source.onended = () => {
+        physicalSourceCount--;
         voice.pendingSources--;
         if (voice.pendingSources === 0) removeVoice(voice);
       };
@@ -647,6 +686,7 @@ export function createAudioEngine() {
 
   return {
     ensureAudio,
+    warmFallbacks,
     resume: () => ctx?.resume(),
     noteOn,
     noteOff,
@@ -704,6 +744,8 @@ export function createAudioEngine() {
         decodedBytes: cacheBytes(),
         cacheLimitBytes: MAX_DECODED_BYTES,
         pendingLoads: pendingLoads.size,
+        failedLoads: failedLoads.size,
+        sampleRate: ctx?.sampleRate ?? null,
         evictions: cacheEvictions,
         hits: cacheHits,
         misses: cacheMisses,
@@ -748,6 +790,7 @@ export function createAudioEngine() {
       }
       return {
         active: voiceCount,
+        physicalSources: physicalSourceCount,
         released,
         sampled,
         fallback: voiceCount - sampled,

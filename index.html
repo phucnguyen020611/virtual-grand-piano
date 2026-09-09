@@ -115,7 +115,7 @@
       <div class="helpGrid">
         <section>
           <h3>Play</h3>
-          <p>
+          <p id="playHelp">
             <kbd>Z–/</kbd> and <kbd>Q–[</kbd> play notes.
             <kbd>Space</kbd> sustains. <kbd>←</kbd>/<kbd>→</kbd> shifts octaves.
           </p>
@@ -144,9 +144,10 @@
 
     <section id="inspector" class="inspector" aria-labelledby="partName" inert>
       <div class="meta" id="partMeta">Piano anatomy</div>
-      <div class="part" id="partName">Select a piano part to inspect it.</div>
+      <div class="part" id="partName">Try Z X C · Space sustains</div>
       <p id="partText">
-        Switch to Exploded mode to reveal the instrument’s major systems.
+        Tap or drag across keys. After using controls, click the piano or Tab to
+        its performance surface to play with your keyboard.
       </p>
       <div class="progress" aria-hidden="true"><i id="songProgress"></i></div>
     </section>
@@ -162,6 +163,6 @@
     </div>
 
     <div id="labels" aria-hidden="true"></div>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/bootstrap.js"></script>
   </body>
 </html>

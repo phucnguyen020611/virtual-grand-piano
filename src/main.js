@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import "./style.css";
 
 import { createMaterials } from "./piano/materials.js";
 import { createPiano } from "./piano/createPiano.js";
@@ -32,12 +31,21 @@ const camera = new THREE.PerspectiveCamera(
   80,
 );
 camera.position.copy(NORMAL_DEFAULT_CAMERA_POSITION);
+// Preserve horizontal framing in portrait without resetting a user’s orbit.
+camera.zoom = Math.min(1, camera.aspect / 1.2);
+camera.updateProjectionMatrix();
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const renderPixelRatio = () =>
+  Math.min(
+    devicePixelRatio,
+    matchMedia("(pointer: coarse)").matches || innerWidth < 768 ? 1.5 : 2,
+  );
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
   powerPreference: "high-performance",
 });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(renderPixelRatio());
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -46,10 +54,19 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.96;
 renderer.domElement.tabIndex = 0;
 renderer.domElement.setAttribute("aria-label", "Piano performance surface");
+renderer.domElement.setAttribute("aria-describedby", "playHelp");
+renderer.domElement.addEventListener(
+  "pointerdown",
+  () => renderer.domElement.focus({ preventScroll: true }),
+  { capture: true },
+);
 document.querySelector("#scene").appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
+controls.enableDamping = !reducedMotion.matches;
+reducedMotion.addEventListener("change", () => {
+  controls.enableDamping = !reducedMotion.matches;
+});
 controls.dampingFactor = 0.055;
 controls.target.copy(NORMAL_DEFAULT_TARGET);
 controls.minDistance = 4;
@@ -62,6 +79,7 @@ scene.environment = environment.texture;
 const mats = createMaterials(renderer.capabilities.getMaxAnisotropy());
 const { stageTopY } = createStage(scene, mats);
 const lighting = createLighting(scene);
+lighting.lamp.visible = camera.aspect >= 0.9;
 
 const piano = createPiano(mats, stageTopY);
 scene.add(piano.group);
@@ -71,6 +89,9 @@ const { midiToKey, lidPivot, prop } = piano;
 if (import.meta.env.DEV) {
   window.__vgp = {
     THREE,
+    renderer,
+    camera,
+    controls,
     scene,
     piano,
     stageTopY,
@@ -312,7 +333,7 @@ function updateRecordingTimer(recording) {
   }
 }
 
-const compactControls = matchMedia("(max-width: 880px)");
+const compactControls = matchMedia("(max-width: 1180px)");
 function syncSecondaryControls() {
   secondaryControls.open = !compactControls.matches;
   secondarySummary.setAttribute(
@@ -325,6 +346,7 @@ syncSecondaryControls();
 
 const computerKeyboard = createComputerKeyboard({
   controller: pianoPerformance,
+  isEnabled: () => audioGate.classList.contains("hidden"),
   onRangeChange: ({ minMidi, maxMidi, canShiftDown, canShiftUp }) => {
     octaveLabel.textContent = `${midiToNoteName(minMidi)}–${midiToNoteName(maxMidi)}`;
     octaveDownBtn.disabled = !canShiftDown;
@@ -391,7 +413,7 @@ function updateRecordingUi() {
       : "Start recording",
   );
   recordBtn.setAttribute("aria-pressed", String(recording));
-  playRecordingBtn.disabled = !eventCount && !playback;
+  playRecordingBtn.disabled = recording || (!eventCount && !playback);
   playRecordingBtn.textContent = playback ? "Stop playback" : "Play recording";
   playRecordingBtn.setAttribute("aria-pressed", String(playback));
   updateRecordingTimer(recording);
@@ -437,8 +459,12 @@ lidBtn.onclick = () => {
   lidBtn.textContent = lidOpen ? "Close lid" : "Open lid";
   lidBtn.setAttribute("aria-pressed", String(lidOpen));
 };
-document.querySelector("#enterBtn").onclick = () => {
+document.querySelector("#enterBtn").onclick = async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  button.textContent = "Preparing piano…";
   prepareAudio();
+  await audio.warmFallbacks();
   audioGate.classList.add("hidden");
   audioGate.setAttribute("aria-hidden", "true");
   gatedInterface.forEach((element) => element.removeAttribute("inert"));
@@ -454,6 +480,14 @@ function setHelpOpen(open, { restoreFocus = true } = {}) {
   else if (restoreFocus) helpBtn.focus();
 }
 
+document.addEventListener("focusin", (event) => {
+  if (
+    !helpPanel.hidden &&
+    !helpPanel.contains(event.target) &&
+    event.target !== helpBtn
+  )
+    setHelpOpen(false, { restoreFocus: false });
+});
 helpBtn.onclick = () => setHelpOpen(helpPanel.hidden);
 helpCloseBtn.onclick = () => setHelpOpen(false);
 document.addEventListener("keydown", (event) => {
@@ -477,24 +511,37 @@ if (import.meta.env.DEV)
 const timer = new THREE.Timer();
 timer.connect(document);
 
+const propBase = new THREE.Vector3(3, 1.43, -0.2);
+const propTop = new THREE.Vector3();
+const propDirection = new THREE.Vector3();
+const propUp = new THREE.Vector3(0, 1, 0);
+
 function animate(timestamp) {
   requestAnimationFrame(animate);
   timer.update(timestamp);
   const dt = Math.min(timer.getDelta(), 0.035);
   controls.update();
 
-  explodedView.update(dt);
-  lighting.update(dt);
+  explodedView.update(dt, reducedMotion.matches);
+  lighting.update(reducedMotion.matches ? 100 : dt);
 
   const targetLid = lidOpen ? 0.32 : 0;
   lidPivot.rotation.z = THREE.MathUtils.damp(
     lidPivot.rotation.z,
     targetLid,
     5.5,
-    dt,
+    reducedMotion.matches ? 100 : dt,
   );
-  prop.scale.y = THREE.MathUtils.damp(prop.scale.y, lidOpen ? 1 : 0.06, 6, dt);
-  prop.visible = prop.scale.y > 0.08;
+  propTop.set(
+    -3.6 + 6.8 * Math.cos(lidPivot.rotation.z),
+    1.4 + 6.8 * Math.sin(lidPivot.rotation.z),
+    -0.2,
+  );
+  propDirection.subVectors(propTop, propBase);
+  prop.position.copy(propBase).addScaledVector(propDirection, 0.5);
+  prop.scale.y = propDirection.length();
+  prop.quaternion.setFromUnitVectors(propUp, propDirection.normalize());
+  prop.visible = lidPivot.rotation.z > 0.03;
 
   pianoPerformance.update(dt);
 
@@ -511,8 +558,10 @@ requestAnimationFrame(animate);
 
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
+  camera.zoom = Math.min(1, camera.aspect / 1.2);
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(renderPixelRatio());
+  lighting.lamp.visible = camera.aspect >= 0.9;
   explodedView.handleResize();
 });

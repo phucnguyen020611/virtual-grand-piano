@@ -393,7 +393,7 @@ export function buildAction(mats, layout, stringRoutes = []) {
     // Rear linkage and wippen make the key → hammer relationship legible.
     const capstan = new THREE.Mesh(capstanGeo, mats.bronze);
     capstan.position.set(0, DIM.caseTopY - 0.025, 1.91);
-    capstan.castShadow = capstan.receiveShadow = true;
+    capstan.receiveShadow = true;
     mechanism.add(capstan);
     const wippen = new THREE.Mesh(wippenGeo, mats.maple);
     wippen.position.set(
@@ -418,7 +418,7 @@ export function buildAction(mats, layout, stringRoutes = []) {
     hammerHead.position.y = hammerHeadY;
     hammerHead.rotation.z = Math.PI / 2;
     hammerHead.scale.set(0.65, 0.72, 1.18);
-    shank.castShadow = shank.receiveShadow = true;
+    shank.receiveShadow = true;
     hammerHead.castShadow = hammerHead.receiveShadow = true;
     hammerPivot.add(shank, hammerHead);
     mechanism.add(hammerPivot);
@@ -436,7 +436,7 @@ export function buildAction(mats, layout, stringRoutes = []) {
       stem.position.y = 0.055;
       damperHead = new THREE.Mesh(damperHeadGeo, mats.felt);
       damperHead.position.set(0, DIM.damperHeadOffsetY, DIM.damperHeadOffsetZ);
-      stem.castShadow = stem.receiveShadow = true;
+      stem.receiveShadow = true;
       damperHead.castShadow = damperHead.receiveShadow = true;
       damperPivot.add(stem, damperHead);
       mechanism.add(damperPivot);
@@ -565,7 +565,7 @@ export function buildPedals(mats) {
   // A compact lyre base leaves the brass pedal arms visibly clear in front.
   box(0.64, 0.1, 0.24, mats.blackLacquer, g, 0, 0.36, 2.1);
   // A back stay connecting the lyre to the case.
-  const stay = cyl(
+  cyl(
     0.03,
     0.03,
     1.4,
@@ -604,7 +604,7 @@ export function buildPedals(mats) {
       mesh.userData.partText =
         type === "sustain"
           ? "Hold to lift the dampers and sustain released notes."
-          : `${label} geometry is inspectable and animated; its acoustic behavior is reserved for a later mechanics phase.`;
+          : `${label} is shown for anatomical reference. Only the sustain pedal affects the sound.`;
       mesh.userData.partCategory = "Controls";
       mesh.userData.inspectable = true;
     }
@@ -632,6 +632,7 @@ export function buildLid(mats) {
 
   const pivot = new THREE.Group();
   pivot.position.set(-3.6, DIM.caseTopY, 0);
+  pivot.rotation.z = 0.32; // Initial open state also defines accurate exploded bounds.
   g.add(pivot);
 
   const lid = extrudeFlat(lidShape(), 0.06, mats.blackLacquer, 0.02);
@@ -647,7 +648,7 @@ export function buildLid(mats) {
   const prop = cyl(
     0.045,
     0.045,
-    2.2,
+    1,
     mats.blackSatin,
     g,
     2.92,
@@ -692,20 +693,19 @@ export function buildMusicDesk(mats) {
     new THREE.PlaneGeometry(1.55, 1.05, 8, 8),
     sheetMat,
   );
-  left.position.set(-0.82, 2.06, 1.63);
-  left.rotation.x = 0.2;
+  left.position.set(-0.82, 0.025, 0.065);
   left.rotation.y = 0.03;
   left.castShadow = true;
-  g.add(left);
+  board.add(left);
   const right = left.clone();
   right.position.x = 0.82;
   right.rotation.y = -0.03;
-  g.add(right);
+  board.add(right);
 
   return tag(
     g,
     "Music desk & score",
-    "A modeled music rack standing ahead of the lid, carrying a textured two-page score of the autoplay piece, Für Elise.",
+    "A modeled music rack standing ahead of the lid, carrying illustrative two-page sheet music. Use autoplay to hear Für Elise.",
     "Score",
   );
 }

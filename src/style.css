@@ -169,6 +169,7 @@ canvas {
 }
 
 .hud {
+  z-index: 11;
   inset: auto max(12px, env(safe-area-inset-right))
     max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   pointer-events: none;
@@ -517,7 +518,7 @@ kbd {
   font-size: 14px;
 }
 
-@media (min-width: 881px) {
+@media (min-width: 1181px) {
   .topbar {
     padding: 18px 22px 0;
   }
@@ -575,7 +576,7 @@ kbd {
   }
 }
 
-@media (max-width: 880px) {
+@media (max-width: 1180px) {
   .eyebrow {
     font-size: 9px;
   }
@@ -629,7 +630,7 @@ kbd {
   }
 
   .performanceGroup .controlRow {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
   }
 
   .performanceGroup button {
@@ -688,7 +689,7 @@ kbd {
   }
 }
 
-@media (max-height: 560px) and (orientation: landscape) {
+@media (max-height: 560px) {
   .topbar {
     padding-top: max(8px, env(safe-area-inset-top));
   }
@@ -721,5 +722,55 @@ kbd {
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
     animation-duration: 1ms !important;
+  }
+}
+
+/* The performance surface remains identifiable during keyboard navigation. */
+#scene canvas:focus-visible {
+  outline: 3px solid var(--ui-accent-strong);
+  outline-offset: -5px;
+}
+#statusText {
+  overflow-wrap: anywhere;
+}
+.audioGate {
+  overflow: auto;
+  align-items: safe center;
+}
+
+@media (max-width: 1180px) {
+  .secondaryContent {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    width: min(380px, calc(100vw - 24px));
+    max-height: calc(100dvh - 220px);
+    overflow: auto;
+    padding: 7px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+    background: var(--ui-panel);
+  }
+}
+
+/* At high zoom or short heights, scroll the controls instead of clipping them. */
+@media (max-height: 440px) {
+  .hud {
+    top: 58px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    overflow: auto;
+    align-content: end;
+  }
+  .secondaryContent {
+    position: static;
+    max-height: none;
+  }
+  .helpPanel {
+    top: 58px;
+    bottom: 8px;
+    max-height: none;
+  }
+  .brand .eyebrow {
+    display: none;
   }
 }

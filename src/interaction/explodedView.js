@@ -174,7 +174,8 @@ export function createExplodedView({ piano, camera, controls }) {
    * and horizontal FOV terms provide the height/width requirements.
    */
   function updateFitDistance() {
-    const halfVerticalFov = THREE.MathUtils.degToRad(camera.fov) * 0.5;
+    const halfVerticalFov =
+      THREE.MathUtils.degToRad(camera.getEffectiveFOV()) * 0.5;
     const verticalTan = Math.tan(halfVerticalFov);
     const horizontalTan = verticalTan * camera.aspect;
     const forwardX = -cameraDirection.x;
@@ -323,15 +324,15 @@ export function createExplodedView({ piano, camera, controls }) {
     controls.update();
   }
 
-  function update(dt) {
-    const alpha = 1 - Math.exp(-5.2 * dt);
+  function update(dt, reducedMotion = false) {
+    const alpha = reducedMotion ? 1 : 1 - Math.exp(-5.2 * dt);
     for (const component of components) {
       const target = targetExploded ? component.exploded : component.assembled;
       component.object.position.lerp(target.position, alpha);
       component.object.quaternion.slerp(target.quaternion, alpha);
       component.object.scale.lerp(target.scale, alpha);
     }
-    updateCamera(dt);
+    updateCamera(reducedMotion ? 100 : dt);
   }
 
   buildLayout();
