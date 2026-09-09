@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { createMaterials } from "./piano/materials.js";
+import { DIM } from "./piano/geometry.js";
 import { createPiano } from "./piano/createPiano.js";
 import { createStage } from "./scene/stage.js";
 import { createLighting } from "./scene/lighting.js";
@@ -83,7 +84,7 @@ lighting.lamp.visible = camera.aspect >= 0.9;
 
 const piano = createPiano(mats, stageTopY);
 scene.add(piano.group);
-const { midiToKey, lidPivot, prop } = piano;
+const { midiToKey, lidPivot } = piano;
 
 // Dev-only inspection hook for geometry validation (stripped from production).
 if (import.meta.env.DEV) {
@@ -511,11 +512,6 @@ if (import.meta.env.DEV)
 const timer = new THREE.Timer();
 timer.connect(document);
 
-const propBase = new THREE.Vector3(3, 1.43, -0.2);
-const propTop = new THREE.Vector3();
-const propDirection = new THREE.Vector3();
-const propUp = new THREE.Vector3(0, 1, 0);
-
 function animate(timestamp) {
   requestAnimationFrame(animate);
   timer.update(timestamp);
@@ -524,24 +520,21 @@ function animate(timestamp) {
 
   explodedView.update(dt, reducedMotion.matches);
   lighting.update(reducedMotion.matches ? 100 : dt);
+  // Keep the decorative fixture out of the entire exploded transition.
+  lighting.lamp.visible =
+    camera.aspect >= 0.9 &&
+    !explodedView.exploded &&
+    !explodedView.isTransitioning;
 
-  const targetLid = lidOpen ? 0.32 : 0;
-  lidPivot.rotation.z = THREE.MathUtils.damp(
-    lidPivot.rotation.z,
-    targetLid,
-    5.5,
-    reducedMotion.matches ? 100 : dt,
+  const targetLid = lidOpen ? DIM.lidOpenAngle : 0;
+  piano.setLidAngle(
+    THREE.MathUtils.damp(
+      lidPivot.rotation.z,
+      targetLid,
+      5.5,
+      reducedMotion.matches ? 100 : dt,
+    ),
   );
-  propTop.set(
-    -3.6 + 6.8 * Math.cos(lidPivot.rotation.z),
-    1.4 + 6.8 * Math.sin(lidPivot.rotation.z),
-    -0.2,
-  );
-  propDirection.subVectors(propTop, propBase);
-  prop.position.copy(propBase).addScaledVector(propDirection, 0.5);
-  prop.scale.y = propDirection.length();
-  prop.quaternion.setFromUnitVectors(propUp, propDirection.normalize());
-  prop.visible = lidPivot.rotation.z > 0.03;
 
   pianoPerformance.update(dt);
 

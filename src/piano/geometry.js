@@ -62,9 +62,12 @@ export const DIM = {
   // Front / keyboard -------------------------------------------------------
   frontEdgeZ: 2.4, // world Z of the straight front (case) edge
   keybedTopY: 1.4, // surface the keys rest on
-  whiteKeyTopY: 1.445, // resting centre Y of a white key
-  blackKeyTopY: 1.505, // resting centre Y of a black key
-  keyboardWidth: 6.6, // total span of the 88 keys along X
+  whiteKeyTopY: 1.5, // resting centre Y of a white key
+  blackKeyTopY: 1.57, // resting centre Y of a black key
+  keyboardWidth: 5.9, // 52 white-key pitches; ~1.226 m at 0.208 m/unit
+  keyDip: 0.048, // ~10 mm, with clearance above the keybed at full travel
+  lidHingeY: 1.45, // clears rim trim and the underside veneer when closed
+  lidOpenAngle: 0.42,
 
   // Action / damper --------------------------------------------------------
   // Hammer pivots are derived per note from its mapped string strike point.

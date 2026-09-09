@@ -28,20 +28,21 @@ export function createKeyboardLayout() {
       while (!whiteX.has(next)) next++;
       x = (whiteX.get(previous) + whiteX.get(next)) / 2;
     }
-    const keyLength = isBlack ? 0.64 : 1.02;
-    const centerZ = isBlack ? 2.24 : 2.54;
+    const keyLength = isBlack ? 0.44 : 0.72;
+    const centerZ = 3.05 - 0.72 + keyLength / 2;
     const pivotZ = centerZ - keyLength * 0.42;
     return {
       midi,
       isBlack,
       x,
-      width: whiteWidth * (isBlack ? 0.56 : 0.92),
-      height: isBlack ? 0.12 : 0.09,
+      width: whiteWidth * (isBlack ? 0.58 : 0.97),
+      height: isBlack ? 0.075 : 0.09,
       keyLength,
       centerZ,
       pivotZ,
       restY: isBlack ? DIM.blackKeyTopY : DIM.whiteKeyTopY,
-      travelRotation: isBlack ? 0.09 : 0.12,
+      // Set a physical dip, not an arbitrary angle that buries the key front.
+      travelRotation: Math.asin(DIM.keyDip / (keyLength * 0.92)),
     };
   });
 }

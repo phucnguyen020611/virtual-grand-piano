@@ -43,7 +43,12 @@ export function createPiano(mats, stageTopY) {
   const legs = buildLegs(mats, stageTopY);
   const { group: pedals, pedalPivots } = buildPedals(mats);
   const musicDesk = buildMusicDesk(mats);
-  const { group: lid, pivot: lidPivot, prop } = buildLid(mats);
+  const {
+    group: lid,
+    pivot: lidPivot,
+    prop,
+    setAngle: setLidAngle,
+  } = buildLid(mats);
   const {
     group: keyboard,
     keyMeshes,
@@ -94,6 +99,7 @@ export function createPiano(mats, stageTopY) {
     pedalPivots,
     lidPivot,
     prop,
+    setLidAngle,
     explodedComponents,
     // Static reference for raycasting the whole instrument.
     parts: group,

@@ -3,6 +3,7 @@ import {
   DIM,
   box,
   cyl,
+  cylBetween,
   extrudeFlat,
   applyPlanarXZUV,
   tag,
@@ -20,13 +21,21 @@ const RIM_H = DIM.caseTopY - DIM.caseBottomY;
  *  pulled back to the belly rail so the closed lid covers only the harp and
  *  leaves the keyboard / music-desk strip exposed. */
 function lidShape() {
-  const s = new THREE.Shape();
-  s.moveTo(-3.62, -1.45);
-  s.lineTo(3.62, -1.45);
-  s.bezierCurveTo(4.07, -0.6, 3.92, 1.7, 2.87, 3.27);
-  s.bezierCurveTo(1.92, 4.57, 0.4, 5.02, -1.17, 4.92);
-  s.bezierCurveTo(-2.52, 4.82, -3.27, 4.62, -3.62, 4.32);
-  s.lineTo(-3.62, -1.45);
+  // Clip the actual case contour at the belly rail. An independently redrawn
+  // Bézier curve drifted inside the treble rim when the lid was closed.
+  const outline = outerFootprint().getPoints(48);
+  const points = [];
+  const front = -1.45;
+  for (let i = 0; i < outline.length - 1; i++) {
+    const a = outline[i],
+      b = outline[i + 1];
+    if (a.y >= front) points.push(a.clone());
+    if (a.y < front !== b.y < front) {
+      points.push(a.clone().lerp(b, (front - a.y) / (b.y - a.y)));
+    }
+  }
+  const s = new THREE.Shape(points);
+  s.closePath();
   return s;
 }
 
@@ -83,14 +92,14 @@ export function buildCaseRim(mats) {
   // Cheek blocks flanking the keyboard, rising just above the keys.
   for (const sx of [-1, 1]) {
     box(
-      0.26,
+      0.58,
       0.2,
-      1.16,
+      0.9,
       mats.blackLacquer,
       g,
-      sx * 3.42,
+      sx * 3.25,
       DIM.caseTopY + 0.06,
-      2.5,
+      2.61,
       "Cheek block",
     );
   }
@@ -98,32 +107,31 @@ export function buildCaseRim(mats) {
   // Nameboard / fallboard standing behind the keys.
   const fallboard = box(
     6.9,
-    0.5,
+    0.26,
     0.14,
     mats.blackLacquer,
     g,
     0,
-    DIM.caseTopY + 0.2,
-    1.86,
+    DIM.caseTopY + 0.18,
+    2.22,
     "Fallboard",
   );
-  fallboard.rotation.x = 0.16;
+  fallboard.rotation.x = -0.12;
 
   const logoTex = createLogoTexture(mats.maxAniso);
   const logo = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.45, 0.36),
+    new THREE.PlaneGeometry(1.6, 0.2),
     new THREE.MeshBasicMaterial({
       map: logoTex,
       transparent: true,
       depthWrite: false,
     }),
   );
-  logo.position.set(0, DIM.caseTopY + 0.22, 1.79);
-  logo.rotation.x = 0.16;
-  g.add(logo);
+  logo.position.set(0, 0, 0.075);
+  fallboard.add(logo);
 
   // Bass-side hinge knuckles along the spine.
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 7; i++) {
     box(
       0.26,
       0.05,
@@ -131,8 +139,8 @@ export function buildCaseRim(mats) {
       mats.gold,
       g,
       -3.58,
-      DIM.caseTopY + 0.01,
-      1.9 - i * 0.8,
+      DIM.lidHingeY - 0.015,
+      1.1 - i * 0.8,
     );
   }
 
@@ -564,25 +572,23 @@ export function buildPedals(mats) {
   );
   // A compact lyre base leaves the brass pedal arms visibly clear in front.
   box(0.64, 0.1, 0.24, mats.blackLacquer, g, 0, 0.36, 2.1);
-  // A back stay connecting the lyre to the case.
-  cyl(
-    0.03,
-    0.03,
-    1.4,
-    mats.blackSatin,
-    g,
-    0,
-    topY - 0.02,
-    1.9,
-    Math.PI / 2.2,
-    0,
-    "",
-    8,
+  // Anchor both ends instead of leaving a rotated rod floating in the case.
+  g.add(
+    cylBetween(
+      new THREE.Vector3(0, 0.41, 2.08),
+      new THREE.Vector3(0, DIM.caseBottomY, 1.4),
+      0.03,
+      mats.blackSatin,
+      8,
+    ),
   );
 
   // Separate, elongated brass pedals pivot at the rear and project +Z.
-  const pedalBodyGeo = new THREE.BoxGeometry(0.115, 0.035, 0.72);
-  const pedalToeGeo = new THREE.CapsuleGeometry(0.07, 0.16, 4, 8);
+  const pedalBodyGeo = new THREE.BoxGeometry(0.085, 0.035, 0.58);
+  const pedalToeGeo = new THREE.CapsuleGeometry(0.085, 0.15, 4, 12);
+  // Bake orientation before flattening in world Y: a horizontal foot plate.
+  pedalToeGeo.rotateX(Math.PI / 2);
+  pedalToeGeo.scale(1, 0.25, 1);
   [
     { type: "soft", x: -0.22, label: "Soft pedal" },
     { type: "sostenuto", x: 0, label: "Sostenuto pedal" },
@@ -591,11 +597,9 @@ export function buildPedals(mats) {
     const pivot = new THREE.Group();
     pivot.position.set(x, DIM.pedalPivotY, DIM.pedalPivotZ);
     const body = new THREE.Mesh(pedalBodyGeo, mats.gold);
-    body.position.z = 0.39;
+    body.position.z = 0.29;
     const toe = new THREE.Mesh(pedalToeGeo, mats.gold);
-    toe.rotation.x = Math.PI / 2;
-    toe.scale.set(1.08, 0.3, 1);
-    toe.position.set(0, 0, 0.86);
+    toe.position.set(0, 0, 0.64);
     body.castShadow = body.receiveShadow = true;
     toe.castShadow = toe.receiveShadow = true;
     for (const mesh of [body, toe]) {
@@ -631,8 +635,8 @@ export function buildLid(mats) {
   const g = new THREE.Group();
 
   const pivot = new THREE.Group();
-  pivot.position.set(-3.6, DIM.caseTopY, 0);
-  pivot.rotation.z = 0.32; // Initial open state also defines accurate exploded bounds.
+  pivot.position.set(-3.6, DIM.lidHingeY, 0);
+  pivot.rotation.z = DIM.lidOpenAngle; // Initial open state also defines accurate exploded bounds.
   g.add(pivot);
 
   const lid = extrudeFlat(lidShape(), 0.06, mats.blackLacquer, 0.02);
@@ -667,7 +671,22 @@ export function buildLid(mats) {
     "Exterior",
   );
 
-  return { group: g, pivot, prop };
+  const base = new THREE.Vector3(3.7, DIM.caseTopY + 0.03, -0.2);
+  const top = new THREE.Vector3();
+  const direction = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
+  function setAngle(angle) {
+    pivot.rotation.z = angle;
+    top.set(7.05 * Math.cos(angle), 7.05 * Math.sin(angle), -0.2);
+    top.add(pivot.position);
+    direction.subVectors(top, base);
+    prop.position.copy(base).addScaledVector(direction, 0.5);
+    prop.scale.y = direction.length();
+    prop.quaternion.setFromUnitVectors(up, direction.normalize());
+    prop.visible = angle > 0.03;
+  }
+  setAngle(DIM.lidOpenAngle);
+  return { group: g, pivot, prop, setAngle };
 }
 
 // ---------------------------------------------------------------------------
@@ -678,9 +697,9 @@ export function buildMusicDesk(mats) {
   const g = new THREE.Group();
 
   // Rack ledge + backing board standing in the exposed strip ahead of the lid.
-  box(3.7, 0.07, 0.14, mats.blackLacquer, g, 0, 1.5, 1.74);
-  const board = box(3.5, 1.2, 0.06, mats.blackLacquer, g, 0, 2.02, 1.6);
-  board.rotation.x = 0.2;
+  box(3.7, 0.07, 0.24, mats.blackLacquer, g, 0, 1.76, 2.15);
+  const board = box(3.5, 1.2, 0.06, mats.blackLacquer, g, 0, 2.38, 2.03);
+  board.rotation.x = -0.2; // Top leans away from the player (+Z).
 
   const sheetTex = createSheetTexture(mats.maxAniso);
   const sheetMat = new THREE.MeshStandardMaterial({

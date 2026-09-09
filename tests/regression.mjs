@@ -182,3 +182,5 @@ check("sample coverage and equal-power velocity blends", () => {
 });
 controller.stopAll();
 console.log(`${passed} regression checks passed`);
+
+await import("./geometry.mjs");

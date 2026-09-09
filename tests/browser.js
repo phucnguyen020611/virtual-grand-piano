@@ -42,6 +42,36 @@ async function run() {
     d.querySelector("#audioGate").classList.contains("hidden"),
     "entry didn't finish",
   );
+  const rim = p.piano.explodedComponents.find((x) => x.id === "rim").object;
+  const desk = p.piano.explodedComponents.find(
+    (x) => x.id === "musicDesk",
+  ).object;
+  let fallboard;
+  rim.traverse((o) => {
+    if (o.userData.partName === "Fallboard") fallboard = o;
+  });
+  const board = desk.children.find((o) => o.children.length === 2);
+  p.scene.updateMatrixWorld(true);
+  const boardTop = board.localToWorld(new p.THREE.Vector3(0, 0.6, 0));
+  const boardBottom = board.localToWorld(new p.THREE.Vector3(0, -0.6, 0));
+  assert(boardTop.z < boardBottom.z, "music desk leans toward player");
+  const railBounds = new p.THREE.Box3().setFromObject(fallboard);
+  assert(boardBottom.y > railBounds.max.y, "rack base intersects fallboard");
+  for (const page of board.children) {
+    const pageBounds = new p.THREE.Box3().setFromObject(page);
+    assert(pageBounds.min.y > railBounds.max.y, "fallboard hides lower score");
+  }
+  key("keydown", "KeyZ");
+  await wait(5000);
+  const heldKey = p.piano.midiToKey.get(48);
+  const keyBounds = new p.THREE.Box3().setFromObject(heldKey);
+  assert(keyBounds.min.y > 1.4, "held key sinks into case");
+  key("keyup", "KeyZ");
+  log(
+    "rack leans backward; score clears fallboard; five-second held key clears bed",
+    { pass: true },
+  );
+
   const cold = {};
   for (const midi of [21, 108, 48]) {
     let t = performance.now();
@@ -111,7 +141,14 @@ async function run() {
     p.scene.updateMatrixWorld(true);
     p.camera.updateMatrixWorld(true);
     const v = object
-      .localToWorld(offset ?? new p.THREE.Vector3(0, 0.07, 0.35))
+      .localToWorld(
+        offset ??
+          new p.THREE.Vector3(
+            0,
+            object.geometry.parameters.height / 2 + 0.001,
+            object.geometry.parameters.depth * 0.35,
+          ),
+      )
       .project(p.camera);
     const rect = canvas.getBoundingClientRect();
     return {
@@ -213,6 +250,7 @@ async function run() {
 
   click("explodeBtn");
   await wait(2500);
+  assert(!p.lighting.lamp.visible, "fixture collides with exploded assembly");
   c.noteOn(60, 0.8, "test:resonance", "test");
   await wait(40);
   assert(
@@ -232,6 +270,7 @@ async function run() {
   click("normalBtn");
   await wait(2500);
   click("resetBtn");
+  assert(p.lighting.lamp.visible, "normal fixture not restored");
   log("Normal/Exploded, resonance parenting, lid, reset", { pass: true });
 
   p.explodedView.setExploded(true);
@@ -411,3 +450,34 @@ document.querySelector("#soak").onclick = async () => {
     log("FAIL", { error: error.stack });
   }
 };
+
+// Repeatable close-up views for the geometry reported in the model review.
+for (const button of document.querySelectorAll("[data-view]")) {
+  button.onclick = () => {
+    const p = frame.contentWindow.__vgp;
+    if (!p) return;
+    p.explodedView.cancelCameraAssist();
+    const views = {
+      side: [
+        [8, 2.7, 5],
+        [0, 1.5, 2],
+      ],
+      keys: [
+        [1.5, 6, 5],
+        [0, 1.5, 2.3],
+      ],
+      hinge: [
+        [-7, 4, -5],
+        [-1, 1.6, -0.8],
+      ],
+      pedals: [
+        [1.7, 0.85, 5],
+        [0, 0.45, 2.45],
+      ],
+    };
+    const [position, target] = views[button.dataset.view];
+    p.camera.position.set(...position);
+    p.controls.target.set(...target);
+    p.controls.update();
+  };
+}

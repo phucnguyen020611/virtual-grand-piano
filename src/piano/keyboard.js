@@ -17,8 +17,10 @@ export function buildKeyboard(mats, layout = createKeyboardLayout()) {
   const keyMeshes = [];
   const midiToKey = new Map();
   const midiToMechanism = new Map();
-  const whiteGeo = new THREE.BoxGeometry(layout[0].width, 0.09, 1.02);
-  const blackGeo = new THREE.BoxGeometry(layout[0].width * 0.56, 0.12, 0.64);
+  const keyGeometry = (entry) =>
+    new THREE.BoxGeometry(entry.width, entry.height, entry.keyLength);
+  const whiteGeo = keyGeometry(layout.find((entry) => !entry.isBlack));
+  const blackGeo = keyGeometry(layout.find((entry) => entry.isBlack));
 
   for (const entry of layout) {
     const pivot = new THREE.Group();
