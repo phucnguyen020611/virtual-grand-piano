@@ -54,6 +54,7 @@ export function createPerformanceRecorder(controller) {
   const unsubscribe = controller.addObserver(observe);
 
   function start() {
+    if (recording) return;
     stopPlayback();
     recording = true;
     startedAt = performance.now();
@@ -122,7 +123,7 @@ export function createPerformanceRecorder(controller) {
   }
 
   function play() {
-    if (!recordingData?.events.length || playback) return false;
+    if (recording || !recordingData?.events.length || playback) return false;
     playback = true;
     playbackIndex = 0;
     playbackSequence++;
@@ -144,7 +145,12 @@ export function createPerformanceRecorder(controller) {
     stop,
     play,
     stopPlayback,
-    dispose: unsubscribe,
+    dispose() {
+      stop();
+      stopPlayback();
+      unsubscribe();
+      stateListeners.clear();
+    },
     subscribe(listener) {
       stateListeners.add(listener);
       return () => stateListeners.delete(listener);

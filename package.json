@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "build": "vite build",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test": "node tests/regression.mjs"
   },
   "engines": {
     "node": ">=22.12.0"

@@ -44,7 +44,7 @@ export function isPerformanceTextTarget(target) {
   if (!(target instanceof Element)) return false;
   return Boolean(
     target.closest(
-      "input, textarea, select, button, a, [contenteditable=''], [contenteditable='true']",
+      "input, textarea, select, button, summary, a, [contenteditable=''], [contenteditable='true']",
     ),
   );
 }
@@ -53,6 +53,7 @@ export function isPerformanceTextTarget(target) {
 export function createComputerKeyboard({
   controller,
   onRangeChange = () => {},
+  isEnabled = () => true,
 }) {
   const activeCodes = new Map();
   let baseMidi = 48; // C3, spans roughly C3–F5 before octave shifting.
@@ -84,7 +85,15 @@ export function createComputerKeyboard({
   }
 
   function onKeyDown(event) {
-    if (isPerformanceTextTarget(event.target)) return;
+    if (
+      !isEnabled() ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.isComposing ||
+      isPerformanceTextTarget(event.target)
+    )
+      return;
     if (event.code === "Space") {
       event.preventDefault();
       if (event.repeat || spaceHeld) return;

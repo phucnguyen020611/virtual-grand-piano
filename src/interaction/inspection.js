@@ -43,6 +43,11 @@ export function createInspection(
     dom.labelRoot.appendChild(el);
     return { component, el };
   });
+  const orderedLabels = [...labels].sort(
+    (a, b) =>
+      b.component.priority - a.component.priority ||
+      a.component.id.localeCompare(b.component.id),
+  );
 
   function ownerOf(o) {
     let p = o;
@@ -124,11 +129,26 @@ export function createInspection(
   }
 
   let down = { x: 0, y: 0 };
-  let activePedal = null;
-  let activePedalPointerId = null;
-  let controlsEnabledBeforePedal = true;
+  const activePedals = new Map();
   const activeKeys = new Map();
-  let controlsEnabledBeforeKeys = true;
+  let controlsEnabledBeforePerformance = true;
+
+  function capturePerformance(pointerId) {
+    if (!activeKeys.size && !activePedals.size)
+      controlsEnabledBeforePerformance = controls?.enabled ?? true;
+    if (controls) controls.enabled = false;
+    renderer.domElement.setPointerCapture?.(pointerId);
+  }
+
+  function releaseCapture(pointerId) {
+    if (!activeKeys.size && !activePedals.size && controls)
+      controls.enabled = controlsEnabledBeforePerformance;
+    try {
+      renderer.domElement.releasePointerCapture(pointerId);
+    } catch {
+      // Cancelled gestures may already have released capture.
+    }
+  }
 
   function hitAt(event) {
     pointerNDC(event);
@@ -150,61 +170,55 @@ export function createInspection(
     if (!activeKeys.has(event.pointerId)) return false;
     activeKeys.delete(event.pointerId);
     onReleaseKey(event.pointerId);
-    try {
-      renderer.domElement.releasePointerCapture(event.pointerId);
-    } catch {
-      // Capture may already have been released by a cancelled touch gesture.
-    }
-    if (!activeKeys.size && controls)
-      controls.enabled = controlsEnabledBeforeKeys;
+    releaseCapture(event.pointerId);
     return true;
   }
 
-  function finishPedal(e) {
-    if (!activePedal) return;
-    if (e && activePedalPointerId !== e.pointerId) return;
-    onPedal(activePedal, false);
-    if (controls) controls.enabled = controlsEnabledBeforePedal;
-    if (e?.pointerId != null) {
-      try {
-        renderer.domElement.releasePointerCapture(e.pointerId);
-      } catch {
-        // The browser may already have released capture after a cancellation.
-      }
-    }
-    activePedal = null;
-    activePedalPointerId = null;
+  function finishPedal(event) {
+    const pedal = activePedals.get(event.pointerId);
+    if (!pedal) return false;
+    activePedals.delete(event.pointerId);
+    if (![...activePedals.values()].includes(pedal)) onPedal(pedal, false);
+    releaseCapture(event.pointerId);
+    return true;
   }
+
+  function releaseAll() {
+    for (const pointerId of [...activeKeys.keys()]) finishKey({ pointerId });
+    for (const pointerId of [...activePedals.keys()])
+      finishPedal({ pointerId });
+  }
+  window.addEventListener("blur", releaseAll);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) releaseAll();
+  });
 
   // Capture wins over OrbitControls' canvas listener, then controls remains
   // disabled until this pointer is released or cancelled.
   renderer.domElement.addEventListener(
     "pointerdown",
     (e) => {
+      if (e.button !== 0) return;
       down = { x: e.clientX, y: e.clientY };
       const hit = hitAt(e);
       const key = hit ? keyOf(hit.object) : null;
       if (key) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (!activeKeys.size)
-          controlsEnabledBeforeKeys = controls?.enabled ?? true;
-        if (controls) controls.enabled = false;
+        capturePerformance(e.pointerId);
         activeKeys.set(e.pointerId, key.userData.midi);
-        renderer.domElement.setPointerCapture?.(e.pointerId);
         onPlayKey(key.userData.midi, e.pointerId, pointerVelocity(e));
         selectPart(key);
         return;
       }
-      activePedal = hit ? pedalOf(hit.object) : null;
+      const activePedal = hit ? pedalOf(hit.object) : null;
       if (activePedal) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        activePedalPointerId = e.pointerId;
-        controlsEnabledBeforePedal = controls?.enabled ?? true;
-        if (controls) controls.enabled = false;
-        renderer.domElement.setPointerCapture?.(e.pointerId);
-        onPedal(activePedal, true);
+        capturePerformance(e.pointerId);
+        const alreadyHeld = [...activePedals.values()].includes(activePedal);
+        activePedals.set(e.pointerId, activePedal);
+        if (!alreadyHeld) onPedal(activePedal, true);
         selectPart(hit.object);
       }
     },
@@ -216,20 +230,15 @@ export function createInspection(
       e.stopImmediatePropagation();
       return;
     }
-    if (activePedal) {
+    if (finishPedal(e)) {
       e.preventDefault();
       e.stopImmediatePropagation();
-      finishPedal(e);
       return;
     }
     if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) return; // ignore drags
     const hit = hitAt(e);
     if (!hit) return;
-    const o = hit.object;
-    if (o.userData.pianoKey) {
-      onPlayKey(o.userData.midi);
-      selectPart(o);
-    } else selectPart(o);
+    selectPart(hit.object);
   });
   renderer.domElement.addEventListener("pointercancel", (e) => {
     finishKey(e);
@@ -256,7 +265,7 @@ export function createInspection(
       }
       return;
     }
-    if (activePedal && activePedalPointerId === e.pointerId) {
+    if (activePedals.has(e.pointerId)) {
       e.preventDefault();
       e.stopImmediatePropagation();
       return;
@@ -283,18 +292,17 @@ export function createInspection(
       dom.partName.textContent = "Exploded anatomy";
       dom.partText.textContent =
         "Major piano systems are spatially separated while remaining individually selectable and orbitable.";
+    } else {
+      dom.partName.textContent = "Try Z X C · Space sustains";
+      dom.partText.textContent =
+        "Tap or drag across keys. Select a part to explore the instrument.";
     }
   }
 
   function updateLabels() {
     placedLabels.length = 0;
     camera.getWorldDirection(cameraForward);
-    const ordered = [...labels].sort(
-      (a, b) =>
-        b.component.priority - a.component.priority ||
-        (a.component.id < b.component.id ? -1 : 1),
-    );
-    for (const { component, el } of ordered) {
+    for (const { component, el } of orderedLabels) {
       labelBounds.setFromObject(component.object);
       labelBounds.getCenter(v3);
       v3.y = labelBounds.max.y + 0.16;

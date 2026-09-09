@@ -45,7 +45,7 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
     const notes = heldTokens.get(id);
     if (!notes) return;
     for (const [token, midi] of [...notes]) {
-      if (!token.includes(`:${channel}:`)) continue;
+      if (!token.startsWith(`${deviceGroup(id)}:${channel}:`)) continue;
       notes.delete(token);
       controller.noteOff(midi, token);
     }
@@ -55,7 +55,9 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
     const notes = heldTokens.get(id);
     if (!notes) return;
     const tokens = new Set(
-      [...notes.keys()].filter((token) => token.includes(`:${channel}:`)),
+      [...notes.keys()].filter((token) =>
+        token.startsWith(`${deviceGroup(id)}:${channel}:`),
+      ),
     );
     for (const token of tokens) notes.delete(token);
     controller.releaseSource(deviceGroup(id), {
