@@ -158,12 +158,13 @@ npm run preview
 
 ## Scripts
 
-| Command           | Description                                |
-| ----------------- | ------------------------------------------ |
-| `npm run dev`     | Start the Vite development server          |
-| `npm run build`   | Build optimized static assets into `dist/` |
-| `npm run preview` | Serve the production build locally         |
-| `npm run check`   | Run the current project validation command |
+| Command                | Description                                           |
+| ---------------------- | ----------------------------------------------------- |
+| `npm run dev`          | Start the Vite development server                     |
+| `npm run build`        | Build optimized static assets into `dist/`            |
+| `npm run preview`      | Serve the production build locally                    |
+| `npm test`             | Run dependency-free input/ownership regression checks |
+| `npm run format:check` | Check formatting                                      |
 
 ## Architecture
 
@@ -184,7 +185,7 @@ nearby number/letter keys fill the black keys. Arrow keys or the compact octave
 buttons move the range in 12-semitone steps without changing notes already held.
 At either physical-range boundary the unavailable octave control is disabled,
 so the range never makes a partial, non-octave shift.
-Space is the sustain pedal unless a focused button, link, or form control owns
+Space is the sustain pedal unless a focused button, disclosure, link, or form control owns
 that key. Browser focus loss and MIDI disconnects perform normal musical
 releases, while the Autoplay and Recording Stop controls intentionally use
 source-scoped force-stop behavior.
@@ -194,9 +195,14 @@ capture releases only that pointer's token. A held pointer can glide across
 keys, and independent touch pointers can form chords. Pen/touch pressure is
 used conservatively when available; mouse clicks use a stable velocity.
 
+Click the piano surface or Tab back to it after using controls. Browser shortcuts
+with Control, Command, or Alt and IME composition are never used as piano input.
+Pointer notes and pedals release on blur or page hiding, including simultaneous
+key/pedal gestures.
+
 Web MIDI is requested only from **Connect MIDI**, without SysEx. The selected
 input supports all channels, note-on velocity 1–127, both standard note-off
-forms, CC64 sustain, and device-scoped CC120/CC123 cleanup. Unsupported
+forms, CC64 sustain, and channel-scoped CC120/CC123 held-note cleanup. Unsupported
 browsers show an unavailable state; denied permission leaves the instrument
 fully playable. MIDI messages and recordings stay in the browser and are never
 sent anywhere.
@@ -206,7 +212,8 @@ sent anywhere.
 It records computer, pointer, and MIDI performance only—never autoplay or its
 own playback. Playback uses the regular `recording` source, so it coexists with
 live performance and can be stopped without affecting other sources. Recordings
-are intentionally not persisted across page reloads.
+are intentionally not persisted across page reloads. Playback is disabled while
+recording so the event list stays immutable during playback.
 
 The geometry is intentionally procedural; higher-fidelity glTF meshes and PBR textures can replace individual modules without changing the overall product concept.
 
@@ -222,7 +229,7 @@ PCM reserved for a cold load or a failed recorded asset.
 | Root samples       | 16, from A0 through C8                                  |
 | Velocity layers    | 3 real captures (original layers 4 / 9 / 14) = 48 files |
 | Shipped asset size | 3.56 MiB Ogg/Opus, mono 48 kHz                          |
-| Decoded cache      | 56 MiB bounded working set (about 48 MiB pinned core)   |
+| Decoded cache      | 56 MiB bounded working set (about 37 MiB pinned)        |
 | Polyphony          | 64 voices                                               |
 
 **Attribution.** “Salamander Grand Piano V3 by Alexander Holm, licensed under
@@ -242,14 +249,22 @@ source nodes.
 **Lazy decode and cache.** The data-driven manifest uses public assets beneath
 `${import.meta.env.BASE_URL}audio/salamander/`, which works under both local
 development and the GitHub Pages repository base path. The C3–C6 mapped range
-(roots D♯3 through A5, all three layers) is pinned and decoded first; this is
-about 48 MiB of mono 48 kHz PCM. Bass and high-register captures load only when
+(roots A2 through A5, all three layers) is decoded first. A2 is required
+because C3 maps down three semitones to that root. The context uses 48 kHz
+and an interactive latency hint. Medium/forte captures in that range are
+pinned (about 37 MiB); soft captures are evictable. This leaves space for
+bass and high-register playing without permanently pinning the entire warmup. Bass and high-register captures load only when
 played. Recorded and fallback buffers share a 56 MiB LRU-like decoded cache:
-unpinned recorded entries are evicted first, then generated fallbacks, while an
+unpinned recordings and generated fallbacks are evicted by last use, while an
 active `AudioBufferSourceNode` continues safely after its cache entry is gone.
-Concurrent requests for one root/layer share one fetch/decode promise.
+Concurrent requests for one root/layer share one fetch/decode promise. Failed
+requests have a 15-second network timeout and a 30-second retry cooldown; a
+later attack can recover after a transient failure without a request storm.
 
-**Fallback.** If a recording fails to load, or no recording has reached the
+**Fallback.** Entry briefly prepares generated forte fallbacks for the first
+computer key (C3’s A2 root), A0 and C8, yielding between buffers. This moves
+that synthesis cost before performance; other cold roots and velocity layers
+can still incur synchronous synthesis. If a recording fails to load, or no recording has reached the
 requested note yet during cold load, the engine immediately generates an
 additive PCM fallback for that attack and queues the recording for a later
 attack. It never crossfades synthetic and recorded layers in one note. Once a
@@ -262,7 +277,8 @@ cache `cacheStats()`, plus `voiceStats()`, `resonanceStats()`, and
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` runs on pushes to `main` and on pull requests. The workflow installs the pinned project dependencies and verifies that the production build succeeds.
+`.github/workflows/ci.yml` runs on pushes to `main` and on pull requests. The workflow installs the pinned project dependencies, checks formatting, runs the
+input/ownership regression checks, and verifies the production build.
 
 ### GitHub Pages deployment
 
@@ -303,21 +319,27 @@ emulation.
   recording/playback, autoplay, inspection, and the responsive HUD.
 - **Firefox and Safari/WebKit:** supported targets that require a release-candidate
   smoke test on the intended browser before broad compatibility is claimed.
-  Safari/WebKit verification is especially important because the recorded assets
-  are Ogg/Opus.
+  Ogg/Opus requires Safari 18.4 on macOS 15.4 / iOS 18.4 or newer, as
+  [documented by WebKit](https://webkit.org/blog/16574/webkit-features-in-safari-18-4/).
+  Older Safari/OS combinations may use generated fallback audio. No alternate
+  encoded sample library is downloaded or decoded.
 - **Touch:** pointer-based touch interaction is supported. Verify multi-touch and
   orientation behavior on representative hardware for each release.
 - **Web MIDI:** optional and browser/device-dependent. The piano remains fully
   playable without it; a denied or unavailable MIDI request is surfaced in the
   HUD.
 - **Audio:** a user gesture is required to start audio. During a cold load or a
-  failed sample request, a generated fallback responds immediately while local
+  failed sample request, a generated fallback responds while local
   recorded samples warm up.
 
 ### Release checklist
 
 - Run `npm ci --no-audit --no-fund`, `npm run format:check`, `npm run build`,
-  and `npm run preview` from the committed lockfile.
+  `npm test`, and `npm run preview` from the committed lockfile.
+- With `npm run dev` running, open `/virtual-grand-piano/tests/browser.html`
+  for renderer/audio/input/layout checks and a three-minute session soak.
+  Open `/virtual-grand-piano/tests/failures.html` for simulated network, decoder,
+  AudioContext and WebGL failures. These test pages are excluded from the build.
 - Confirm CI and GitHub Pages succeed for the exact release SHA.
 - Smoke-test the deployed Pages URL, including audio unlock, one keyboard note,
   recording/playback, autoplay, inspection, and browser console/network errors.
@@ -337,18 +359,22 @@ When adding production assets:
 - Keep render-loop allocations minimal.
 - Measure frame time on integrated GPUs and mobile devices before increasing polygon or shadow-map budgets.
 
-## Roadmap
+## Quality and known limits
 
-- [ ] High-fidelity grand piano GLB model
-- [ ] PBR lacquer, wood, felt, steel, brass, and cast-plate textures
-- [ ] Expand the compact recorded piano set toward chromatic 88-key coverage
-- [ ] Sustain, sostenuto, and soft pedal behavior
-- [ ] Animated dampers, hammers, repetition levers, and key action
-- [ ] Visible string vibration and resonance feedback
-- [ ] More accurate duplex scaling, agraffes, tuning pins, and bridge geometry
-- [ ] Multiple classical autoplay pieces
-- [ ] Optional guided anatomy tour
-- [ ] Performance quality presets for desktop and mobile GPUs
+Portrait framing and a 1.5 DPR cap on narrow/coarse-pointer devices keep the
+full piano visible at a lower pixel cost. The lamp fixture is hidden in portrait;
+its lights still illuminate the piano. Controls collapse below 1181px and become
+scrollable at short heights. Reduced motion snaps camera/assembly transitions
+and lid movement while retaining musical key/action feedback.
+
+The model is an educational representation: 36 representative string courses
+serve 88 key actions; soft and sostenuto pedals animate but do not affect audio.
+The score texture is illustrative sheet music. No guided tour, extra song,
+presentation mode or graphics menu is included in this pass.
+
+See [the Phase 9 audit](docs/PHASE9_AUDIT.md) for evidence, decisions and
+regression coverage. Hardware MIDI, real mobile/touch behavior, listening tests
+and prolonged multi-hour sessions still require human/device validation.
 
 ## Contributing
 
@@ -372,7 +398,8 @@ See the repository's [contributors graph](https://github.com/phucnguyen020611/vi
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+Project code is licensed under the [MIT License](LICENSE). The Salamander
+recording derivatives remain CC BY 3.0; see [audio attribution](THIRD_PARTY_AUDIO.md).
 
 ## Trademark notice
 

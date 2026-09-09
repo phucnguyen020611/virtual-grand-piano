@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>Piano browser regression</title>
+  <button id="run">Run browser regression</button>
+  <button id="soak">Run 3-minute session</button>
+  <p id="summary" role="status">Ready</p>
+  <pre id="results" style="max-height: 180px; overflow: auto">
+Wait for the piano, then run. Uses real rendering/audio and synthetic input; no MIDI or touch hardware coverage.</pre>
+  <iframe
+    title="Piano under test"
+    src="../index.html"
+    style="border: 0; width: 1440px; height: 900px"
+  ></iframe>
+  <script type="module" src="./browser.js"></script>
+</html>

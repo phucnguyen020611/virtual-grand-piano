@@ -9,7 +9,7 @@ Thank you for helping improve Virtual Grand Piano.
 3. Install dependencies with `npm ci`.
 4. Start the development server with `npm run dev`.
 5. Keep changes focused and avoid unrelated formatting churn.
-6. Run `npm run check` before opening a pull request.
+6. Run `npm test`, `npm run format:check`, and `npm run build` before opening a pull request.
 7. Open a pull request with a clear description, screenshots for visual changes, and testing notes.
 
 ## Commit style
