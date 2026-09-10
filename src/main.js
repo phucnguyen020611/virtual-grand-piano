@@ -4,6 +4,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { createMaterials } from "./piano/materials.js";
 import { DIM } from "./piano/geometry.js";
 import { createPiano } from "./piano/createPiano.js";
+import { createBench } from "./scene/bench.js";
 import { createStage } from "./scene/stage.js";
 import { createLighting } from "./scene/lighting.js";
 import { createReflectionEnvironment } from "./scene/environment.js";
@@ -32,8 +33,8 @@ const camera = new THREE.PerspectiveCamera(
   80,
 );
 camera.position.copy(NORMAL_DEFAULT_CAMERA_POSITION);
-// Preserve horizontal framing in portrait without resetting a user’s orbit.
-camera.zoom = Math.min(1, camera.aspect / 1.2);
+// Include the forward bench in portrait without resetting a user’s orbit.
+camera.zoom = Math.min(1, camera.aspect / 1.6);
 camera.updateProjectionMatrix();
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const renderPixelRatio = () =>
@@ -79,6 +80,8 @@ const environment = createReflectionEnvironment(renderer);
 scene.environment = environment.texture;
 const mats = createMaterials(renderer.capabilities.getMaxAnisotropy());
 const { stageTopY } = createStage(scene, mats);
+const bench = createBench(mats, stageTopY);
+scene.add(bench);
 const lighting = createLighting(scene);
 lighting.lamp.visible = camera.aspect >= 0.9;
 
@@ -96,6 +99,7 @@ if (import.meta.env.DEV) {
     scene,
     piano,
     stageTopY,
+    bench,
     lighting,
     mats,
     environment,
@@ -551,7 +555,7 @@ requestAnimationFrame(animate);
 
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
-  camera.zoom = Math.min(1, camera.aspect / 1.2);
+  camera.zoom = Math.min(1, camera.aspect / 1.6);
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(renderPixelRatio());

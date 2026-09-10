@@ -78,3 +78,33 @@ suite is a development entrypoint; it is excluded from the production build.
 
 No audio assets, dependencies, material palette or light intensities changed.
 The existing large Three.js bundle advisory remains.
+
+## Brand visibility, bench and room-light follow-up
+
+The subsequent close-up showed the fallboard logo's lower lettering behind the
+black keys. The nameboard now extends upward with the logo's entire plane above
+the resting black-key tops. Its original texture aspect ratio is preserved. The
+music rack moves upward with it so the score remains unobscured. A browser
+raycast check targets three points across the lettering from front, side and
+high keyboard-review angles; each ray must hit the logo before any other part.
+
+Keyboard dimensions were reviewed again and retained: about 22.9 mm white-key
+surface width, 13.7 mm black-key width and 165.2 mm octave span under the stated
+normalization. There is no hand mesh or calibrated physical display scale, so
+screen magnification cannot establish a real hand-to-key measurement. Shrinking
+the keys further would depart from the conventional octave reference.
+
+A stationary padded black bench now sits centered in front of the keyboard.
+Four legs reach the stage, the seat is below the key tops, and its front edge
+clears even the extended keyboard in Exploded mode. It uses six meshes, shared
+leg geometry and the existing lacquer material; rounded cushion geometry comes
+from the already-installed Three.js package. It adds no input mode or controls.
+Portrait framing includes extra width for the forward bench so its seat does
+not clip the viewport edge. The bench follows the scene's stylized vertical proportions rather than claiming
+a fully dimensioned furniture replica.
+
+Room fill is brighter: hemisphere sky/ground colors are lifted and intensity
+changes from 0.24 to 0.65; front/side area-light intensities increase from 3/1.8
+to 3.3/2.1. No additional light or shadow map is introduced. Exposure and the
+lacquer/ivory materials remain unchanged. This specifically lifts shadowed case,
+pedal and stage detail while retaining the warm main light.

@@ -61,6 +61,44 @@ async function run() {
     const pageBounds = new p.THREE.Box3().setFromObject(page);
     assert(pageBounds.min.y > railBounds.max.y, "fallboard hides lower score");
   }
+  const logo = rim.getObjectByName("fallboard-logo");
+  const logoBounds = new p.THREE.Box3().setFromObject(logo);
+  const blackTop = Math.max(
+    ...p.piano.keyMeshes
+      .filter((k) => k.userData.isBlack)
+      .map((k) => new p.THREE.Box3().setFromObject(k).max.y),
+  );
+  assert(logoBounds.min.y > blackTop + 0.02, "logo hidden behind black keys");
+  const ray = new p.THREE.Raycaster();
+  for (const origin of [
+    [0, 2.2, 6],
+    [8, 2.7, 5],
+    [1.5, 6, 5],
+  ]) {
+    for (const x of [-0.35, 0, 0.35]) {
+      const target = logo.localToWorld(new p.THREE.Vector3(x, -0.08, 0));
+      const eye = new p.THREE.Vector3(...origin);
+      ray.set(eye, target.sub(eye).normalize());
+      assert(
+        ray.intersectObject(p.piano.group, true)[0]?.object === logo,
+        "brand lettering occluded from review angle",
+      );
+    }
+  }
+  const benchBounds = new p.THREE.Box3().setFromObject(p.bench);
+  assert(
+    Math.abs(benchBounds.min.y - p.stageTopY) < 1e-6,
+    "bench feet off floor",
+  );
+  assert(
+    benchBounds.max.y <
+      new p.THREE.Box3().setFromObject(p.piano.midiToKey.get(48)).max.y,
+    "bench seat above keyboard",
+  );
+  log("logo lettering visible from three review angles; bench grounded", {
+    pass: true,
+  });
+
   key("keydown", "KeyZ");
   await wait(5000);
   const heldKey = p.piano.midiToKey.get(48);
@@ -251,6 +289,14 @@ async function run() {
   click("explodeBtn");
   await wait(2500);
   assert(!p.lighting.lamp.visible, "fixture collides with exploded assembly");
+  for (const component of p.piano.explodedComponents) {
+    assert(
+      !benchBounds.intersectsBox(
+        new p.THREE.Box3().setFromObject(component.object),
+      ),
+      "bench intersects exploded component",
+    );
+  }
   c.noteOn(60, 0.8, "test:resonance", "test");
   await wait(40);
   assert(
@@ -338,6 +384,20 @@ async function run() {
       w.innerWidth === width && w.innerHeight === height,
       "viewport mismatch",
     );
+    if (height > width) {
+      p.camera.updateMatrixWorld(true);
+      for (const x of [benchBounds.min.x, benchBounds.max.x]) {
+        for (const y of [benchBounds.min.y, benchBounds.max.y]) {
+          for (const z of [benchBounds.min.z, benchBounds.max.z]) {
+            const screen = new p.THREE.Vector3(x, y, z).project(p.camera);
+            assert(
+              Math.abs(screen.x) <= 1,
+              "portrait clips bench horizontally",
+            );
+          }
+        }
+      }
+    }
     const details = d.querySelector("details");
     details.open = true;
     await wait(20);

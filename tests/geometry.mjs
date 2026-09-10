@@ -110,3 +110,11 @@ for (const p of outline)
 console.log(
   "PASS lid contour, closed trim clearance, prop attachment throughout travel",
 );
+
+const { createBench } = await import("../src/scene/bench.js");
+const bench = createBench(mats, -0.045);
+const benchBounds = new THREE.Box3().setFromObject(bench);
+assert(Math.abs(benchBounds.min.y + 0.045) < 1e-6);
+assert(benchBounds.max.y < DIM.whiteKeyTopY);
+assert(benchBounds.min.z > 3.05 + 1.2, "bench blocks exploded key fronts");
+console.log("PASS grounded bench with seat below keys and exploded clearance");

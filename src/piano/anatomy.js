@@ -107,12 +107,12 @@ export function buildCaseRim(mats) {
   // Nameboard / fallboard standing behind the keys.
   const fallboard = box(
     6.9,
-    0.26,
+    0.4,
     0.14,
     mats.blackLacquer,
     g,
     0,
-    DIM.caseTopY + 0.18,
+    DIM.caseTopY + 0.34,
     2.22,
     "Fallboard",
   );
@@ -120,14 +120,15 @@ export function buildCaseRim(mats) {
 
   const logoTex = createLogoTexture(mats.maxAniso);
   const logo = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.6, 0.2),
+    new THREE.PlaneGeometry(1.9, 0.285),
     new THREE.MeshBasicMaterial({
       map: logoTex,
       transparent: true,
       depthWrite: false,
     }),
   );
-  logo.position.set(0, 0, 0.075);
+  logo.position.set(0, 0.03, 0.075);
+  logo.name = "fallboard-logo";
   fallboard.add(logo);
 
   // Bass-side hinge knuckles along the spine.
@@ -697,8 +698,8 @@ export function buildMusicDesk(mats) {
   const g = new THREE.Group();
 
   // Rack ledge + backing board standing in the exposed strip ahead of the lid.
-  box(3.7, 0.07, 0.24, mats.blackLacquer, g, 0, 1.76, 2.15);
-  const board = box(3.5, 1.2, 0.06, mats.blackLacquer, g, 0, 2.38, 2.03);
+  box(3.7, 0.07, 0.24, mats.blackLacquer, g, 0, 1.96, 2.15);
+  const board = box(3.5, 1.2, 0.06, mats.blackLacquer, g, 0, 2.58, 2.03);
   board.rotation.x = -0.2; // Top leans away from the player (+Z).
 
   const sheetTex = createSheetTexture(mats.maxAniso);
