@@ -226,10 +226,10 @@ PCM reserved for a cold load or a failed recorded asset.
 | ------------------ | ------------------------------------------------------- |
 | Source             | Salamander Grand Piano V3 — Yamaha C5 recordings        |
 | Licence            | CC BY 3.0 (Alexander Holm; attribution below)           |
-| Root samples       | 16, from A0 through C8                                  |
-| Velocity layers    | 3 real captures (original layers 4 / 9 / 14) = 48 files |
-| Shipped asset size | 3.56 MiB Ogg/Opus, mono 48 kHz                          |
-| Decoded cache      | 56 MiB bounded working set (about 37 MiB pinned)        |
+| Root samples       | 30, every Salamander root from A0 through C8            |
+| Velocity layers    | 3 real captures (original layers 4 / 9 / 14) = 90 files |
+| Shipped asset size | 6.89 MiB Ogg/Opus, mono 48 kHz                          |
+| Decoded cache      | 112 MiB desktop / 56 MiB touch (about 37 MiB pinned)    |
 | Polyphony          | 64 voices                                               |
 
 **Attribution.** “Salamander Grand Piano V3 by Alexander Holm, licensed under
@@ -241,7 +241,8 @@ sample derivatives remain available under their CC BY 3.0 attribution terms.
 
 **Mapping.** Each MIDI note picks its nearest root and plays it at
 `2^((midi - rootMidi) / 12)`. The measured full-range transposition bound is
-**+3 / -2 semitones** (never more than ±3). Soft↔medium blends continuously
+**±1 semitone**. If the nearest root is still loading or was evicted, the
+nearest warm neighbour (at most ±3) plays instead of generated PCM. Soft↔medium blends continuously
 from velocity 0.30–0.46; medium↔forte does the same from 0.64–0.80. The blend
 uses equal-power gains, so it is one logical voice even when it has two sample
 source nodes.
@@ -253,8 +254,11 @@ development and the GitHub Pages repository base path. The C3–C6 mapped range
 because C3 maps down three semitones to that root. The context uses 48 kHz
 and an interactive latency hint. Medium/forte captures in that range are
 pinned (about 37 MiB); soft captures are evictable. This leaves space for
-bass and high-register playing without permanently pinning the entire warmup. Bass and high-register captures load only when
-played. Recorded and fallback buffers share a 56 MiB LRU-like decoded cache:
+bass and high-register playing without permanently pinning the entire warmup.
+On desktop (fine pointer) the C/F# roots from C3 to F#5 then decode in the
+background, evictable. Bass and high-register captures load only when
+played. Recorded and fallback buffers share an LRU-like decoded cache (112 MiB
+desktop, 56 MiB touch devices):
 unpinned recordings and generated fallbacks are evicted by last use, while an
 active `AudioBufferSourceNode` continues safely after its cache entry is gone.
 Concurrent requests for one root/layer share one fetch/decode promise. Failed

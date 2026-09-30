@@ -62,8 +62,15 @@ function releaseSeconds(midi, velocity, age, reason) {
   return registerBase * (0.82 + 0.35 * energy) * ageShape * pedalShape;
 }
 
-const MAX_DECODED_BYTES = 56 * 1024 * 1024;
+// ponytail: pointer type stands in for device memory; phones keep 56 MB.
+const COARSE_POINTER =
+  globalThis.matchMedia?.("(pointer: coarse)").matches ?? false;
+const MAX_DECODED_BYTES = (COARSE_POINTER ? 56 : 112) * 1024 * 1024;
 const CORE_ROOTS = new Set([45, 51, 57, 63, 69, 75, 81]);
+// Denser C/F# roots across the default keyboard range. Desktop decodes them
+// after the pinned core; they stay evictable, and a warm neighbour root covers
+// any that is cold, so they only ever improve on the core's ±3 coverage.
+const DETAIL_ROOTS = COARSE_POINTER ? [] : [60, 66, 54, 72, 48, 78];
 
 function bufferBytes(buffer) {
   return buffer.length * buffer.numberOfChannels * 4;
@@ -100,14 +107,15 @@ export function createAudioEngine() {
   const roots = [...new Set(manifest.map((entry) => entry.rootMidi))].sort(
     (a, b) => a - b,
   );
-  /** midi -> nearest root, resolved once. */
+  /** midi -> the three nearest roots (nearest first), resolved once. */
+  const rootCandidates = new Map();
   const rootForMidi = new Map();
   for (let midi = 21; midi <= 108; midi++) {
-    let best = roots[0];
-    for (const root of roots) {
-      if (Math.abs(root - midi) < Math.abs(best - midi)) best = root;
-    }
-    rootForMidi.set(midi, best);
+    const nearest = [...roots]
+      .sort((a, b) => Math.abs(a - midi) - Math.abs(b - midi) || a - b)
+      .slice(0, 3);
+    rootCandidates.set(midi, nearest);
+    rootForMidi.set(midi, nearest[0]);
   }
 
   const activeVoices = new Map(); // midi -> Set<voice>, consumed by the controller
@@ -198,13 +206,9 @@ export function createAudioEngine() {
    * are requested only after they are played, leaving mobile memory for the
    * common keyboard range.
    */
-  function loadSamples() {
-    if (loading) return loading;
-    const orderedRoots = [...CORE_ROOTS].sort(
-      (a, b) => Math.abs(a - 63) - Math.abs(b - 63),
-    );
-    loading = (async () => {
-      for (const rootMidi of orderedRoots) {
+  function loadRoots(rootMidis) {
+    return (async () => {
+      for (const rootMidi of rootMidis) {
         if (disposed) return;
         await Promise.all(
           manifest
@@ -213,12 +217,22 @@ export function createAudioEngine() {
         );
         ready = recordedBuffers.size > 0;
       }
+    })();
+  }
+
+  function loadSamples() {
+    if (loading) return loading;
+    loading = loadRoots(
+      [...CORE_ROOTS].sort((a, b) => Math.abs(a - 63) - Math.abs(b - 63)),
+    ).then(() => {
       ready = recordedBuffers.size > 0;
       if (import.meta.env.DEV && !ready)
         console.warn(
           "No recorded piano samples loaded; the engine stays on generated fallback PCM.",
         );
-    })();
+      // Background pass: readiness never waits on the detail roots.
+      if (ready) loadRoots(DETAIL_ROOTS);
+    });
     return loading;
   }
 
@@ -382,9 +396,18 @@ export function createAudioEngine() {
       const entry = manifestByKey.get(`${root}:${layer}`);
       if (entry) queueRecordedLoad(entry);
     }
-    const recorded = weights
-      .map(({ layer, weight }) => ({ ...bufferForLayer(root, layer), weight }))
-      .filter((sample) => sample.buffer && sample.backend === "recorded");
+    // Nearest warm recording wins; a neighbour root beats a synthetic attack
+    // while the nearest one is still loading or has been evicted.
+    let recorded = [];
+    for (const candidate of rootCandidates.get(midi)) {
+      recorded = weights
+        .map(({ layer, weight }) => ({
+          ...bufferForLayer(candidate, layer),
+          weight,
+        }))
+        .filter((sample) => sample.buffer && sample.backend === "recorded");
+      if (recorded.length) break;
+    }
     const available = recorded.length
       ? recorded
       : weights
@@ -716,12 +739,20 @@ export function createAudioEngine() {
       const recorded = desired
         .map(({ layer }) => recordedBuffers.get(`${rootMidi}:${layer}`))
         .filter(Boolean);
+      const warmNeighbour = rootCandidates
+        .get(midi)
+        .slice(1)
+        .some((root) =>
+          desired.some(({ layer }) => recordedBuffers.has(`${root}:${layer}`)),
+        );
       const backend =
         recorded.length === desired.length
           ? "recorded"
           : recorded.length
             ? "recorded-single-layer"
-            : "fallback";
+            : warmNeighbour
+              ? "recorded-neighbour"
+              : "fallback";
       return {
         midi,
         rootMidi,

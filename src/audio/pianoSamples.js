@@ -7,30 +7,26 @@
  * missing asset, a network failure, or a cold load before a recording arrives.
  */
 
-// Six-semitone root spacing bounds the measured range to +3 / -2 semitones.
-// A0 and C8 are pinned so the extremes are never extrapolated.
+// Every Salamander root (A, C, D#, F# per octave) bounds the shift to ±1
+// semitone. A0 and C8 are pinned so the extremes are never extrapolated.
 const ROOT_MIDI = [
-  21, 27, 33, 39, 45, 51, 57, 63, 69, 75, 81, 87, 93, 99, 105, 108,
+  21,
+  ...Array.from({ length: 28 }, (_, i) => 24 + i * 3),
+  108,
 ];
 
-const ROOT_FILE_STEMS = new Map([
-  [21, "A0"],
-  [27, "D1s"],
-  [33, "A1"],
-  [39, "D2s"],
-  [45, "A2"],
-  [51, "D3s"],
-  [57, "A3"],
-  [63, "D4s"],
-  [69, "A4"],
-  [75, "D5s"],
-  [81, "A5"],
-  [87, "D6s"],
-  [93, "A6"],
-  [99, "D7s"],
-  [105, "A7"],
-  [108, "C8"],
-]);
+const NOTE_STEMS = ["A", "C", "Ds", "Fs"];
+const ROOT_FILE_STEMS = new Map(
+  ROOT_MIDI.map((midi) => {
+    const octave = Math.floor(midi / 12) - 1;
+    const stem = midi === 108 ? "C" : NOTE_STEMS[((midi - 21) / 3) % 4];
+    // Files spell sharps as a suffix: D#1 -> D1s.
+    return [
+      midi,
+      stem.endsWith("s") ? `${stem[0]}${octave}s` : `${stem}${octave}`,
+    ];
+  }),
+);
 
 /**
  * Velocity layers. `threshold` is the lower bound of the layer's region; the

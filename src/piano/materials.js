@@ -241,15 +241,16 @@ export function createMaterials(maxAniso) {
     maxAniso,
 
     // Case / exterior
+    // Concert polyester finish: full clearcoat over a slightly softer base.
     blackLacquer: new THREE.MeshPhysicalMaterial({
-      color: 0x08090a,
+      color: 0x0a0b0d,
       metalness: 0,
-      roughness: 0.13,
-      clearcoat: 0.58,
-      clearcoatRoughness: 0.065,
+      roughness: 0.2,
+      clearcoat: 1,
+      clearcoatRoughness: 0.035,
       ior: 1.5,
-      specularIntensity: 0.38,
-      envMapIntensity: 0.4,
+      specularIntensity: 0.5,
+      envMapIntensity: 1.05,
     }),
     blackSatin: new THREE.MeshPhysicalMaterial({
       color: 0x0b0c0d,
@@ -272,10 +273,11 @@ export function createMaterials(maxAniso) {
       roughness: 0.3,
       envMapIntensity: 0.78,
     }),
+    // Gold-painted cast-iron plate: warm enough to read under the raised lid.
     plateGold: new THREE.MeshStandardMaterial({
-      color: 0x514f42,
-      metalness: 0.72,
-      roughness: 0.62,
+      color: 0x8f7442,
+      metalness: 0.6,
+      roughness: 0.48,
       roughnessMap: castRoughness,
       envMapIntensity: 0.45,
     }),

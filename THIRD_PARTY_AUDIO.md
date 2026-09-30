@@ -12,8 +12,8 @@ Piano V3**, real recordings of a Yamaha C5 grand piano by **Alexander Holm**.
   under CC BY 3.0.” This project includes that attribution here and in the
   README. No endorsement by Alexander Holm is implied.
 
-This repository uses 16 roots (`A0`, `D#1`, `A1`, `D#2`, `A2`, `D#3`, `A3`,
-`D#4`, `A4`, `D#5`, `A5`, `D#6`, `A6`, `D#7`, `A7`, `C8`) at original Salamander
+This repository uses all 30 Salamander roots — `A0`, then `C`, `D#`, `F#` and
+`A` in every octave from `C1` through `A7`, and `C8` — at original Salamander
 velocity layers 4, 9, and 14. The original FLAC recordings were downmixed to
 mono, resampled to 48 kHz, and encoded as Ogg/Opus at 48 kb/s for web delivery.
 No musical content was added or edited; this is a format/channel/bitrate

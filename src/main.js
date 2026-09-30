@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-import { createMaterials } from "./piano/materials.js";
+import { createMaterials, makeCanvasTexture } from "./piano/materials.js";
 import { DIM } from "./piano/geometry.js";
 import { createPiano } from "./piano/createPiano.js";
 import { createBench } from "./scene/bench.js";
@@ -23,7 +23,26 @@ import {
 
 // --- Renderer / scene / camera ---------------------------------------------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050506);
+// Warm, low glow behind the instrument so the black case reads against the room.
+scene.background = makeCanvasTexture(
+  (g, w, h) => {
+    const glow = g.createRadialGradient(
+      w / 2,
+      h * 0.46,
+      0,
+      w / 2,
+      h * 0.46,
+      w * 0.62,
+    );
+    glow.addColorStop(0, "#211a15");
+    glow.addColorStop(0.45, "#110e0c");
+    glow.addColorStop(1, "#050506");
+    g.fillStyle = glow;
+    g.fillRect(0, 0, w, h);
+  },
+  512,
+  512,
+);
 scene.fog = new THREE.FogExp2(0x050506, 0.007);
 
 const camera = new THREE.PerspectiveCamera(

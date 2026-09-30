@@ -523,19 +523,24 @@ kbd {
     padding: 18px 22px 0;
   }
 
+  /* Primary transport top-centre; secondary tools bottom-right over the
+     empty floor, so neither row covers the raised lid. */
   .hud {
-    top: 18px;
-    bottom: auto;
-    left: 50%;
-    right: auto;
-    width: min(860px, calc(100vw - 300px));
-    transform: translateX(-50%);
+    inset: 18px 22px;
   }
 
   .controlDeck {
+    height: 100%;
     max-width: none;
-    align-items: stretch;
-    justify-content: center;
+    align-items: flex-end;
+    justify-content: flex-end;
+  }
+
+  .performanceGroup {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
   }
 
   .secondaryControls {
@@ -572,7 +577,7 @@ kbd {
 
   .helpPanel {
     right: 18px;
-    bottom: 18px;
+    bottom: 112px;
   }
 }
 
@@ -686,6 +691,14 @@ kbd {
   .helpGrid {
     grid-template-columns: 1fr;
     gap: 11px;
+  }
+}
+
+/* Below ~380px the performance row wraps to two lines; lift the inspector
+   clear of the taller deck. */
+@media (max-width: 380px) {
+  .inspector {
+    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 186px);
   }
 }
 

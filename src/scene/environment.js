@@ -36,6 +36,19 @@ export function createReflectionEnvironment(renderer) {
   lidBroadHighlight.rotation.y = 0.88;
   studio.add(lidBroadHighlight);
 
+  // Tall strips at camera height, left and right of the default view: they
+  // draw a vertical highlight down the curved rim so the black case reads.
+  // Lacquer reflects ~4% head-on, so these must be HDR-bright to register.
+  for (const [x, z] of [
+    [9, 3.5],
+    [-2.5, 9],
+  ]) {
+    const rimStrip = reflectionCard(1.4, 5, 0xf2e6d4, 7);
+    rimStrip.position.set(x, 2.2, z);
+    rimStrip.lookAt(0, 1.2, 0);
+    studio.add(rimStrip);
+  }
+
   const warmSide = reflectionCard(6, 4, 0xc88e58, 0.35);
   warmSide.position.set(-7, 2.8, 2.2);
   warmSide.rotation.y = Math.PI / 2;
@@ -45,7 +58,9 @@ export function createReflectionEnvironment(renderer) {
   coolRear.position.set(3, 4.6, -7);
   studio.add(coolRear);
 
-  const lowFill = reflectionCard(10, 2, 0x442d20, 0.28);
+  // Spot-lit floor pool: vertical case sides viewed from above mirror the
+  // floor, so this is what separates the rim from the dark room.
+  const lowFill = reflectionCard(16, 16, 0x6b4a33, 1.4);
   lowFill.position.set(0, -4, 2);
   lowFill.rotation.x = -Math.PI / 2;
   studio.add(lowFill);

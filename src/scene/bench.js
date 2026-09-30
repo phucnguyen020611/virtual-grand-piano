@@ -11,7 +11,15 @@ export function createBench(mats, stageTopY) {
   box(2.48, 0.14, 1.22, mats.blackLacquer, bench, 0, 0.83);
   const cushion = new THREE.Mesh(
     new RoundedBoxGeometry(2.6, 0.22, 1.34, 2, 0.07),
-    new THREE.MeshStandardMaterial({ color: 0x28231f, roughness: 0.78 }),
+    // Tufted leather: sheen lifts the silhouette out of the unlit floor.
+    new THREE.MeshPhysicalMaterial({
+      color: 0x2c211b,
+      roughness: 0.6,
+      sheen: 0.6,
+      sheenRoughness: 0.45,
+      sheenColor: 0x8a6a55,
+      envMapIntensity: 0.8,
+    }),
   );
   cushion.position.y = 0.99;
   cushion.castShadow = cushion.receiveShadow = true;

@@ -119,6 +119,21 @@ async function run() {
   }
   log("cold note call duration, ms (not output latency)", cold);
   await a.whenReady();
+  // C6's own root is cold here; the pinned A5 neighbour must play, not PCM.
+  assert(
+    a.sampleForMidi(84).backendIfPlayedNow === "recorded-neighbour",
+    "cold root should report a warm neighbour",
+  );
+  // Earlier cold strikes may still be ringing as PCM; compare the delta.
+  const before = a.voiceStats();
+  c.noteOn(84, 0.72, "test:neighbour", "test");
+  const after = a.voiceStats();
+  c.noteOff(84, "test:neighbour");
+  assert(
+    after.sampled > before.sampled && after.fallback === before.fallback,
+    "cold root fell back to generated PCM",
+  );
+  log("cold root plays a recorded neighbour", { pass: true });
   await wait(1200);
   log("initial outer-register residency", {
     A0: a.sampleForMidi(21),

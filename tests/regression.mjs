@@ -169,10 +169,10 @@ check("MIDI velocity, both note-offs, CC64, CC123, CC120, hot unplug", () => {
 });
 check("sample coverage and equal-power velocity blends", () => {
   const manifest = createSampleManifest();
-  assert.equal(manifest.length, 48);
+  assert.equal(manifest.length, 90);
   const coverage = validateSampleCoverage(manifest);
-  assert.equal(coverage.maximumPositive, 3);
-  assert.equal(coverage.maximumNegative, -2);
+  assert.equal(coverage.maximumPositive, 1);
+  assert.equal(coverage.maximumNegative, -1);
   for (let v = 0; v <= 1; v += 0.01)
     assert(
       Math.abs(
