@@ -9,6 +9,8 @@
   --ui-radius: 14px;
   --ui-gap: 8px;
   --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  /* Copperplate script for headings only; it is unreadable at UI sizes. */
+  --font-script: "Pinyon Script", "Cormorant Garamond", Georgia, cursive;
   --font-ui: Jost, ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
@@ -135,10 +137,10 @@ canvas {
 
 .title {
   margin-top: 3px;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: clamp(24px, 5.4vw, 40px);
-  line-height: 1.04;
+  font-family: var(--font-script);
+  font-weight: 400;
+  font-size: clamp(30px, 6.6vw, 48px);
+  line-height: 1.15;
 }
 
 .status {
@@ -343,9 +345,9 @@ canvas {
 
 .panelHeading h2 {
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 26px;
+  font-family: var(--font-script);
+  font-weight: 400;
+  font-size: 34px;
 }
 
 .helpGrid {
@@ -365,8 +367,11 @@ canvas {
 .inspector p {
   margin: 0;
   color: var(--ui-muted);
-  font-size: 13px;
-  line-height: 1.5;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1.4;
 }
 
 kbd {
@@ -393,10 +398,10 @@ kbd {
 
 .inspector .part {
   margin: 3px 0 7px;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 20px;
-  line-height: 1.12;
+  font-family: var(--font-script);
+  font-weight: 400;
+  font-size: 27px;
+  line-height: 1.2;
 }
 
 .progress {
@@ -509,10 +514,11 @@ kbd {
 
 .gateInner h1 {
   margin: 6px 0 23px;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: clamp(34px, 10vw, 58px);
-  line-height: 0.98;
+  font-family: var(--font-script);
+  font-weight: 400;
+  font-size: clamp(40px, 10vw, 62px);
+  white-space: nowrap;
+  line-height: 1.1;
 }
 
 .enter {
@@ -524,7 +530,10 @@ kbd {
 .gateInner p {
   margin: 15px 0 0;
   color: var(--ui-muted);
-  font-size: 14px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 17px;
 }
 
 @media (min-width: 1181px) {
@@ -629,7 +638,7 @@ kbd {
   }
 
   .title {
-    font-size: 22px;
+    font-size: 28px;
   }
 
   .status {
@@ -687,7 +696,7 @@ kbd {
 
   .inspector .part {
     margin-bottom: 0;
-    font-size: 17px;
+    font-size: 23px;
   }
 
   .progress {

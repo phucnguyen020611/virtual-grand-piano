@@ -12,6 +12,7 @@ const PAGE_H = 1366;
 const PAPER = "#f4efe2";
 const INK = "#1d1b18";
 const TEXT_FONT = '"Cormorant Garamond", Georgia, serif';
+const SCRIPT_FONT = '"Pinyon Script", "Cormorant Garamond", Georgia, serif';
 const MUSIC_FONT = '"Noto Music", "Bravura", serif';
 const SP = 8.5; // staff space
 const MARGIN_X = 86;
@@ -70,9 +71,17 @@ function text(
   x,
   y,
   size,
-  { weight = 500, italic = false, align = "center", spacing = 0 } = {},
+  {
+    weight = 500,
+    italic = false,
+    align = "center",
+    spacing = 0,
+    script = false,
+  } = {},
 ) {
-  g.font = `${italic ? "italic " : ""}${weight} ${size}px ${TEXT_FONT}`;
+  g.font = script
+    ? `400 ${size}px ${SCRIPT_FONT}`
+    : `${italic ? "italic " : ""}${weight} ${size}px ${TEXT_FONT}`;
   g.textAlign = align;
   g.textBaseline = "alphabetic";
   if ("letterSpacing" in g) g.letterSpacing = `${spacing}px`;
@@ -500,7 +509,7 @@ function drawMusicPage(g, w, h, song, pageIndex) {
   g.fillStyle = g.strokeStyle = INK;
   let top = 150;
   if (pageIndex === 0) {
-    text(g, song.title, w / 2, 128, 56, { weight: 600 });
+    text(g, song.title, w / 2, 128, 64, { script: true });
     text(g, song.subtitle, w / 2, 166, 22, { italic: true });
     text(g, song.composer, w - MARGIN_X, 214, 21, { align: "right" });
     text(g, song.dates, w - MARGIN_X, 236, 15, {
@@ -537,8 +546,8 @@ function drawTitlePage(g, w, h, song) {
     g.lineTo(w / 2 + 170, y);
     g.stroke();
   }
-  text(g, song.title, w / 2, 520, song.title.length > 12 ? 78 : 104, {
-    weight: 600,
+  text(g, song.title, w / 2, 520, song.title.length > 12 ? 92 : 120, {
+    script: true,
   });
   const [primary, secondary] = song.subtitle.split(" · ");
   text(g, primary, w / 2, 590, 30, { italic: true });
@@ -784,6 +793,7 @@ export function createScoreBook(maxAniso, song) {
     Promise.all([
       document.fonts.load(`600 40px ${TEXT_FONT}`),
       document.fonts.load(`italic 500 40px ${TEXT_FONT}`),
+      document.fonts.load(`40px ${SCRIPT_FONT}`),
       document.fonts.load(
         `40px ${MUSIC_FONT}`,
         GLYPH.treble + GLYPH.bass + GLYPH.eighthRest,

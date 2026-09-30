@@ -570,10 +570,10 @@ freeCamBtn.onclick = () => {
   // Pull the orbit point close so a drag turns the head, not the world.
   const ahead = controls.target.clone().sub(camera.position).setLength(1.5);
   controls.target.copy(camera.position).add(ahead);
-  dom.partMeta.textContent = "Free cam";
-  dom.partName.textContent = "↑ ↓ walk · ← → turn";
+  dom.partMeta.textContent = "Camera";
+  dom.partName.textContent = "Free cam";
   dom.partText.textContent =
-    "Hold Shift with ↑ ↓ to rise and descend (or PageUp / PageDown), Shift with ← → to step sideways. Drag to look around.";
+    "↑ ↓ walk, ← → turn. Hold Shift with ↑ ↓ to rise and descend (or PageUp / PageDown), with ← → to step sideways. Drag to look around.";
   renderer.domElement.focus({ preventScroll: true });
 };
 addEventListener("keydown", (event) => {

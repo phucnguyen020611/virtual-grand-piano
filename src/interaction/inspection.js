@@ -313,9 +313,10 @@ export function createInspection(
       dom.partText.textContent =
         "Major piano systems are spatially separated while remaining individually selectable and orbitable.";
     } else {
-      dom.partName.textContent = "Try Z X C · Space sustains";
+      // Key names stay in the body face: the script heading would blur them.
+      dom.partName.textContent = "Play the piano";
       dom.partText.textContent =
-        "Tap or drag across keys. Select a part to explore the instrument.";
+        "Try Z X C, and Space to sustain. Tap or drag across keys, or select a part to explore the instrument.";
     }
   }
 
