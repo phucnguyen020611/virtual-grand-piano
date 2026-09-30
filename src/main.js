@@ -14,6 +14,8 @@ import { createPerformanceController } from "./performance/performanceController
 import { createComputerKeyboard } from "./performance/computerKeyboard.js";
 import { createMidiInput } from "./performance/midiInput.js";
 import { createPerformanceRecorder } from "./performance/performanceRecorder.js";
+import { scoreEvents } from "./performance/furElise.js";
+import { createNoteEffects } from "./scene/noteEffects.js";
 import { createInspection } from "./interaction/inspection.js";
 import {
   createExplodedView,
@@ -34,9 +36,9 @@ scene.background = makeCanvasTexture(
       h * 0.46,
       w * 0.62,
     );
-    glow.addColorStop(0, "#211a15");
-    glow.addColorStop(0.45, "#110e0c");
-    glow.addColorStop(1, "#050506");
+    glow.addColorStop(0, "#3a2d22");
+    glow.addColorStop(0.45, "#1d1712");
+    glow.addColorStop(1, "#0b0a0a");
     g.fillStyle = glow;
     g.fillRect(0, 0, w, h);
   },
@@ -72,7 +74,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.96;
+renderer.toneMappingExposure = 1.35;
 renderer.domElement.tabIndex = 0;
 renderer.domElement.setAttribute("aria-label", "Piano performance surface");
 renderer.domElement.setAttribute("aria-describedby", "playHelp");
@@ -172,60 +174,14 @@ const inspection = createInspection(
 const explodedView = createExplodedView({ piano, camera, controls });
 if (import.meta.env.DEV) window.__vgp.explodedView = explodedView;
 
-// --- Für Elise autoplay (public-domain composition, simplified) ------------
-const furElise = [
-  [76, 0.25],
-  [75, 0.25],
-  [76, 0.25],
-  [75, 0.25],
-  [76, 0.25],
-  [71, 0.25],
-  [74, 0.25],
-  [72, 0.25],
-  [69, 0.52],
-  [60, 0.25],
-  [64, 0.25],
-  [69, 0.25],
-  [71, 0.52],
-  [64, 0.25],
-  [68, 0.25],
-  [71, 0.25],
-  [72, 0.52],
-  [64, 0.25],
-  [76, 0.25],
-  [75, 0.25],
-  [76, 0.25],
-  [75, 0.25],
-  [76, 0.25],
-  [71, 0.25],
-  [74, 0.25],
-  [72, 0.25],
-  [69, 0.52],
-  [60, 0.25],
-  [64, 0.25],
-  [69, 0.25],
-  [71, 0.52],
-  [64, 0.25],
-  [72, 0.25],
-  [71, 0.25],
-  [69, 0.64],
-  [71, 0.25],
-  [72, 0.25],
-  [74, 0.25],
-  [76, 0.5],
-  [67, 0.25],
-  [77, 0.25],
-  [76, 0.25],
-  [74, 0.5],
-  [65, 0.25],
-  [76, 0.25],
-  [74, 0.25],
-  [72, 0.5],
-];
+// --- Für Elise autoplay, read from the engraved score -----------------------
+const songEvents = scoreEvents(0.2);
+const LEAD_IN = 2.2; // seconds for the first light columns to fall
+const songLength = Math.max(...songEvents.map((e) => e.time + e.duration));
+const noteEffects = createNoteEffects(scene, piano, renderer, camera);
 let autoplay = false,
   autoTimers = [],
-  songStart = 0,
-  songLength = 0;
+  songStart = 0;
 const autoBtn = document.querySelector("#autoBtn"),
   progressEl = document.querySelector("#songProgress");
 
@@ -236,6 +192,7 @@ function stopAutoplay() {
   autoBtn.textContent = "Play Für Elise";
   autoBtn.setAttribute("aria-pressed", "false");
   pianoPerformance.stopSource("autoplay");
+  noteEffects.stop();
   progressEl.style.width = "0%";
 }
 function startAutoplay() {
@@ -247,21 +204,28 @@ function startAutoplay() {
   autoplay = true;
   autoBtn.textContent = "Stop Für Elise";
   autoBtn.setAttribute("aria-pressed", "true");
-  const tempo = 0.9;
-  let t = 0;
-  songLength = furElise.reduce((a, n) => a + n[1] * tempo, 0);
-  songStart = performance.now();
-  furElise.forEach(([m, d]) => {
+  piano.scoreBook.turnTo(1); // open at the music
+  songStart = performance.now() + LEAD_IN * 1000;
+  noteEffects.start(songEvents);
+  for (const event of songEvents) {
     autoTimers.push(
-      setTimeout(() => {
-        if (!autoplay) return;
-        pianoPerformance.playMidi(m, d * tempo * 0.92, 0.68, "autoplay");
-        inspection.selectPart(midiToKey.get(m));
-      }, t * 1000),
+      setTimeout(
+        () => {
+          if (!autoplay) return;
+          pianoPerformance.playMidi(
+            event.midi,
+            event.duration * 0.95,
+            event.velocity,
+            "autoplay",
+          );
+        },
+        (LEAD_IN + event.time) * 1000,
+      ),
     );
-    t += d * tempo;
-  });
-  autoTimers.push(setTimeout(() => stopAutoplay(), (t + 0.35) * 1000));
+  }
+  autoTimers.push(
+    setTimeout(() => stopAutoplay(), (LEAD_IN + songLength + 0.6) * 1000),
+  );
 }
 
 // --- UI wiring --------------------------------------------------------------
@@ -560,11 +524,13 @@ function animate(timestamp) {
   );
 
   pianoPerformance.update(dt);
+  piano.scoreBook.update(dt, reducedMotion.matches);
 
-  if (autoplay) {
-    const elapsed = (performance.now() - songStart) / 1000;
-    progressEl.style.width = Math.min(1, elapsed / songLength) * 100 + "%";
-  }
+  const songTime = autoplay ? (performance.now() - songStart) / 1000 : null;
+  if (autoplay)
+    progressEl.style.width =
+      THREE.MathUtils.clamp(songTime / songLength, 0, 1) * 100 + "%";
+  noteEffects.update(dt, songTime, reducedMotion.matches);
   if (explodedView.exploded || explodedView.isTransitioning)
     inspection.updateLabels();
 

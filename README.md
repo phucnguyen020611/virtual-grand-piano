@@ -25,7 +25,9 @@ The current model is procedural and intentionally lightweight. Future releases c
 - Mouse/touch key interaction
 - Computer-keyboard performance controls
 - Recorded acoustic piano samples with a bounded generated fallback
-- Autoplay demonstration using the opening theme of _Für Elise_
+- Autoplay of a simplified _Für Elise_ with hand-coloured key glow, falling
+  crystal light columns and star-dust sparkles
+- An engraved, page-turning score book on the music desk (click a page to turn)
 - Free orbit, zoom, and pan inspection camera
 - Normal inspection mode
 - Exploded-parts inspection mode
@@ -371,9 +373,10 @@ its lights still illuminate the piano. Controls collapse below 1181px and become
 scrollable at short heights. Reduced motion snaps camera/assembly transitions
 and lid movement while retaining musical key/action feedback.
 
-The model is an educational representation: 36 representative string courses
-serve 88 key actions; soft and sostenuto pedals animate but do not affect audio.
-The score texture is illustrative sheet music. No guided tour, extra song,
+The model is an educational representation: one string course per key, evenly
+spaced at the strike line; soft and sostenuto pedals animate but do not affect
+audio. The score book is engraved from the same data autoplay plays
+(`src/performance/furElise.js`). No guided tour, extra song,
 presentation mode or graphics menu is included in this pass.
 
 See [the Phase 9 audit](docs/PHASE9_AUDIT.md) for evidence, decisions and

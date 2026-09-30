@@ -8,12 +8,12 @@ export function createStage(scene, mats) {
   const stage = new THREE.Mesh(
     new THREE.BoxGeometry(22, 0.55, 15),
     new THREE.MeshPhysicalMaterial({
-      color: 0x75685d,
+      color: 0x9a8a7b,
       map: mats.woodTex,
-      roughness: 0.8,
+      roughness: 0.62,
       metalness: 0,
       clearcoat: 0,
-      envMapIntensity: 0.03,
+      envMapIntensity: 0.25,
     }),
   );
   stage.position.y = -0.32;

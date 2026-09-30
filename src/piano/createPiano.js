@@ -101,6 +101,7 @@ export function createPiano(mats, stageTopY) {
     prop,
     setLidAngle,
     explodedComponents,
+    scoreBook: musicDesk.userData.book,
     // Static reference for raycasting the whole instrument.
     parts: group,
   };

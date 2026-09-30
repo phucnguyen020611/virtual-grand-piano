@@ -48,9 +48,9 @@ export function createLighting(scene) {
 
   const keyLight = new THREE.SpotLight(
     0xffe6bf,
-    66,
+    82,
     22,
-    Math.PI * 0.245,
+    Math.PI * 0.3,
     0.86,
     2,
   );
@@ -81,7 +81,7 @@ export function createLighting(scene) {
   lidReflection.position.set(-6.2, 2.1, -5.8);
   scene.add(lidReflection);
 
-  const ambient = new THREE.HemisphereLight(0x77808c, 0x403329, 0.65);
+  const ambient = new THREE.HemisphereLight(0x8a919c, 0x4a3b2e, 1.05);
   scene.add(ambient);
 
   const normalFocus = new THREE.Vector3(0, 1.2, -0.35);

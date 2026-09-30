@@ -50,14 +50,14 @@ async function run() {
   rim.traverse((o) => {
     if (o.userData.partName === "Fallboard") fallboard = o;
   });
-  const board = desk.children.find((o) => o.children.length === 2);
+  const board = desk.getObjectByName("music-desk-board");
   p.scene.updateMatrixWorld(true);
   const boardTop = board.localToWorld(new p.THREE.Vector3(0, 0.6, 0));
   const boardBottom = board.localToWorld(new p.THREE.Vector3(0, -0.6, 0));
   assert(boardTop.z < boardBottom.z, "music desk leans toward player");
   const railBounds = new p.THREE.Box3().setFromObject(fallboard);
   assert(boardBottom.y > railBounds.max.y, "rack base intersects fallboard");
-  for (const page of board.children) {
+  for (const page of board.getObjectByName("score-book").children) {
     const pageBounds = new p.THREE.Box3().setFromObject(page);
     assert(pageBounds.min.y > railBounds.max.y, "fallboard hides lower score");
   }

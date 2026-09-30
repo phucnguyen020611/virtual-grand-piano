@@ -13,7 +13,8 @@ import {
   hitchRailCurve,
   plateRingShape,
 } from "./geometry.js";
-import { createLogoTexture, createSheetTexture } from "./materials.js";
+import { createLogoTexture } from "./materials.js";
+import { createScoreBook } from "./scoreBook.js";
 
 const RIM_H = DIM.caseTopY - DIM.caseBottomY;
 
@@ -342,9 +343,15 @@ export function buildAction(mats, layout, stringRoutes = []) {
   const routeIndex = new Map(
     stringRoutes.map((route, index) => [route, index]),
   );
-  const routesByX = [...stringRoutes].sort(
-    (a, b) => a.frontBearingPoint.x - b.frontBearingPoint.x,
-  );
+  // Each key owns one course; use its centre string so unisons stay centred.
+  const routeByMidi = new Map();
+  for (const route of stringRoutes) {
+    const course = stringRoutes.filter(
+      (r) => r.courseIndex === route.courseIndex,
+    );
+    if (route === course[Math.floor(course.length / 2)])
+      routeByMidi.set(route.midi, route);
+  }
 
   const capstanGeo = new THREE.CylinderGeometry(0.018, 0.022, 0.09, 6);
   const wippenGeo = new THREE.BoxGeometry(0.055, 0.035, 0.24);
@@ -357,22 +364,8 @@ export function buildAction(mats, layout, stringRoutes = []) {
   // A short tapered felt roll reads more like a hammer than a rectangular block.
   const hammerGeo = new THREE.CylinderGeometry(0.052, 0.038, 0.11, 8);
   const damperStemGeo = new THREE.CylinderGeometry(0.006, 0.008, 0.18, 5);
-  const damperHeadGeo = new THREE.BoxGeometry(0.065, 0.045, 0.095);
-
-  function routeForKey(x) {
-    let nearest = routesByX[0] || null;
-    let distance = nearest
-      ? Math.abs(nearest.frontBearingPoint.x - x)
-      : Infinity;
-    for (let index = 1; index < routesByX.length; index++) {
-      const candidate = routesByX[index];
-      const candidateDistance = Math.abs(candidate.frontBearingPoint.x - x);
-      if (candidateDistance >= distance) break;
-      nearest = candidate;
-      distance = candidateDistance;
-    }
-    return nearest;
-  }
+  // Sized to one semitone (~0.067) so 88 heads sit side by side, not overlapping.
+  const damperHeadGeo = new THREE.BoxGeometry(0.05, 0.045, 0.095);
 
   function pointOnSpeakingLength(route, amount) {
     return route.frontBearingPoint.clone().lerp(route.bridgePoint, amount);
@@ -386,7 +379,7 @@ export function buildAction(mats, layout, stringRoutes = []) {
     const entry = layout[index];
     const mechanism = new THREE.Group();
     mechanism.position.x = entry.x;
-    const stringRoute = routeForKey(entry.x);
+    const stringRoute = routeByMidi.get(entry.midi) ?? null;
     const strikePoint = stringRoute
       ? pointOnSpeakingLength(
           stringRoute,
@@ -405,11 +398,11 @@ export function buildAction(mats, layout, stringRoutes = []) {
     capstan.receiveShadow = true;
     mechanism.add(capstan);
     const wippen = new THREE.Mesh(wippenGeo, mats.maple);
-    wippen.position.set(
-      (strikePoint.x - entry.x) * 0.35,
-      DIM.caseTopY - 0.09,
-      strikePoint.z + 0.5,
-    );
+    // As in a real action, the key tail is cranked sideways so capstan and
+    // wippen sit directly under their evenly spaced hammer.
+    const reach = strikePoint.x - entry.x;
+    capstan.position.x = reach;
+    wippen.position.set(reach, DIM.caseTopY - 0.09, strikePoint.z + 0.5);
     wippen.rotation.x = -0.28;
     wippen.castShadow = wippen.receiveShadow = true;
     mechanism.add(wippen);
@@ -426,7 +419,7 @@ export function buildAction(mats, layout, stringRoutes = []) {
     const hammerHead = new THREE.Mesh(hammerGeo, mats.hammerFelt);
     hammerHead.position.y = hammerHeadY;
     hammerHead.rotation.z = Math.PI / 2;
-    hammerHead.scale.set(0.65, 0.72, 1.18);
+    hammerHead.scale.set(0.65, 0.48, 1.18);
     shank.receiveShadow = true;
     hammerHead.castShadow = hammerHead.receiveShadow = true;
     hammerPivot.add(shank, hammerHead);
@@ -702,30 +695,17 @@ export function buildMusicDesk(mats) {
   const board = box(3.5, 1.2, 0.06, mats.blackLacquer, g, 0, 2.58, 2.03);
   board.rotation.x = -0.2; // Top leans away from the player (+Z).
 
-  const sheetTex = createSheetTexture(mats.maxAniso);
-  const sheetMat = new THREE.MeshStandardMaterial({
-    color: 0xd7cebb,
-    map: sheetTex,
-    roughness: 0.9,
-    side: THREE.DoubleSide,
-  });
-  const left = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.55, 1.05, 8, 8),
-    sheetMat,
-  );
-  left.position.set(-0.82, 0.025, 0.065);
-  left.rotation.y = 0.03;
-  left.castShadow = true;
-  board.add(left);
-  const right = left.clone();
-  right.position.x = 0.82;
-  right.rotation.y = -0.03;
-  board.add(right);
+  board.name = "music-desk-board";
+  // The book rests on the ledge and leans on the board's face.
+  const book = createScoreBook(mats.maxAniso);
+  book.group.position.set(0, -0.58 + book.height / 2, 0.042);
+  board.add(book.group);
+  g.userData.book = book;
 
   return tag(
     g,
     "Music desk & score",
-    "A modeled music rack standing ahead of the lid, carrying illustrative two-page sheet music. Use autoplay to hear Für Elise.",
+    "An engraved edition of Für Elise on the music rack. Click the right page to turn forward, the left page to turn back; autoplay follows this score.",
     "Score",
   );
 }

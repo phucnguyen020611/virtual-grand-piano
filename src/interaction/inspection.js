@@ -239,6 +239,12 @@ export function createInspection(
     const hit = hitAt(e);
     if (!hit) return;
     selectPart(hit.object);
+    // Objects may react to a click (the score book turns its pages).
+    for (let o = hit.object; o; o = o.parent)
+      if (o.userData?.onPick) {
+        o.userData.onPick(hit);
+        break;
+      }
   });
   renderer.domElement.addEventListener("pointercancel", (e) => {
     finishKey(e);

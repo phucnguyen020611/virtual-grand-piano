@@ -62,26 +62,32 @@ function solveConstrainedRoute(
 ) {
   let bestRoute;
   let bestScore = Infinity;
-  const samples = 180;
-  for (let sample = 0; sample <= samples; sample++) {
-    const t = THREE.MathUtils.lerp(
-      hitchRange[0],
-      hitchRange[1],
-      sample / samples,
-    );
+  let bestT = hitchRange[0];
+  const tryT = (t) => {
     const route = makeStraightRoute(
       bridgePoint.clone(),
       curvePoint(hitchRail, t, 0),
       tuningZ,
       stringY,
     );
-    const error = route.tuningPoint.x - desiredTuningX;
+    // Even spacing belongs at the front bearing (next to the strike line);
+    // the staggered tuning-pin rows then fall wherever each line lands.
+    const error = route.frontBearingPoint.x - desiredTuningX;
     const score = error * error;
     if (routeFitsTuningField(route) && score < bestScore) {
       bestRoute = route;
       bestScore = score;
+      bestT = t;
     }
-  }
+  };
+  const samples = 180;
+  const step = (hitchRange[1] - hitchRange[0]) / samples;
+  for (let sample = 0; sample <= samples; sample++)
+    tryT(hitchRange[0] + sample * step);
+  // Refine around the coarse winner so neighbouring courses stay in order.
+  const coarse = bestT;
+  for (let sample = -40; sample <= 40; sample++)
+    tryT(THREE.MathUtils.clamp(coarse + (sample / 40) * step, 0, 1));
   if (!bestRoute) {
     throw new Error(
       `No valid hitch-rail solution for string route at tuning X ${desiredTuningX}.`,
@@ -147,43 +153,48 @@ export function createStringLayout() {
   const mainBridge = mainBridgeCurve();
   const bassBridge = bassBridgeCurve();
   const hitchRail = hitchRailCurve();
+  // One course per key, as on a real grand, so every hammer and damper sits
+  // on its own string. Courses are evenly spaced per semitone (keys are not:
+  // E-F and B-C have no black key between), as a real action is.
   const zones = [
+    // Wound single bass strings, overstrung on the rear bass bridge.
     {
       name: "bass",
-      courses: 11,
+      from: 21,
+      to: 40,
       strings: 1,
       spacing: 0,
       stringY: 0.014,
-      bridgeRange: [0.08, 0.66],
-      hitchRange: [0.5, 0.9],
-      tuningRange: [-1.08, -2.72],
+      bridgeRange: [0.94, 0.06],
+      hitchRange: [0, 1],
     },
     {
       name: "tenor",
-      courses: 11,
+      from: 41,
+      to: 60,
       strings: 2,
-      spacing: 0.028,
+      spacing: 0.02,
       stringY: 0,
-      bridgeRange: [0.92, 0.52],
-      hitchRange: [0.48, 0.72],
-      tuningRange: [-0.72, 1.35],
+      bridgeRange: [0.96, 0.55],
+      hitchRange: [0, 1],
     },
     {
       name: "treble",
-      courses: 14,
+      from: 61,
+      to: 108,
       strings: 3,
-      spacing: 0.021,
+      spacing: 0.014,
       stringY: 0,
-      bridgeRange: [0.5, 0.08],
-      hitchRange: [0.1, 0.48],
-      tuningRange: [1.48, 2.64],
+      bridgeRange: [0.54, 0.04],
+      hitchRange: [0, 1],
     },
   ];
+  const courseX = (midi) => THREE.MathUtils.lerp(-2.69, 2.69, (midi - 21) / 87);
   let courseIndex = 0;
 
   for (const zone of zones) {
-    for (let course = 0; course < zone.courses; course++) {
-      const t = zone.courses === 1 ? 0 : course / (zone.courses - 1);
+    for (let midi = zone.from; midi <= zone.to; midi++) {
+      const t = (midi - zone.from) / (zone.to - zone.from);
       const bridge = zone.name === "bass" ? bassBridge : mainBridge;
       const bridgePoint = curvePoint(
         bridge,
@@ -196,7 +207,7 @@ export function createStringLayout() {
         bridgePoint,
         hitchRail,
         zone.hitchRange,
-        THREE.MathUtils.lerp(zone.tuningRange[0], zone.tuningRange[1], t),
+        courseX(midi),
         DIM.tuningPinZ + row * DIM.tuningRowStep,
         zone.stringY,
       );
@@ -206,6 +217,7 @@ export function createStringLayout() {
           ...routeOffset(route, offset),
           zone: zone.name,
           courseIndex,
+          midi,
           stringIndex: string,
         });
       }

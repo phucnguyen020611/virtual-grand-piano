@@ -278,16 +278,18 @@ export function mainBridgeCurve(y = 0) {
 
 export function bassBridgeCurve(y = 0) {
   return new THREE.QuadraticBezierCurve3(
-    new THREE.Vector3(-0.7, y, -1.4),
-    new THREE.Vector3(-1.7, y, -2.35),
-    new THREE.Vector3(-2.4, y, -3.15),
+    // Set behind the long bridge's bass end and parallel to it, not
+    // continuing it: the overstrung bass needs its own rearward bridge.
+    new THREE.Vector3(-0.3, y, -2.2),
+    new THREE.Vector3(-1.3, y, -2.62),
+    new THREE.Vector3(-2.35, y, -3.02),
   );
 }
 
 /** The tail rail that carries the hitch-pin field. */
 export function hitchRailCurve(y = 0) {
   return new THREE.QuadraticBezierCurve3(
-    new THREE.Vector3(1.9, y, -0.4),
+    new THREE.Vector3(2.55, y, -0.05),
     new THREE.Vector3(0.4, y, -4.2),
     new THREE.Vector3(-2.6, y, -3.4),
   );

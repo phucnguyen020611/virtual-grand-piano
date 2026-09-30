@@ -166,63 +166,6 @@ export function createLogoTexture(maxAniso) {
   );
 }
 
-/** Two-page Für Elise score used on the music desk. */
-export function createSheetTexture(maxAniso) {
-  return makeCanvasTexture(
-    (g, w, h) => {
-      g.fillStyle = "#efe9d8";
-      g.fillRect(0, 0, w, h);
-      g.fillStyle = "rgba(100,75,42,.08)";
-      for (let i = 0; i < 140; i++)
-        g.fillRect(
-          Math.random() * w,
-          Math.random() * h,
-          Math.random() * 2 + 1,
-          Math.random() * 18 + 4,
-        );
-      g.fillStyle = "#2b2722";
-      g.textAlign = "center";
-      g.font = "26px Georgia";
-      g.fillText("FÜR ELISE", w / 2, 48);
-      g.font = "14px Georgia";
-      g.fillText("Ludwig van Beethoven", w / 2, 72);
-      g.textAlign = "left";
-      for (let stave = 0; stave < 4; stave++) {
-        const sy = 118 + stave * 116;
-        g.lineWidth = 1.3;
-        g.strokeStyle = "#3c3831";
-        for (let l = 0; l < 5; l++) {
-          g.beginPath();
-          g.moveTo(54, sy + l * 13);
-          g.lineTo(w - 54, sy + l * 13);
-          g.stroke();
-        }
-        g.font = "50px Georgia";
-        g.fillText("𝄞", 60, sy + 48);
-        for (let n = 0; n < 18; n++) {
-          const x = 128 + n * 43 + (stave % 2) * 8,
-            y = sy + 15 + ((n * 7 + stave * 3) % 5) * 8;
-          g.beginPath();
-          g.ellipse(x, y, 6.5, 4.8, -0.25, 0, Math.PI * 2);
-          g.fill();
-          g.lineWidth = 1.5;
-          g.beginPath();
-          g.moveTo(x + 6, y);
-          g.lineTo(x + 6, y - 28);
-          g.stroke();
-          if (n % 5 === 0) {
-            g.font = "15px Georgia";
-            g.fillText(n % 10 === 0 ? "♭" : "♯", x - 18, y + 4);
-          }
-        }
-      }
-    },
-    900,
-    620,
-    maxAniso,
-  );
-}
-
 /**
  * Build the shared material palette. Canvas textures need the renderer's max
  * anisotropy, so the whole set is created once the renderer exists.
