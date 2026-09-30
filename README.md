@@ -8,8 +8,8 @@
 [![CI](https://github.com/phucnguyen020611/virtual-grand-piano/actions/workflows/ci.yml/badge.svg)](https://github.com/phucnguyen020611/virtual-grand-piano/actions/workflows/ci.yml)
 [![Deploy](https://github.com/phucnguyen020611/virtual-grand-piano/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/phucnguyen020611/virtual-grand-piano/actions/workflows/deploy-pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
-[![Three.js](https://img.shields.io/badge/Three.js-0.185.1-black?logo=threedotjs)](https://threejs.org/)
-[![Vite](https://img.shields.io/badge/Vite-8.1.5-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![Three.js](https://img.shields.io/badge/Three.js-0.186.0-black?logo=threedotjs)](https://threejs.org/)
+[![Vite](https://img.shields.io/badge/Vite-8.3.0-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
 </div>
 
 ## Overview

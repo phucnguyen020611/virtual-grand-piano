@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#080808" />
+    <meta name="theme-color" content="#0e0b08" />
     <meta
       name="description"
       content="Virtual Grand Piano is an interactive 88-key 3D concert grand for keyboard, touch, and MIDI performance."
@@ -186,11 +186,66 @@
 
     <div class="audioGate" id="audioGate">
       <div class="gateInner">
-        <div class="seal" aria-hidden="true">♩</div>
+        <!-- The logo's piano mark (public/logo.svg), without its tile. -->
+        <svg class="seal" viewBox="150 76 220 344" aria-hidden="true">
+          <defs>
+            <linearGradient
+              id="sealGilt"
+              x1="150"
+              y1="80"
+              x2="370"
+              y2="420"
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop stop-color="#f3dda2" />
+              <stop offset="0.5" stop-color="#c9a052" />
+              <stop offset="1" stop-color="#8e6a2c" />
+            </linearGradient>
+            <path
+              id="sealCase"
+              d="M160 396V146C160 104 205 86 238 112C268 136 272 196 304 236C328 266 360 268 360 318V396H160Z"
+            />
+          </defs>
+          <use href="#sealCase" fill="url(#sealGilt)" />
+          <use
+            href="#sealCase"
+            fill="#17110b"
+            transform="translate(256 252) scale(0.84) translate(-256 -252)"
+          />
+          <path
+            d="M184 352L180 150M204 352L204 140M224 352L230 146M244 352L256 174M264 352L280 210M284 352L304 246M304 352L326 268M324 352L346 292"
+            stroke="url(#sealGilt)"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+          <rect x="160" y="350" width="200" height="46" rx="4" fill="#f4ecda" />
+          <path
+            d="M185 350V396M210 350V396M235 350V396M260 350V396M285 350V396M310 350V396M335 350V396"
+            stroke="#8a7b63"
+            stroke-width="2.5"
+          />
+          <path
+            d="M178 350H192V378H178ZM203 350H217V378H203ZM253 350H267V378H253ZM278 350H292V378H278ZM303 350H317V378H303Z"
+            fill="#17110b"
+          />
+          <rect
+            x="160"
+            y="396"
+            width="200"
+            height="14"
+            rx="4"
+            fill="url(#sealGilt)"
+          />
+        </svg>
         <div class="eyebrow">Interactive 88-key concert grand</div>
         <h1>Virtual Grand Piano</h1>
-        <button class="enter" id="enterBtn">Enter Piano</button>
-        <p>Play with keyboard, touch, or MIDI.</p>
+        <div class="flourish" aria-hidden="true"></div>
+        <p class="lede">
+          A concert grand on a gilded Viennese stage. Play it, take it apart, or
+          listen from the stalls.
+        </p>
+        <button class="enter" id="enterBtn">Enter the hall</button>
+        <p id="gateNote">Keyboard, touch, or MIDI · best with headphones</p>
       </div>
     </div>
 

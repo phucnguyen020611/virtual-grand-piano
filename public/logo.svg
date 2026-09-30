@@ -1,12 +1,26 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="112" fill="#070708"/>
-  <path d="M117 170C117 144.595 137.595 124 163 124H348C373.405 124 394 144.595 394 170V207H117V170Z" fill="#151517" stroke="#C9A568" stroke-width="8"/>
-  <path d="M133 207H377V285C377 304.882 360.882 321 341 321H169C149.118 321 133 304.882 133 285V207Z" fill="#0B0B0C" stroke="#C9A568" stroke-width="8"/>
-  <path d="M158 226H352V278C352 287.941 343.941 296 334 296H176C166.059 296 158 287.941 158 278V226Z" fill="#F0ECE1"/>
-  <path d="M184 226V274M210 226V274M236 226V274M262 226V274M288 226V274M314 226V274" stroke="#18181A" stroke-width="5"/>
-  <path d="M197 226H213V258H197V226ZM249 226H265V258H249V226ZM301 226H317V258H301V226Z" fill="#111113"/>
-  <path d="M176 321L156 398M334 321L354 398M255 321V398" stroke="#C9A568" stroke-width="12" stroke-linecap="round"/>
-  <path d="M232 399H278" stroke="#C9A568" stroke-width="12" stroke-linecap="round"/>
-  <path d="M344 124C375 110 410 91 434 67" stroke="#C9A568" stroke-width="8" stroke-linecap="round"/>
-  <circle cx="437" cy="64" r="10" fill="#C9A568"/>
+  <title>Virtual Grand Piano</title>
+  <defs>
+    <linearGradient id="gilt" x1="120" y1="80" x2="400" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F3DDA2"/>
+      <stop offset="0.5" stop-color="#C9A052"/>
+      <stop offset="1" stop-color="#8E6A2C"/>
+    </linearGradient>
+    <!-- A grand seen from above: straight spine, curved bentside, keyboard at the front. -->
+    <path id="case" d="M160 396V146C160 104 205 86 238 112C268 136 272 196 304 236C328 266 360 268 360 318V396H160Z"/>
+    <clipPath id="board"><use href="#case" transform="translate(256 252) scale(0.84) translate(-256 -252)"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0E0B08"/>
+  <rect x="22" y="22" width="468" height="468" rx="92" stroke="#C9A052" stroke-opacity="0.35" stroke-width="3"/>
+  <g transform="translate(256 262) scale(1.2) translate(-260 -248)">
+  <use href="#case" fill="url(#gilt)"/>
+  <use href="#case" fill="#17110B" transform="translate(256 252) scale(0.84) translate(-256 -252)"/>
+  <g clip-path="url(#board)" stroke="url(#gilt)" stroke-width="3" stroke-linecap="round" opacity="0.9">
+    <path d="M184 352L178 130M204 352L204 128M224 352L232 138M244 352L258 170M264 352L282 208M284 352L306 246M304 352L330 268M324 352L352 290"/>
+  </g>
+  <rect x="160" y="350" width="200" height="46" rx="4" fill="#F4ECDA"/>
+  <path d="M185 350V396M210 350V396M235 350V396M260 350V396M285 350V396M310 350V396M335 350V396" stroke="#8A7B63" stroke-width="2.5"/>
+  <path d="M178 350H192V378H178ZM203 350H217V378H203ZM253 350H267V378H253ZM278 350H292V378H278ZM303 350H317V378H303Z" fill="#17110B"/>
+  <rect x="160" y="396" width="200" height="14" rx="4" fill="url(#gilt)"/>
+  </g>
 </svg>
