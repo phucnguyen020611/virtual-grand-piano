@@ -268,3 +268,128 @@ export function cofferSet(aniso) {
     { aniso },
   );
 }
+
+/**
+ * Oak herringbone parquet, the floor of a palace salon: 1 × 4 blocks laid at
+ * 45° so the zigzag runs along the texture's u axis. Blocks follow the
+ * lattice (1, 1) · (8, 0) in cell units; the tile is its rotated period,
+ * √2 × 4√2 cells, so it repeats seamlessly. `cellSize` is one block width.
+ */
+export function parquetSet(aniso) {
+  const W = 128;
+  const H = 512;
+  const cellPx = W / Math.SQRT2;
+  // 8 × 8 cell table: which block covers a cell, its direction and place.
+  const table = [];
+  for (let s = 0; s < 8; s++) {
+    for (let i = 0; i < 4; i++)
+      table[s * 8 + ((s + i) % 8)] = { id: s * 2, vertical: false, index: i };
+    for (let j = 0; j < 4; j++)
+      table[((s + 1 + j) % 8) * 8 + s] = {
+        id: s * 2 + 1,
+        vertical: true,
+        index: j,
+      };
+  }
+  const rand = rng(83);
+  const tone = Array.from({ length: 16 }, () => 0.88 + rand() * 0.2);
+  const phase = Array.from({ length: 16 }, () => rand() * 10);
+  const fine = valueNoise(rng(89), 24, 96);
+  return paint(
+    W,
+    H,
+    (u, v, x, y) => {
+      // Texel → lattice coordinates (cells), via the 45° frame.
+      const X = x / cellPx;
+      const Y = y / cellPx;
+      const a = (X + Y) / Math.SQRT2;
+      const b = (X - Y) / Math.SQRT2;
+      const ca = Math.floor(a);
+      const cb = Math.floor(b);
+      const cell = table[(((cb % 8) + 8) % 8) * 8 + (((ca % 8) + 8) % 8)];
+      const fa = a - ca;
+      const fb = b - cb;
+      const along = cell.vertical
+        ? (cell.index + fb) / 4
+        : (cell.index + fa) / 4;
+      const across = cell.vertical ? fa : fb;
+      const p = phase[cell.id];
+      // Quarter-sawn oak: fine straight grain with a slow wander.
+      const ring = Math.sin(
+        (across * 7 + Math.sin(along * 5 + p) * 0.4 + p) * Math.PI * 2,
+      );
+      const figure = Math.pow(0.5 + 0.5 * ring, 5);
+      const grain = fine(u, v);
+      // The two block directions catch the light differently.
+      const t =
+        tone[cell.id] *
+        (cell.vertical ? 0.93 : 1) *
+        (1 - 0.18 * figure) *
+        (0.95 + 0.1 * grain);
+      const seam = Math.min(
+        Math.min(across, 1 - across) * cellPx,
+        Math.min(along, 1 - along) * cellPx * 4,
+      );
+      const groove = seam < 0.9 ? 1 : seam < 1.8 ? 0.3 : 0;
+      const shade = t * (1 - 0.5 * groove);
+      return [
+        Math.min(255, 152 * shade),
+        Math.min(255, 104 * shade),
+        Math.min(255, 62 * shade),
+        -groove * 1.6 - figure * 0.1,
+        0.34 + 0.14 * figure + 0.08 * grain + 0.3 * groove,
+      ];
+    },
+    2,
+    { aniso },
+  );
+}
+/** World size of one parquet tile (√2 × 4√2 block widths of 0.33 units). */
+export const PARQUET_TILE = [0.33 * Math.SQRT2, 0.33 * 4 * Math.SQRT2];
+
+/**
+ * Royal aisle runner: a crimson wool field between gold borders, a gold
+ * lozenge medallion every repeat. u runs across the runner, v along it.
+ */
+export function runnerSet(aniso) {
+  const W = 256;
+  const H = 512;
+  const pile = valueNoise(rng(97), 64, 128);
+  const CRIMSON = [132, 16, 28];
+  const DEEP = [80, 8, 18];
+  const GOLD = [200, 156, 74];
+  return paint(
+    W,
+    H,
+    (u, v) => {
+      const edge = Math.min(u, 1 - u);
+      const dx = Math.abs(u - 0.5);
+      const dy = Math.abs(v - 0.5);
+      const lozenge = dx / 0.3 + dy / 0.22; // diamond around the centre
+      const petals =
+        Math.hypot(dx * 1.6, dy) <
+        0.05 + 0.02 * Math.cos(Math.atan2(dy, dx) * 8);
+      let colour = CRIMSON;
+      if (edge < 0.035) colour = DEEP;
+      else if (edge < 0.08) colour = GOLD;
+      else if (edge < 0.1) colour = DEEP;
+      else if (edge < 0.11) colour = GOLD;
+      else if ((lozenge > 0.92 && lozenge < 1) || petals) colour = GOLD;
+      else if (lozenge < 0.92) colour = DEEP;
+      // Small gold studs between medallions.
+      else if (Math.hypot(dx, Math.min(v, 1 - v) * 1.4) < 0.025) colour = GOLD;
+      const gold = colour === GOLD;
+      const p = pile(u, v);
+      const m = 0.92 + 0.12 * p;
+      return [
+        colour[0] * m,
+        colour[1] * m,
+        colour[2] * m,
+        p * 0.5 + (gold ? 0.35 : 0),
+        gold ? 0.62 : 0.9,
+      ];
+    },
+    1.1,
+    { aniso },
+  );
+}
