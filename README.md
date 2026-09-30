@@ -67,7 +67,10 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Separate systems        | **Exploded**                                     |
 | Restore assembled piano | **Normal**                                       |
 | Toggle lid              | **Open Lid / Close Lid**                         |
-| Autoplay                | **5-piece playlist**                             |
+| House curtain & lights  | **Close curtain / Open curtain**                 |
+| Adjust bench height     | Click a knob at either end of the bench          |
+| Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift` |
+| Autoplay                | **5-piece playlist** with key-line soundwave     |
 | Restore camera          | **Reset View**                                   |
 
 ## Tech stack

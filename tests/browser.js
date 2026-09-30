@@ -448,6 +448,63 @@ async function run() {
   await wait(100);
   click("resetBtn");
 
+  // Free cam: arrows walk the viewer instead of shifting octaves.
+  const octave = d.querySelector("#octaveLabel").textContent;
+  const startedAt = p.camera.position.clone();
+  click("freeCamBtn");
+  key("keydown", "ArrowUp");
+  await wait(400);
+  key("keyup", "ArrowUp");
+  await wait(200);
+  const walked = p.camera.position.distanceTo(startedAt);
+  // Shift arrives only as a flag on the arrow event, as from a held key.
+  const groundY = p.camera.position.y;
+  key("keydown", "ArrowUp", { shiftKey: true });
+  await wait(400);
+  key("keyup", "ArrowUp", { shiftKey: true });
+  await wait(200);
+  const rose = p.camera.position.y - groundY;
+  click("freeCamBtn");
+  assert(rose > 1, `free cam rose only ${rose.toFixed(2)}`);
+  assert(walked > 1, `free cam walked only ${walked.toFixed(2)}`);
+  assert(
+    d.querySelector("#octaveLabel").textContent === octave,
+    "free cam arrows shifted the octave",
+  );
+  log("free cam walks and flies on arrow keys", { pass: true, walked, rose });
+
+  // Curtain: closing darkens the house down to the ghost light, opening
+  // restores it.
+  const ghost = p.scene.getObjectByName("ghost-light");
+  click("curtainBtn");
+  p.hall.update(100);
+  const dark = p.hall.key.intensity === 0 && p.scene.environmentIntensity < 0.2;
+  assert(dark && ghost.visible, "closed curtain left the house lit");
+  click("curtainBtn");
+  p.hall.update(100);
+  assert(
+    p.hall.key.intensity > 1 &&
+      p.scene.environmentIntensity === 1 &&
+      !ghost.visible,
+    "opened curtain did not restore the lights",
+  );
+  log("curtain dims and restores the house", { pass: true });
+
+  // Bench knobs step the seat up and back down.
+  const knob = p.bench.children.find((o) => o.userData.onPick);
+  const seatTop = () => new p.THREE.Box3().setFromObject(p.bench).max.y;
+  const rest = seatTop();
+  const heights = [1, 2, 3, 4].map(() => {
+    knob.userData.onPick();
+    p.bench.userData.update(100);
+    return seatTop() - rest;
+  });
+  assert(
+    [0.1, 0.2, 0.1, 0].every((h, i) => Math.abs(heights[i] - h) < 0.01),
+    `bench lift steps ${heights.map((h) => h.toFixed(2))}`,
+  );
+  log("bench knobs raise and lower the seat", { pass: true, heights });
+
   let meshes = 0,
     shadowCasters = 0;
   const geometries = new Set(),

@@ -99,6 +99,9 @@
                   <button id="explodeBtn" aria-pressed="false">Exploded</button>
                 </div>
                 <button id="lidBtn" aria-pressed="true">Close lid</button>
+                <button id="curtainBtn" aria-pressed="true">
+                  Close curtain
+                </button>
                 <select id="viewSelect" aria-label="Camera view">
                   <option value="pianist">Pianist view</option>
                   <option value="keys">Keyboard close-up</option>
@@ -106,6 +109,7 @@
                   <option value="balcony">Balcony</option>
                   <option value="overview">Whole hall</option>
                 </select>
+                <button id="freeCamBtn" aria-pressed="false">Free cam</button>
                 <button id="resetBtn">Reset view</button>
               </div>
             </section>
@@ -156,7 +160,14 @@
           <p>
             Drag to orbit, right-drag or two fingers to pan, scroll to zoom
             toward the cursor. Double-click any spot to orbit around it. In
-            Exploded mode, pick a part’s name to fly to it.
+            Exploded mode, pick a part’s name to fly to it. With
+            <b>Free cam</b> on, <kbd>↑</kbd>/<kbd>↓</kbd> walk and
+            <kbd>←</kbd>/<kbd>→</kbd> turn; hold <kbd>Shift</kbd> with
+            <kbd>↑</kbd>/<kbd>↓</kbd> to rise and descend (or
+            <kbd>PageUp</kbd>/<kbd>PageDown</kbd>), with <kbd>←</kbd>/<kbd
+              >→</kbd
+            >
+            to step sideways.
           </p>
         </section>
       </div>

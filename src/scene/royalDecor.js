@@ -302,6 +302,31 @@ export function buildRoyalInterior(hall, scene, room) {
   pelmet.position.set(0, ceilingY - 9.5, stageFrontZ - 0.9);
   hall.add(pelmet);
 
+  // --- House curtain: two velvet panels that travel in from the wings -----------
+  // Each panel hangs from its outer edge; drawing it open gathers the folds.
+  const curtainReach = halfWidth - 7; // outer edge, tucked behind the drapes
+  const curtainH = ceilingY - 9 - drapeFloor;
+  const panel = new THREE.PlaneGeometry(curtainReach + 0.6, curtainH, 160, 1);
+  panel.translate(-(curtainReach + 0.6) / 2, curtainH / 2, 0);
+  const panelPos = panel.attributes.position;
+  for (let i = 0; i < panelPos.count; i++) {
+    const x = panelPos.getX(i);
+    panelPos.setZ(i, Math.sin(x * 2.2) * 0.5 + Math.sin(x * 4.9 + 1) * 0.1);
+  }
+  panel.computeVertexNormals();
+  const curtain = [-1, 1].map((side) => {
+    const m = new THREE.Mesh(panel, drapeMat);
+    m.name = "house-curtain";
+    m.position.set(
+      side * curtainReach,
+      drapeFloor,
+      stageFrontZ - 1.8 + side * 0.65,
+    );
+    m.userData.side = side;
+    hall.add(m);
+    return m;
+  });
+
   // --- Crystal chandeliers over the stalls ----------------------------------------------
   const crystal = keepEnv(
     new THREE.MeshStandardMaterial({
@@ -441,5 +466,23 @@ export function buildRoyalInterior(hall, scene, room) {
   halos.renderOrder = 4;
   hall.add(halos);
 
-  return { gilt, lights, bulbCount: bulbs.length };
+  const litBulb = bulbGlow.color.clone();
+  const coldBulb = new THREE.Color(0x2a2520); // unlit glass
+  const lightPower = lights.map((light) => light.intensity);
+  return {
+    gilt,
+    lights,
+    bulbCount: bulbs.length,
+    /** 0 = curtain closed across the stage, 1 = drawn open into the wings. */
+    setCurtain(open) {
+      for (const m of curtain) m.scale.x = m.userData.side * (1 - 0.9 * open);
+    },
+    /** Dim every lamp in the room: 0 = dark, 1 = full house. */
+    setHouseLights(level) {
+      lights.forEach((light, i) => (light.intensity = lightPower[i] * level));
+      bulbGlow.color.lerpColors(coldBulb, litBulb, level);
+      halos.material.opacity = level;
+      crystal.emissiveIntensity = 0.35 * level;
+    },
+  };
 }

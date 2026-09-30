@@ -332,7 +332,49 @@ export function createHall(scene, mats) {
 
   // House lights: the chandeliers (royalDecor) carry the room; this is only
   // the faint bounce from the gilt and the damask.
-  scene.add(new THREE.HemisphereLight(0x9a8672, 0x2a1c14, 0.1));
+  const bounce = new THREE.HemisphereLight(0x9a8672, 0x2a1c14, 0.1);
+  scene.add(bounce);
+
+  // Ghost light: the bare work lamp a closed theatre leaves burning on stage.
+  const ghost = new THREE.Group();
+  ghost.name = "ghost-light";
+  const ironwork = new THREE.MeshStandardMaterial({
+    color: 0x1b1a19,
+    metalness: 0.6,
+    roughness: 0.5,
+  });
+  mesh(
+    new THREE.CylinderGeometry(0.9, 1, 0.3, 24),
+    ironwork,
+    0,
+    0.15,
+    0,
+    ghost,
+  );
+  mesh(
+    new THREE.CylinderGeometry(0.06, 0.06, 8, 8),
+    ironwork,
+    0,
+    4.2,
+    0,
+    ghost,
+  );
+  const ghostGlass = new THREE.MeshBasicMaterial({ toneMapped: false });
+  mesh(new THREE.SphereGeometry(0.3, 16, 12), ghostGlass, 0, 8.5, 0, ghost);
+  mesh(
+    new THREE.IcosahedronGeometry(0.5, 1),
+    new THREE.MeshBasicMaterial({ color: 0x151412, wireframe: true }),
+    0,
+    8.5,
+    0,
+    ghost,
+  );
+  const ghostLamp = new THREE.PointLight(0xffdcb0, 0, 0, 2);
+  ghostLamp.position.y = 8.5;
+  ghost.add(ghostLamp);
+  ghost.position.set(5.5, STAGE_TOP, 6.5);
+  scene.add(ghost);
+  const ghostGlow = new THREE.Color(0xffe6c0).multiplyScalar(4);
 
   // The studio reflection map is tuned for the lacquer; on the room's matte
   // surfaces it reads as ambient fill, so the hall takes only a trace of it.
@@ -341,6 +383,27 @@ export function createHall(scene, mats) {
       if (m && "envMapIntensity" in m && !m.userData.keepEnv)
         m.envMapIntensity = 0.08;
   });
+
+  // House lights follow the curtain: open is a lit hall, closed a dark one.
+  const dimmable = [key, fill, back, wash, wallGlaze, bounce].map((light) => [
+    light,
+    light.intensity,
+  ]);
+  let curtainTarget = 1;
+  let curtain = 1;
+  let houseLevel = -1;
+  function setHouse(level) {
+    if (level === houseLevel) return;
+    houseLevel = level;
+    for (const [light, power] of dimmable) light.intensity = power * level;
+    royal.setHouseLights(level);
+    // Studio reflections fade with the room, all but a trace. (Materials
+    // lit by scene.environment take this, not their own envMapIntensity.)
+    scene.environmentIntensity = 0.1 + 0.9 * level;
+    ghostLamp.intensity = 28 * (1 - level);
+    ghostGlass.color.copy(ghostGlow).multiplyScalar(1 - level);
+    ghost.visible = level < 0.999;
+  }
 
   let target = 0;
   let blend = 0;
@@ -394,7 +457,22 @@ export function createHall(scene, mats) {
     setExploded(value) {
       target = value ? 1 : 0;
     },
+    get curtainOpen() {
+      return curtainTarget === 1;
+    },
+    setCurtainOpen(open) {
+      curtainTarget = open ? 1 : 0;
+    },
     update(dt) {
+      // The traveller takes a few seconds to cross; lights follow it.
+      curtain = THREE.MathUtils.clamp(
+        curtain + Math.sign(curtainTarget - curtain) * (dt / 3.2),
+        0,
+        1,
+      );
+      const eased = curtain * curtain * (3 - 2 * curtain);
+      royal.setCurtain(eased);
+      setHouse(eased);
       blend = THREE.MathUtils.damp(blend, target, 2.8, dt);
       focus.lerpVectors(normalFocus, explodedFocus, blend);
       aim();

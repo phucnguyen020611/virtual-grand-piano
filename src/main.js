@@ -181,6 +181,7 @@ const inspection = createInspection(
   },
   controls,
 );
+inspection.addPickable(bench);
 const explodedView = createExplodedView({ piano, camera, controls });
 if (import.meta.env.DEV) window.__vgp.explodedView = explodedView;
 
@@ -362,6 +363,7 @@ syncSecondaryControls();
 const computerKeyboard = createComputerKeyboard({
   controller: pianoPerformance,
   isEnabled: () => audioGate.classList.contains("hidden"),
+  arrowsShiftOctave: () => !freeCam.on,
   onRangeChange: ({ minMidi, maxMidi, canShiftDown, canShiftUp }) => {
     octaveLabel.textContent = `${midiToNoteName(minMidi)}–${midiToNoteName(maxMidi)}`;
     octaveDownBtn.disabled = !canShiftDown;
@@ -545,6 +547,83 @@ renderer.domElement.addEventListener("dblclick", (event) => {
   flyTo(hit.point.clone().add(offset), hit.point, 0.8);
 });
 
+// Free cam: the arrow keys walk and turn the viewer through the hall; Shift
+// (or PageUp / PageDown) flies. Dragging still looks around a point just ahead.
+const freeCamBtn = document.querySelector("#freeCamBtn");
+const freeCam = {
+  on: false,
+  held: new Set(),
+  released: new Set(), // let up only after a frame, so quick taps still move
+  shift: false,
+  velocity: new THREE.Vector3(),
+  turn: 0,
+};
+const FREE_CAM_KEYS = /^(Arrow|Page(Up|Down))/;
+const WALK_SPEED = 9; // units per second
+const TURN_SPEED = 1.5; // radians per second
+freeCamBtn.onclick = () => {
+  freeCam.on = !freeCam.on;
+  freeCamBtn.setAttribute("aria-pressed", String(freeCam.on));
+  if (!freeCam.on) return;
+  flight.t = 1;
+  explodedView.cancelCameraAssist();
+  // Pull the orbit point close so a drag turns the head, not the world.
+  const ahead = controls.target.clone().sub(camera.position).setLength(1.5);
+  controls.target.copy(camera.position).add(ahead);
+  dom.partMeta.textContent = "Free cam";
+  dom.partName.textContent = "↑ ↓ walk · ← → turn";
+  dom.partText.textContent =
+    "Hold Shift with ↑ ↓ to rise and descend (or PageUp / PageDown), Shift with ← → to step sideways. Drag to look around.";
+  renderer.domElement.focus({ preventScroll: true });
+};
+addEventListener("keydown", (event) => {
+  // Read Shift from every event: its own keydown may land elsewhere.
+  freeCam.shift = event.shiftKey;
+  if (!freeCam.on || !FREE_CAM_KEYS.test(event.code)) return;
+  if (event.target.closest?.("input, select, textarea")) return;
+  event.preventDefault();
+  freeCam.held.add(event.code);
+  freeCam.released.delete(event.code);
+  flight.t = 1;
+});
+addEventListener("keyup", (event) => {
+  freeCam.shift = event.shiftKey;
+  if (freeCam.held.has(event.code)) freeCam.released.add(event.code);
+});
+addEventListener("blur", () => {
+  freeCam.held.clear();
+  freeCam.released.clear();
+  freeCam.shift = false;
+});
+
+const UP = new THREE.Vector3(0, 1, 0);
+function updateFreeCam(dt) {
+  const held = (code) => (freeCam.on && freeCam.held.has(code) ? 1 : 0);
+  const fly = freeCam.shift;
+  const ahead = held("ArrowUp") - held("ArrowDown");
+  const side = held("ArrowRight") - held("ArrowLeft");
+  const rise = (fly ? ahead : 0) + held("PageUp") - held("PageDown");
+  for (const code of freeCam.released) freeCam.held.delete(code);
+  freeCam.released.clear();
+  const look = controls.target.clone().sub(camera.position);
+  const forward = look.clone().setY(0);
+  if (forward.lengthSq() < 1e-6) camera.getWorldDirection(forward).setY(0);
+  forward.normalize();
+  const right = new THREE.Vector3().crossVectors(forward, UP);
+  const wish = fly ? right.multiplyScalar(side) : forward.multiplyScalar(ahead);
+  wish.y = rise;
+  // Ease in and out of every move and turn.
+  const ease = 1 - Math.exp(-8 * dt);
+  freeCam.velocity.lerp(wish.multiplyScalar(WALK_SPEED), ease);
+  freeCam.turn += ((fly ? 0 : -side * TURN_SPEED) - freeCam.turn) * ease;
+  if (freeCam.velocity.lengthSq() < 1e-6 && Math.abs(freeCam.turn) < 1e-4)
+    return;
+  camera.position.addScaledVector(freeCam.velocity, dt);
+  hall.keepInside(camera.position, 0.8);
+  look.applyAxisAngle(UP, freeCam.turn * dt);
+  controls.target.copy(camera.position).add(look);
+}
+
 document.querySelector("#resetBtn").onclick = () => {
   flight.t = 1;
   viewSelect.value = "pianist";
@@ -555,6 +634,13 @@ lidBtn.onclick = () => {
   lidOpen = !lidOpen;
   lidBtn.textContent = lidOpen ? "Close lid" : "Open lid";
   lidBtn.setAttribute("aria-pressed", String(lidOpen));
+};
+const curtainBtn = document.querySelector("#curtainBtn");
+curtainBtn.onclick = () => {
+  const open = !hall.curtainOpen;
+  hall.setCurtainOpen(open);
+  curtainBtn.textContent = open ? "Close curtain" : "Open curtain";
+  curtainBtn.setAttribute("aria-pressed", String(open));
 };
 document.querySelector("#enterBtn").onclick = async (event) => {
   const button = event.currentTarget;
@@ -618,6 +704,7 @@ function animate(timestamp) {
   timer.update(timestamp);
   const dt = Math.min(timer.getDelta(), 0.035);
   updateFlight(dt);
+  updateFreeCam(dt);
   controls.update();
   // Never pass through a wall, the ceiling or a floor.
   hall.keepInside(camera.position, 0.8);
@@ -625,6 +712,7 @@ function animate(timestamp) {
 
   explodedView.update(dt, reducedMotion.matches);
   hall.update(reducedMotion.matches ? 100 : dt);
+  bench.userData.update(reducedMotion.matches ? 100 : dt);
 
   const targetLid = lidOpen ? DIM.lidOpenAngle : 0;
   piano.setLidAngle(

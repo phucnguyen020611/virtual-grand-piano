@@ -118,7 +118,36 @@ function createLeatherGrain() {
   return { normalMap: toTexture(normal), roughnessMap: toTexture(rough) };
 }
 
-/** A stationary pianist's bench with a tufted black leather seat. */
+/** A turned knob with a fluted grip, its axis along +x. */
+function knobGeometry() {
+  const knob = new THREE.LatheGeometry(
+    [
+      [0, 0],
+      [0.1, 0],
+      [0.14, 0.025],
+      [0.15, 0.06],
+      [0.14, 0.1],
+      [0.1, 0.125],
+      [0, 0.13],
+    ].map(([r, y]) => new THREE.Vector2(r, y)),
+    48,
+  );
+  const p = knob.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const flute = 1 + 0.035 * Math.cos(Math.atan2(p.getZ(i), p.getX(i)) * 16);
+    p.setX(i, p.getX(i) * flute);
+    p.setZ(i, p.getZ(i) * flute);
+  }
+  knob.computeVertexNormals();
+  return knob.rotateZ(-Math.PI / 2);
+}
+
+const LIFTS = [0, 0.1, 0.2]; // seat heights the knobs step through
+
+/**
+ * A concert artist bench with a tufted black leather seat. The seat rides a
+ * scissor lift; either end knob turns the spindle to raise or lower it.
+ */
 export function createBench(mats, stageTopY) {
   const bench = new THREE.Group();
   bench.name = "pianist-bench";
@@ -138,14 +167,16 @@ export function createBench(mats, stageTopY) {
     envMapIntensity: 0.9,
   });
 
-  box(2.48, 0.14, 1.22, mats.blackLacquer, bench, 0, 0.83);
+  const carriage = new THREE.Group(); // everything the lift carries
+  bench.add(carriage);
+  box(2.48, 0.14, 1.22, mats.blackLacquer, carriage, 0, 0.83);
   const base = new THREE.Mesh(
     new RoundedBoxGeometry(2.6, 0.2, 1.34, 3, 0.06),
     leather,
   );
   base.position.y = 0.98;
   base.castShadow = base.receiveShadow = true;
-  bench.add(base);
+  carriage.add(base);
 
   // Real geometry for the pillowed top, so tufts show in silhouette and light.
   const top = new THREE.PlaneGeometry(SEAT_W, SEAT_D, 160, 80);
@@ -157,14 +188,14 @@ export function createBench(mats, stageTopY) {
   const seat = new THREE.Mesh(top, leather);
   seat.position.y = 1.075;
   seat.castShadow = seat.receiveShadow = true;
-  bench.add(seat);
+  carriage.add(seat);
 
   const buttonGeometry = new THREE.SphereGeometry(0.03, 12, 8);
   buttonGeometry.scale(1, 0.55, 1);
   for (const [x, z] of BUTTONS) {
     const button = new THREE.Mesh(buttonGeometry, leather);
     button.position.set(x, seat.position.y + puff(x, z) * PUFF + 0.008, z);
-    bench.add(button);
+    carriage.add(button);
   }
 
   const legGeometry = new THREE.BoxGeometry(0.14, 0.8, 0.14);
@@ -176,5 +207,72 @@ export function createBench(mats, stageTopY) {
       bench.add(leg);
     }
   }
+
+  // Lower frame, spindle and scissor arms, bared as the seat rises.
+  for (const z of [-0.48, 0.48])
+    box(2.02, 0.1, 0.08, mats.blackLacquer, bench, 0, 0.7, z);
+  for (const x of [-1.08, 1.08])
+    box(0.1, 0.1, 0.82, mats.blackLacquer, bench, x, 0.7, 0);
+  const steel = new THREE.MeshStandardMaterial({
+    color: 0x8a8d90,
+    metalness: 1,
+    roughness: 0.35,
+  });
+  const spindle = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.025, 2.36, 12).rotateZ(Math.PI / 2),
+    steel,
+  );
+  spindle.position.y = 0.7;
+  bench.add(spindle);
+  const arms = [-0.4, 0.4].flatMap((z) =>
+    [-1, 1].map((slope) => {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(1, 0.035, 0.03), steel);
+      arm.position.z = z;
+      arm.userData.slope = slope;
+      bench.add(arm);
+      return arm;
+    }),
+  );
+
+  let step = 0;
+  let direction = 1;
+  let lift = 0;
+  const grip = knobGeometry();
+  const knobs = [-1, 1].map((side) => {
+    const knob = new THREE.Mesh(grip, mats.blackLacquer);
+    knob.scale.x = side;
+    knob.position.set(side * 1.14, 0.7, 0);
+    knob.castShadow = true;
+    Object.assign(knob.userData, {
+      inspectable: true,
+      partName: "Height adjustment knob",
+      partText:
+        "Concert benches rise on a scissor lift turned by these knobs. Click one to raise or lower the seat.",
+      partCategory: "Artist bench",
+      onPick() {
+        if (LIFTS[step + direction] === undefined) direction = -direction;
+        step += direction;
+      },
+    });
+    bench.add(knob);
+    return knob;
+  });
+
+  function setLift(value) {
+    lift = value;
+    carriage.position.y = lift;
+    const rise = 0.01 + lift; // frame underside above the rail tops
+    for (const arm of arms) {
+      arm.scale.x = Math.hypot(1.7, rise);
+      arm.rotation.z = arm.userData.slope * Math.atan2(rise, 1.7);
+      arm.position.y = 0.75 + rise / 2;
+    }
+    for (const knob of knobs) knob.rotation.x = lift * 60; // ~2 turns
+  }
+  setLift(0);
+  bench.userData.update = (dt) => {
+    if (Math.abs(LIFTS[step] - lift) > 1e-4)
+      setLift(THREE.MathUtils.damp(lift, LIFTS[step], 3, dt));
+  };
   return bench;
 }

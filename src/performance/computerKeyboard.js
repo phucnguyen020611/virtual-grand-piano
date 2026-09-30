@@ -54,6 +54,7 @@ export function createComputerKeyboard({
   controller,
   onRangeChange = () => {},
   isEnabled = () => true,
+  arrowsShiftOctave = () => true,
 }) {
   const activeCodes = new Map();
   let baseMidi = 48; // C3, spans roughly C3–F5 before octave shifting.
@@ -101,7 +102,10 @@ export function createComputerKeyboard({
       controller.setSustainForSource("computer:space", true, "computer");
       return;
     }
-    if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
+    if (
+      (event.code === "ArrowLeft" || event.code === "ArrowRight") &&
+      arrowsShiftOctave()
+    ) {
       event.preventDefault();
       if (!event.repeat) shiftOctave(event.code === "ArrowLeft" ? -1 : 1);
       return;

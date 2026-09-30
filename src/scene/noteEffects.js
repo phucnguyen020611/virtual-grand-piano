@@ -52,6 +52,46 @@ const columnFragment = /* glsl */ `
   }
 `;
 
+const waveVertex = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const waveFragment = /* glsl */ `
+  uniform sampler2D energy;
+  uniform vec3 right;
+  uniform vec3 left;
+  uniform float time;
+  uniform float opacity;
+  varying vec2 vUv;
+  const float BARS = 180.0;
+  void main() {
+    float bar = floor(vUv.x * BARS);
+    float u = (bar + 0.5) / BARS;
+    vec2 e = texture2D(energy, vec2(u, 0.5)).rg;
+    float sum = e.r + e.g;
+    // A quiet travelling ripple, and louder bars that shimmer as they ring.
+    float idle = 0.05 + 0.035 * sin(u * 26.0 - time * 2.2) * sin(u * 7.0 + time * 0.9);
+    float amp = idle + sum * (0.75 + 0.25 * sin(bar * 1.7 + time * 11.0));
+    amp *= smoothstep(0.0, 0.05, u) * smoothstep(1.0, 0.95, u);
+    amp = min(amp, 0.98);
+    // Antialiased round-ended bars, brightest at the centre line.
+    float fx = abs(fract(vUv.x * BARS) - 0.5);
+    float aa = fwidth(vUv.x * BARS);
+    float column = 1.0 - smoothstep(0.2 - aa, 0.2 + aa, fx);
+    float y = abs(vUv.y - 0.5) * 2.0;
+    float body = 1.0 - smoothstep(amp - 0.04, amp, y);
+    float core = exp(-y * 5.0 / max(amp, 0.05));
+    float line = exp(-y * 60.0) * 0.35;
+    vec3 hand = sum > 0.001 ? mix(right, left, e.g / sum) : vec3(0.75, 0.93, 1.0);
+    vec3 color = mix(hand, vec3(1.0), 0.45 * core);
+    float a = (column * body * (0.55 + 1.1 * core) + line) * opacity;
+    gl_FragColor = vec4(color * a * 1.8, a);
+  }
+`;
+
 const particleVertex = /* glsl */ `
   attribute vec3 aColor;
   attribute float aSize;
@@ -184,21 +224,74 @@ export function createNoteEffects(scene, piano, renderer, camera) {
     return mesh;
   });
 
-  // A thin line of light across the keyboard while a song plays.
-  const keyLine = new THREE.Mesh(
-    new THREE.PlaneGeometry(6.2, 0.05),
-    new THREE.MeshBasicMaterial({
-      color: new THREE.Color("#bfefff").multiplyScalar(1.6),
+  // --- Soundwave ribbon ----------------------------------------------------------
+  // Stands along the back of the keys: glowing bars swell over the keys that
+  // sound, tinted by hand, and ripple softly between notes.
+  const WAVE_W = 6.2;
+  const WAVE_H = 0.28;
+  const WAVE_TEXELS = 128;
+  const energy = new Uint8Array(WAVE_TEXELS * 4);
+  const energyTexture = new THREE.DataTexture(energy, WAVE_TEXELS, 1);
+  energyTexture.magFilter = energyTexture.minFilter = THREE.LinearFilter;
+  const wave = new THREE.Mesh(
+    new THREE.PlaneGeometry(WAVE_W, WAVE_H),
+    new THREE.ShaderMaterial({
+      uniforms: {
+        energy: { value: energyTexture },
+        right: { value: HAND_COLORS.right },
+        left: { value: HAND_COLORS.left },
+        time: { value: 0 },
+        opacity: { value: 0 },
+      },
+      vertexShader: waveVertex,
+      fragmentShader: waveFragment,
       transparent: true,
-      opacity: 0,
       depthWrite: false,
+      side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
       toneMapped: false,
     }),
   );
-  keyLine.rotation.x = -Math.PI / 2;
-  keyLine.position.set(0, lineY + 0.004, whiteBack - 0.16);
-  keyboard.add(keyLine);
+  wave.renderOrder = 5;
+  wave.raycast = () => {}; // light, not a part: clicks pass through to the keys
+  wave.position.set(0, lineY + 0.13, whiteBack - 0.42);
+  keyboard.add(wave);
+  const keyU = new Map(
+    [...keyInfo].map(([midi, info]) => [
+      midi,
+      toKeyboard(info).x / WAVE_W + 0.5,
+    ]),
+  );
+  const envelope = new Map(); // midi -> [level, hand]
+
+  function updateWave(dt, next) {
+    for (const [midi, hand] of next)
+      if (!envelope.has(midi)) envelope.set(midi, [1.4, hand]); // strike
+    for (const [midi, entry] of envelope) {
+      // Held notes settle to a steady swell; released ones ring away.
+      entry[0] = THREE.MathUtils.damp(
+        entry[0],
+        next.has(midi) ? 1 : 0,
+        next.has(midi) ? 3 : 2.4,
+        dt,
+      );
+      if (next.has(midi)) entry[1] = next.get(midi);
+      else if (entry[0] < 0.01) envelope.delete(midi);
+    }
+    for (let i = 0; i < WAVE_TEXELS; i++) {
+      const u = (i + 0.5) / WAVE_TEXELS;
+      let r = 0;
+      let l = 0;
+      for (const [midi, [level, hand]] of envelope) {
+        const e = level * Math.exp(-(((u - keyU.get(midi)) / 0.035) ** 2));
+        if (hand === "left") l += e;
+        else r += e;
+      }
+      energy[i * 4] = Math.min(255, r * 180);
+      energy[i * 4 + 1] = Math.min(255, l * 180);
+    }
+    energyTexture.needsUpdate = true;
+  }
 
   // --- Star dust ----------------------------------------------------------------
   const positions = new Float32Array(MAX_PARTICLES * 3);
@@ -311,12 +404,14 @@ export function createNoteEffects(scene, piano, renderer, camera) {
   function update(dt, elapsed, reducedMotion = false) {
     clock += dt;
     const playing = elapsed !== null && events.length > 0;
-    keyLine.material.opacity = THREE.MathUtils.damp(
-      keyLine.material.opacity,
-      playing && !reducedMotion ? 0.55 : 0,
+    const waveUniforms = wave.material.uniforms;
+    waveUniforms.opacity.value = THREE.MathUtils.damp(
+      waveUniforms.opacity.value,
+      playing && !reducedMotion ? 1 : 0,
       4,
       dt,
     );
+    waveUniforms.time.value = clock;
 
     const next = new Map();
     let used = 0;
@@ -362,6 +457,7 @@ export function createNoteEffects(scene, piano, renderer, camera) {
     }
     for (let i = used; i < MAX_COLUMNS; i++) columns[i].visible = false;
     setLit(next);
+    if (waveUniforms.opacity.value > 0.005) updateWave(dt, next);
 
     renderer.getDrawingBufferSize(drawingSize);
     particleMaterial.uniforms.scale.value =

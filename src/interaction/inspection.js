@@ -38,6 +38,7 @@ export function createInspection(
   // Build floating DOM labels, one per bounds-aware exploded component.
   // Each label is a button: picking it selects and frames that part.
   let onLabelPick = () => {};
+  const extraParts = []; // pickable props beyond the piano (the bench)
   const labels = piano.explodedComponents.map((component) => {
     const el = document.createElement("button");
     el.type = "button";
@@ -161,7 +162,12 @@ export function createInspection(
   function hitAt(event) {
     pointerNDC(event);
     raycaster.setFromCamera(pointer, camera);
-    return raycaster.intersectObjects(piano.parts.children, true)[0] || null;
+    return (
+      raycaster.intersectObjects(
+        [...piano.parts.children, ...extraParts],
+        true,
+      )[0] || null
+    );
   }
 
   function pointerVelocity(event) {
@@ -387,6 +393,9 @@ export function createInspection(
     selectPart,
     setMode,
     updateLabels,
+    addPickable(object) {
+      extraParts.push(object);
+    },
     set onLabelPick(fn) {
       onLabelPick = fn;
     },
