@@ -8,7 +8,12 @@ import {
   validateSampleCoverage,
   velocityLayerWeights,
 } from "../src/audio/pianoSamples.js";
-import { SONGS, parsePitch, scoreEvents } from "../src/performance/songs.js";
+import {
+  SONGS,
+  parsePitch,
+  scoreEvents,
+  scorePedal,
+} from "../src/performance/songs.js";
 
 const calls = [];
 const audio = {
@@ -204,6 +209,20 @@ check("repertoire: bars fill their metre, pages hold every bar once", () => {
     );
     assert(song.pages.length <= 2, `${song.id} needs more than two pages`);
     assert(scoreEvents(song).length > 20, `${song.id} events`);
+    // Pedalled from start to finish, lifted at the end, never out of order.
+    const pedal = scorePedal(song);
+    assert(
+      pedal.length > 10 && pedal.at(-1).down === false,
+      `${song.id} pedal`,
+    );
+    const notes = scoreEvents(song);
+    assert(
+      pedal.at(-1).time > notes.at(-1).time,
+      `${song.id} pedal lifts early`,
+    );
+    pedal.forEach((change, i) =>
+      assert(!i || change.time >= pedal[i - 1].time, `${song.id} pedal order`),
+    );
   }
 });
 controller.stopAll();

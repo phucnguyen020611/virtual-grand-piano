@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { tag } from "./geometry.js";
 import { createKeyboardLayout } from "./keyboardLayout.js";
 
@@ -17,8 +18,26 @@ export function buildKeyboard(mats, layout = createKeyboardLayout()) {
   const keyMeshes = [];
   const midiToKey = new Map();
   const midiToMechanism = new Map();
-  const keyGeometry = (entry) =>
-    new THREE.BoxGeometry(entry.width, entry.height, entry.keyLength);
+  // Softly radiused edges, as on a real keyboard. Black keys also taper
+  // toward the top and slope back at the front, like turned ebony sharps.
+  const keyGeometry = ({ width, height, keyLength, isBlack }) => {
+    const geometry = new RoundedBoxGeometry(
+      width,
+      height,
+      keyLength,
+      2,
+      isBlack ? 0.014 : 0.01,
+    );
+    if (!isBlack) return geometry;
+    const position = geometry.attributes.position;
+    for (let i = 0; i < position.count; i++) {
+      const rise = position.getY(i) / height + 0.5; // 0 at the base, 1 on top
+      position.setX(i, position.getX(i) * (1 - 0.24 * rise));
+      if (position.getZ(i) > 0)
+        position.setZ(i, position.getZ(i) - 0.035 * rise);
+    }
+    return geometry;
+  };
   const whiteGeo = keyGeometry(layout.find((entry) => !entry.isBlack));
   const blackGeo = keyGeometry(layout.find((entry) => entry.isBlack));
 

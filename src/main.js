@@ -13,7 +13,7 @@ import { createPerformanceController } from "./performance/performanceController
 import { createComputerKeyboard } from "./performance/computerKeyboard.js";
 import { createMidiInput } from "./performance/midiInput.js";
 import { createPerformanceRecorder } from "./performance/performanceRecorder.js";
-import { SONGS, scoreEvents } from "./performance/songs.js";
+import { SONGS, scoreEvents, scorePedal } from "./performance/songs.js";
 import { createNoteEffects } from "./scene/noteEffects.js";
 import { createInspection } from "./interaction/inspection.js";
 import {
@@ -251,8 +251,23 @@ function startAutoplay() {
       ),
     );
   }
+  // Legato pedalling from the score: the dampers, the sympathetic ring and
+  // the pedal's own thump all follow.
+  for (const { time, down } of scorePedal(song))
+    autoTimers.push(
+      setTimeout(
+        () =>
+          autoplay &&
+          pianoPerformance.setSustainForSource(
+            "autoplay:pedal",
+            down,
+            "autoplay",
+          ),
+        (LEAD_IN + time) * 1000,
+      ),
+    );
   autoTimers.push(
-    setTimeout(() => stopAutoplay(), (LEAD_IN + songLength + 0.6) * 1000),
+    setTimeout(() => stopAutoplay(), (LEAD_IN + songLength + 2) * 1000),
   );
 }
 

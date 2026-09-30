@@ -39,8 +39,10 @@ const GLYPH = {
   eighthRest: "\u{1D13E}",
   sixteenthRest: "\u{1D13F}",
   sharp: "♯",
+  flat: "♭",
   natural: "♮",
 };
+const ACCIDENTAL = { "#": GLYPH.sharp, b: GLYPH.flat, "": GLYPH.natural };
 
 function paper(g, w, h, seed) {
   g.fillStyle = PAPER;
@@ -254,12 +256,7 @@ function chordsOf(notes, staff, keySharps) {
       : keySharps.has(p.letter)
         ? "#"
         : "";
-    const mark =
-      p.accidental !== previous
-        ? p.accidental
-          ? GLYPH.sharp
-          : GLYPH.natural
-        : null;
+    const mark = p.accidental !== previous ? ACCIDENTAL[p.accidental] : null;
     accidentals.set(key, p.accidental);
     if (!byPos.has(note.pos))
       byPos.set(note.pos, { pos: note.pos, dur: note.dur, heads: [] });
@@ -796,7 +793,7 @@ export function createScoreBook(maxAniso, song) {
       document.fonts.load(`40px ${SCRIPT_FONT}`),
       document.fonts.load(
         `40px ${MUSIC_FONT}`,
-        GLYPH.treble + GLYPH.bass + GLYPH.eighthRest,
+        GLYPH.treble + GLYPH.bass + GLYPH.eighthRest + GLYPH.flat + GLYPH.sharp,
       ),
     ])
       .then(() => setSong(current))

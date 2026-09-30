@@ -70,7 +70,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | House curtain & lights  | **Close curtain / Open curtain**                 |
 | Adjust bench height     | Click a knob at either end of the bench          |
 | Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift` |
-| Autoplay                | **5-piece playlist** with key-line soundwave     |
+| Autoplay                | **5-piece playlist**, pedalled, with a soundwave |
 | Restore camera          | **Reset View**                                   |
 
 ## Tech stack

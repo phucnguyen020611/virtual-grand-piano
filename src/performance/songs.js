@@ -52,7 +52,8 @@ const furElise = {
   time: [3, 8],
   sharps: 0,
   beamEvery: 6,
-  sixteenth: 0.2,
+  sixteenth: 0.22,
+  pedal: 6,
   measures: [
     { length: 2, rh: [n(0, "E5"), n(1, "D#5")], lh: [], pickup: true },
     ...feA,
@@ -116,52 +117,79 @@ const q = (pos, pitch) => n(pos, pitch, 4);
 const h = (pos, pitch) => n(pos, pitch, 8);
 const halves = (a, b) => [h(0, a), h(8, b)];
 const ode = (rh, lh, extra) => bar(16, rh, lh, extra);
+// Left-hand textures, one per phrase: open fifths, Alberti eighths, block
+// chords on the beat.
+const ODE_CHORDS = {
+  C: ["C3", "G3", "E3"],
+  G: ["G2", "D3", "B2"],
+  G7: ["G2", "F3", "B2"],
+};
+const fifths = (a, b) => [
+  ...chord(0, ODE_CHORDS[a].slice(0, 2), 8),
+  ...chord(8, ODE_CHORDS[b].slice(0, 2), 8),
+];
+const alberti = (a, b) =>
+  [a, b].flatMap((name, half) => {
+    const [root, fifth, third] = ODE_CHORDS[name];
+    return [root, fifth, third, fifth].map((p, i) => n(half * 8 + i * 2, p, 2));
+  });
+const blocks = (...names) =>
+  names.flatMap((name, beat) => chord(beat * 4, ODE_CHORDS[name], 4));
+// The last verse is harmonised in thirds (sixth under C).
+const BELOW = { E5: "C5", F5: "D5", G5: "E5", D5: "B4", C5: "E4" };
+const thirds = (notes) =>
+  notes.flatMap((note) =>
+    BELOW[note.pitch] ? [note, { ...note, pitch: BELOW[note.pitch] }] : [note],
+  );
 const odeLine = [
   [q(0, "E5"), q(4, "E5"), q(8, "F5"), q(12, "G5")],
   [q(0, "G5"), q(4, "F5"), q(8, "E5"), q(12, "D5")],
   [q(0, "C5"), q(4, "C5"), q(8, "D5"), q(12, "E5")],
 ];
-const odePhrase = (cadence) => [
-  ode(odeLine[0], halves("C3", "G3")),
-  ode(odeLine[1], halves("G2", "D3")),
-  ode(odeLine[2], halves("C3", "G3")),
-  cadence,
-];
+const cadenceHalf = [n(0, "E5", 6), n(6, "D5", 2), h(8, "D5")];
+const cadenceFull = [n(0, "D5", 6), n(6, "C5", 2), h(8, "C5")];
 const odeToJoy = {
   id: "ode-to-joy",
   title: "Ode to Joy",
   subtitle: "Theme from Symphony No. 9 in D minor · Op. 125",
   composer: "Ludwig van Beethoven",
   dates: "(1770–1827)",
-  tempo: "Allegro assai",
+  tempo: "Allegro moderato",
   dynamic: "p",
   time: [4, 4],
   sharps: 0,
   beamEvery: 4,
-  sixteenth: 0.13,
+  sixteenth: 0.16,
+  pedal: 8,
   measures: [
-    ...odePhrase(
-      ode([n(0, "E5", 6), n(6, "D5", 2), h(8, "D5")], halves("G2", "D3")),
+    ode(odeLine[0], fifths("C", "C")),
+    ode(odeLine[1], fifths("G", "G")),
+    ode(odeLine[2], fifths("C", "C")),
+    ode(cadenceHalf, fifths("G", "G")),
+    ode(odeLine[0], alberti("C", "C")),
+    ode(odeLine[1], alberti("G", "G")),
+    ode(odeLine[2], alberti("C", "C")),
+    ode(cadenceFull, alberti("G", "C")),
+    ode(
+      [q(0, "D5"), q(4, "D5"), q(8, "E5"), q(12, "C5")],
+      blocks("G", "G", "C", "C"),
     ),
-    ...odePhrase(
-      ode([n(0, "D5", 6), n(6, "C5", 2), h(8, "C5")], halves("G2", "C3")),
-    ),
-    ode([q(0, "D5"), q(4, "D5"), q(8, "E5"), q(12, "C5")], halves("G2", "C3")),
     ode(
       [q(0, "D5"), n(4, "E5", 2), n(6, "F5", 2), q(8, "E5"), q(12, "C5")],
-      halves("G2", "C3"),
+      blocks("G", "G", "C", "C"),
     ),
     ode(
       [q(0, "D5"), n(4, "E5", 2), n(6, "F5", 2), q(8, "E5"), q(12, "D5")],
-      halves("G2", "B2"),
+      blocks("G7", "G7", "C", "C"),
     ),
-    ode([q(0, "C5"), q(4, "D5"), h(8, "G4")], halves("C3", "G2")),
-    ...odePhrase(
-      ode(
-        [n(0, "D5", 6), n(6, "C5", 2), h(8, "C5")],
-        [h(0, "G2"), ...chord(8, ["C3", "E3", "G3"], 8)],
-        { final: true },
-      ),
+    ode([q(0, "C5"), q(4, "D5"), h(8, "G4")], blocks("C", "G", "G", "G")),
+    ode(thirds(odeLine[0]), alberti("C", "C")),
+    ode(thirds(odeLine[1]), alberti("G", "G")),
+    ode(thirds(odeLine[2]), alberti("C", "C")),
+    ode(
+      thirds(cadenceFull),
+      [...alberti("G", "C").slice(0, 4), ...chord(8, ["C3", "E3", "G3"], 8)],
+      { final: true },
     ),
   ],
   pages: [
@@ -174,20 +202,60 @@ const odeToJoy = {
   ],
   notes: [
     "The melody of the choral finale of the Ninth Symphony, first",
-    "performed in Vienna in 1824. Keep it smooth and singing, with",
-    "the left hand quietly marking the harmony on each half bar.",
+    "performed in Vienna in 1824. Each verse adds a new texture:",
+    "open fifths, flowing Alberti eighths, chords on the beat, and",
+    "a last verse sung in thirds over a warm, pedalled bass.",
   ],
 };
 
 // --- Canon in D -------------------------------------------------------------
-const canonBass = [
-  halves("D3", "A2"),
-  halves("B2", "F#2"),
-  halves("G2", "D2"),
-  halves("G2", "A2"),
-];
-const canonBar = (rh, i) => bar(16, rh, canonBass[i % 4]);
+const CANON_BASS = ["D3", "A2", "B2", "F#2", "G2", "D2", "G2", "A2"];
+// Root, fifth, octave, fifth: the ground bass broken into eighths.
+const BROKEN = {
+  D3: ["D3", "A3", "D4", "A3"],
+  A2: ["A2", "E3", "A3", "E3"],
+  B2: ["B2", "F#3", "B3", "F#3"],
+  "F#2": ["F#2", "C#3", "F#3", "C#3"],
+  G2: ["G2", "D3", "G3", "D3"],
+  D2: ["D2", "A2", "D3", "A2"],
+};
+const groundHalves = (i) =>
+  halves(CANON_BASS[(i % 4) * 2], CANON_BASS[(i % 4) * 2 + 1]);
+const groundEighths = (i) =>
+  [0, 1].flatMap((half) =>
+    BROKEN[CANON_BASS[(i % 4) * 2 + half]].map((p, k) =>
+      n(half * 8 + k * 2, p, 2),
+    ),
+  );
 const dyads = (a, b) => [...chord(0, a, 8), ...chord(8, b, 8)];
+const eighths = (...pitches) => pitches.map((p, i) => n(i * 2, p, 2));
+const canonVoice = [
+  // I. The canon enters in half notes over the bare ground.
+  halves("F#5", "E5"),
+  halves("D5", "C#5"),
+  halves("B4", "A4"),
+  halves("B4", "C#5"),
+  // II. Same line lower, the bass now rippling in eighths.
+  halves("D5", "C#5"),
+  halves("B4", "A4"),
+  halves("G4", "F#4"),
+  halves("G4", "E4"),
+  // III. Quarter-note variation.
+  [q(0, "D5"), q(4, "F#5"), q(8, "A5"), q(12, "G5")],
+  [q(0, "F#5"), q(4, "D5"), q(8, "F#5"), q(12, "E5")],
+  [q(0, "D5"), q(4, "B4"), q(8, "D5"), q(12, "A4")],
+  [q(0, "G4"), q(4, "B4"), q(8, "A4"), q(12, "G4")],
+  // IV. Broken-chord eighths over a plain ground.
+  eighths("D5", "F#5", "A5", "F#5", "C#5", "E5", "A5", "E5"),
+  eighths("B4", "D5", "F#5", "D5", "A4", "C#5", "F#5", "C#5"),
+  eighths("B4", "D5", "G5", "D5", "A4", "D5", "F#5", "D5"),
+  eighths("B4", "D5", "G5", "D5", "C#5", "E5", "A5", "E5"),
+  // V. Two voices in sixths and thirds.
+  dyads(["A4", "F#5"], ["A4", "E5"]),
+  dyads(["F#4", "D5"], ["A4", "C#5"]),
+  dyads(["D4", "B4"], ["F#4", "A4"]),
+  dyads(["G4", "B4"], ["A4", "C#5"]),
+];
 const canon = {
   id: "canon-in-d",
   title: "Canon in D",
@@ -199,26 +267,16 @@ const canon = {
   time: [4, 4],
   sharps: 2,
   beamEvery: 4,
-  sixteenth: 0.16,
-  measures: [
-    halves("F#5", "E5"),
-    halves("D5", "C#5"),
-    halves("B4", "A4"),
-    halves("B4", "C#5"),
-    halves("D5", "C#5"),
-    halves("B4", "A4"),
-    halves("G4", "F#4"),
-    halves("G4", "E4"),
-    [q(0, "D5"), q(4, "F#5"), q(8, "A5"), q(12, "G5")],
-    [q(0, "F#5"), q(4, "D5"), q(8, "F#5"), q(12, "E5")],
-    [q(0, "D5"), q(4, "B4"), q(8, "D5"), q(12, "A4")],
-    [q(0, "G4"), q(4, "B4"), q(8, "A4"), q(12, "G4")],
-    dyads(["A4", "F#5"], ["A4", "E5"]),
-    dyads(["F#4", "D5"], ["A4", "C#5"]),
-    dyads(["D4", "B4"], ["F#4", "A4"]),
-    dyads(["G4", "B4"], ["A4", "C#5"]),
-  ]
-    .map(canonBar)
+  sixteenth: 0.2,
+  pedal: 8,
+  measures: canonVoice
+    .map((rh, i) =>
+      bar(
+        16,
+        rh,
+        i < 4 || (i >= 12 && i < 16) ? groundHalves(i) : groundEighths(i),
+      ),
+    )
     .concat(
       bar(16, chord(0, ["F#4", "A4", "D5"], 16), chord(0, ["D2", "D3"], 16), {
         final: true,
@@ -226,16 +284,22 @@ const canon = {
     ),
   pages: [
     [
-      [0, 1, 2, 3],
-      [4, 5, 6, 7],
-      [8, 9, 10, 11],
-      [12, 13, 14, 15, 16],
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [9, 10, 11],
+    ],
+    [
+      [12, 13, 14],
+      [15, 16, 17],
+      [18, 19, 20],
     ],
   ],
   notes: [
     "A ground bass of eight notes repeats beneath the whole piece",
-    "while the upper voice unfolds ever more elaborate variations.",
-    "Let each half note ring into the next; the canon should breathe.",
+    "while the upper voice unfolds ever more elaborate variations:",
+    "half notes, quarters, rippling eighths, then two voices in",
+    "sixths. Change the pedal with every bass note so it can breathe.",
   ],
 };
 
@@ -260,7 +324,8 @@ const bach = {
   time: [4, 4],
   sharps: 0,
   beamEvery: 4,
-  sixteenth: 0.14,
+  sixteenth: 0.2,
+  pedal: 16,
   measures: [
     prelude("C4", "E4", "G4", "C5", "E5"),
     prelude("C4", "D4", "A4", "D5", "F5"),
@@ -273,8 +338,23 @@ const bach = {
     prelude("A3", "C4", "E4", "G4", "C5"),
     prelude("D3", "A3", "D4", "F#4", "C5"),
     prelude("G3", "B3", "D4", "G4", "B4"),
-    prelude("C4", "E4", "G4", "C5", "E5"),
-    bar(16, chord(0, ["E4", "G4", "C5"], 16), chord(0, ["C3", "C4"], 16), {
+    prelude("G3", "Bb3", "E4", "G4", "C#5"),
+    prelude("F3", "A3", "D4", "A4", "D5"),
+    prelude("F3", "Ab3", "D4", "F4", "B4"),
+    prelude("E3", "G3", "C4", "G4", "C5"),
+    prelude("E3", "F3", "A3", "C4", "F4"),
+    prelude("D3", "F3", "A3", "C4", "F4"),
+    prelude("G2", "D3", "G3", "B3", "F4"),
+    prelude("C3", "E3", "G3", "C4", "E4"),
+    prelude("C3", "G3", "Bb3", "C4", "E4"),
+    prelude("F2", "F3", "A3", "C4", "E4"),
+    prelude("F#2", "C3", "A3", "C4", "Eb4"),
+    prelude("Ab2", "F3", "B3", "C4", "D4"),
+    prelude("G2", "F3", "G3", "B3", "D4"),
+    prelude("G2", "E3", "G3", "C4", "E4"),
+    prelude("G2", "D3", "G3", "C4", "F4"),
+    prelude("G2", "D3", "G3", "B3", "F4"),
+    bar(16, chord(0, ["E4", "G4", "C5"], 16), chord(0, ["C2", "C3"], 16), {
       final: true,
     }),
   ],
@@ -283,24 +363,61 @@ const bach = {
       [0, 1, 2],
       [3, 4, 5],
       [6, 7, 8],
-      [9, 10, 11, 12],
+      [9, 10, 11],
+    ],
+    [
+      [12, 13, 14],
+      [15, 16, 17],
+      [18, 19, 20],
+      [21, 22, 23],
+      [24, 25, 26, 27],
     ],
   ],
   notes: [
     "The first prelude of The Well-Tempered Clavier (1722). Every bar",
-    "is a single harmony, broken into the same flowing figure.",
-    "This edition gives the opening bars and an abridged cadence.",
+    "is a single harmony broken into the same flowing figure, moving",
+    "through chromatic colours over a long dominant pedal before the",
+    "final C. Change the pedal cleanly on each new bar.",
   ],
 };
 
 // --- Amazing Grace ----------------------------------------------------------
 const waltz = (root, pair) => [q(0, root), ...chord(4, pair, 8)];
-const G = waltz("G2", ["B2", "D3"]);
-const C = waltz("C3", ["E3", "G3"]);
-const D = waltz("D3", ["F#3", "A3"]);
+// Root, fifth, third, fifth, octave, fifth: a rocking eighth-note bass.
+const rocking = (root, fifth, third, octave) =>
+  [root, fifth, third, fifth, octave, fifth].map((p, i) => n(i * 2, p, 2));
+const HYMN = {
+  G: [waltz("G2", ["B2", "D3"]), rocking("G2", "D3", "B2", "G3")],
+  C: [waltz("C3", ["E3", "G3"]), rocking("C3", "G3", "E3", "C4")],
+  D: [waltz("D3", ["F#3", "A3"]), rocking("D3", "A3", "F#3", "D4")],
+};
 const hymn = (rh, lh, extra) => bar(12, rh, lh, extra);
 const long = (a, b, c) => [h(0, a), n(8, b, 2), n(10, c, 2)];
 const step = (a, b) => [h(0, a), q(8, b)];
+// The second verse gives each long melody note an alto below it.
+const ALTO = { G4: "D4", B4: "G4", D5: "B4", A4: "F#4", E4: "C4" };
+const alto = (notes) =>
+  notes.flatMap((note) =>
+    note.dur >= 8 && ALTO[note.pitch]
+      ? [note, { ...note, pitch: ALTO[note.pitch] }]
+      : [note],
+  );
+const verse = [
+  [long("G4", "B4", "G4"), "G"],
+  [step("B4", "A4"), "G"],
+  [step("G4", "E4"), "C"],
+  [step("D4", "D4"), "G"],
+  [long("G4", "B4", "G4"), "G"],
+  [[h(0, "B4"), n(8, "A4", 2), n(10, "B4", 2)], "G"],
+  [[n(0, "D5", 12)], "D"],
+  [step("D5", "B4"), "D"],
+  [long("D5", "B4", "G4"), "G"],
+  [step("B4", "A4"), "G"],
+  [step("G4", "E4"), "C"],
+  [step("D4", "D4"), "G"],
+  [long("G4", "B4", "G4"), "G"],
+  [step("B4", "A4"), "D"],
+];
 const amazingGrace = {
   id: "amazing-grace",
   title: "Amazing Grace",
@@ -312,24 +429,17 @@ const amazingGrace = {
   time: [3, 4],
   sharps: 1,
   beamEvery: 4,
-  sixteenth: 0.14,
+  sixteenth: 0.19,
+  pedal: 12,
   measures: [
     { length: 4, rh: [q(0, "D4")], lh: [], pickup: true },
-    hymn(long("G4", "B4", "G4"), G),
-    hymn(step("B4", "A4"), G),
-    hymn(step("G4", "E4"), C),
-    hymn(step("D4", "D4"), G),
-    hymn(long("G4", "B4", "G4"), G),
-    hymn([h(0, "B4"), n(8, "A4", 2), n(10, "B4", 2)], G),
-    hymn([n(0, "D5", 12)], D),
-    hymn(step("D5", "B4"), D),
-    hymn(long("D5", "B4", "G4"), G),
-    hymn(step("B4", "A4"), G),
-    hymn(step("G4", "E4"), C),
-    hymn(step("D4", "D4"), G),
-    hymn(long("G4", "B4", "G4"), G),
-    hymn(step("B4", "A4"), D),
-    hymn([n(0, "G4", 12)], chord(0, ["G2", "D3"], 12), { final: true }),
+    // The first half keeps a soft waltz; the second rocks in eighths.
+    ...verse.map(([rh, harmony], i) =>
+      i < 8 ? hymn(rh, HYMN[harmony][0]) : hymn(alto(rh), HYMN[harmony][1]),
+    ),
+    hymn(chord(0, ["B3", "D4", "G4"], 12), chord(0, ["G2", "D3"], 12), {
+      final: true,
+    }),
   ],
   pages: [
     [
@@ -342,7 +452,8 @@ const amazingGrace = {
   notes: [
     "John Newton’s words were published in Olney Hymns (1779); the",
     "tune “New Britain” appeared in 1829. Play it like a singer:",
-    "lean on the long notes and let the left hand’s waltz stay soft.",
+    "a soft waltz for the first half, then an alto joins the long",
+    "notes while the left hand rocks gently in eighths.",
   ],
 };
 
@@ -351,7 +462,7 @@ export const SONGS = [furElise, odeToJoy, canon, bach, amazingGrace];
 const LETTERS = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 
 export function parsePitch(pitch) {
-  const [, letter, accidental, octave] = pitch.match(/^([A-G])(#?)(\d)$/);
+  const [, letter, accidental, octave] = pitch.match(/^([A-G])([#b]?)(\d)$/);
   return {
     letter,
     accidental,
@@ -359,32 +470,96 @@ export function parsePitch(pitch) {
     midi:
       12 * (Number(octave) + 1) +
       LETTERS[letter] +
-      (accidental === "#" ? 1 : 0),
+      (accidental === "#" ? 1 : accidental === "b" ? -1 : 0),
     // Diatonic step, for staff placement: C4 = 28.
     step: "CDEFGAB".indexOf(letter) + 7 * Number(octave),
   };
 }
 
-/** Timed note events for playback, in seconds from the first note. */
-export function scoreEvents(song) {
+const DYNAMIC = { pp: 0.42, p: 0.5, mp: 0.56, mf: 0.64 };
+
+/**
+ * The performed timeline: bar starts in seconds, easing into a closing
+ * ritardando over the last two bars.
+ */
+function timeline(song) {
   const order = song.playOrder ?? song.measures.map((_, i) => i);
+  let seconds = 0;
+  return order.map((index, k) => {
+    const fromEnd = order.length - k;
+    const unit = song.sixteenth * (fromEnd <= 2 ? 1 + 0.2 * (3 - fromEnd) : 1);
+    const start = seconds;
+    seconds += song.measures[index].length * unit;
+    return { index, k, start, unit, measure: song.measures[index] };
+  });
+}
+
+/**
+ * Timed note events for playback, in seconds from the first note. Velocity
+ * is shaped like a player would: melody over accompaniment, the top of a
+ * chord over its inner notes, downbeats leaned on, four-bar phrases that
+ * swell and relax, and a little deterministic unevenness.
+ */
+export function scoreEvents(song) {
+  const base = DYNAMIC[song.dynamic] ?? 0.52;
   const events = [];
-  let start = 0;
-  for (const index of order) {
-    const measure = song.measures[index];
+  for (const { index, k, start, unit, measure } of timeline(song)) {
+    const arch = 0.9 + 0.16 * Math.sin((Math.PI * ((k % 4) + 0.5)) / 4);
     for (const hand of ["rh", "lh"]) {
+      const top = new Map();
+      for (const note of measure[hand])
+        top.set(
+          note.pos,
+          Math.max(top.get(note.pos) ?? 0, parsePitch(note.pitch).midi),
+        );
       for (const note of measure[hand]) {
+        const midi = parsePitch(note.pitch).midi;
+        const accent =
+          note.pos === 0 ? 0.06 : note.pos % song.beamEvery === 0 ? 0.025 : 0;
+        const voice =
+          hand === "lh" ? 0.78 : midi === top.get(note.pos) ? 1.14 : 0.9;
+        const wobble =
+          (((midi * 7919 + k * 131 + note.pos * 17) % 23) / 23 - 0.5) * 0.05;
         events.push({
-          time: (start + note.pos + (note.play ?? 0)) * song.sixteenth,
-          duration: (note.hold ?? note.dur) * song.sixteenth,
-          midi: parsePitch(note.pitch).midi,
+          time: start + (note.pos + (note.play ?? 0)) * unit,
+          duration: (note.hold ?? note.dur) * unit,
+          midi,
           hand: hand === "rh" ? "right" : "left",
-          velocity: hand === "rh" ? 0.66 : 0.5,
+          velocity: Math.min(
+            0.92,
+            Math.max(0.18, base * voice * arch + accent + wobble),
+          ),
           measure: index,
         });
       }
     }
-    start += measure.length;
   }
   return events.sort((a, b) => a.time - b.time);
+}
+
+/**
+ * Sustain pedal changes, `{ time, down }` in seconds: legato ("syncopated")
+ * pedalling, lifted as each new harmony sounds and caught again just after,
+ * only where the left hand carries the harmony. Held through the last chord.
+ */
+export function scorePedal(song, catchAfter = 0.09) {
+  const changes = [];
+  if (!song.pedal) return changes;
+  const bars = timeline(song);
+  for (const { start, unit, measure } of bars) {
+    if (!measure.lh.length) continue;
+    for (let pos = 0; pos < measure.length; pos += song.pedal) {
+      const at = start + pos * unit;
+      changes.push(
+        { time: at, down: false },
+        { time: at + catchAfter, down: true },
+      );
+    }
+  }
+  const last = bars.at(-1);
+  changes.push({
+    time: last.start + last.measure.length * last.unit + 1.4,
+    down: false,
+  });
+  return changes;
 }
