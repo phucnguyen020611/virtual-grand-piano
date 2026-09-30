@@ -395,7 +395,7 @@ export function buildAction(mats, layout, stringRoutes = []) {
 
     // Rear linkage and wippen make the key → hammer relationship legible.
     const capstan = new THREE.Mesh(capstanGeo, mats.bronze);
-    capstan.position.set(0, DIM.caseTopY - 0.025, 1.91);
+    capstan.position.set(0, DIM.capstanRestY, 1.91);
     capstan.receiveShadow = true;
     mechanism.add(capstan);
     const wippen = new THREE.Mesh(wippenGeo, mats.maple);

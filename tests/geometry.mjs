@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { DIM, outerFootprint } from "../src/piano/geometry.js";
 import { buildKeyboard } from "../src/piano/keyboard.js";
-import { buildPedals, buildLid } from "../src/piano/anatomy.js";
+import { buildAction, buildPedals, buildLid } from "../src/piano/anatomy.js";
+import { createStringLayout } from "../src/piano/strings.js";
 import { createMechanics } from "../src/piano/mechanics.js";
 
 const material = new THREE.MeshStandardMaterial();
@@ -111,6 +112,38 @@ console.log(
   "PASS lid contour, closed trim clearance, prop attachment throughout travel",
 );
 
+// With every key held down, no action part may rise above the case top.
+{
+  const action = buildAction(
+    {
+      ...mats,
+      bronze: material,
+      maple: material,
+      hammerFelt: material,
+      felt: material,
+    },
+    keyboard.layout,
+    createStringLayout().routes,
+  );
+  const held = createMechanics({
+    ...keyboard,
+    ...pedals,
+    actionMechanisms: action.midiToMechanism,
+  });
+  for (const entry of keyboard.layout) held.setNoteHeld(entry.midi, true);
+  for (let frame = 0; frame < 120; frame++) held.update(1 / 60);
+  action.group.updateMatrixWorld(true);
+  for (const [midi, parts] of action.midiToMechanism)
+    for (const part of [parts.capstan, parts.wippen]) {
+      bounds.setFromObject(part);
+      assert(
+        bounds.max.y < DIM.caseTopY,
+        `${midi} action shows above the case`,
+      );
+    }
+  for (const entry of keyboard.layout) held.setNoteHeld(entry.midi, false);
+}
+console.log("PASS held action stays below the case top");
 const { createBench } = await import("../src/scene/bench.js");
 const bench = createBench(mats, -0.045);
 const benchBounds = new THREE.Box3().setFromObject(bench);

@@ -122,7 +122,7 @@ export function createMechanics({
       if (note.action?.capstan) {
         note.action.capstan.position.y = THREE.MathUtils.damp(
           note.action.capstan.position.y,
-          DIM.caseTopY - 0.025 + (note.pressed ? 0.035 : 0),
+          DIM.capstanRestY + (note.pressed ? 0.035 : 0),
           24,
           dt,
         );

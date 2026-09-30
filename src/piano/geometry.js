@@ -18,6 +18,9 @@ export const DIM = {
   // Case / rim -------------------------------------------------------------
   caseBottomY: 0.86, // underside of the rim (legs reach down from here)
   caseTopY: 1.4, // top edge of the rim wall / keybed surface
+  // Capstan centre at rest: low enough that its top (+0.045) stays below the
+  // case even with the key down (+0.035), out of sight under the desk.
+  capstanRestY: 1.3,
   wallThickness: 0.36, // visible rim wall thickness
 
   // Interior stack (all below the rim top so the rim frames the anatomy) ---
