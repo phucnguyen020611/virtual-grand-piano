@@ -418,18 +418,29 @@ kbd {
 .label3d {
   position: fixed;
   z-index: 5;
-  pointer-events: none;
+  min-height: 28px;
+  cursor: pointer;
   transform: translate(-50%, -50%);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 999px;
-  padding: 5px 8px;
+  padding: 6px 11px;
   color: #f9f3e7;
   background: rgba(7, 7, 8, 0.86);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   opacity: 0;
   transition: opacity 180ms ease;
+}
+
+.label3d:not(.show) {
+  pointer-events: none;
+}
+
+.label3d:hover,
+.label3d:focus-visible {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent-strong);
 }
 
 .label3d.show {

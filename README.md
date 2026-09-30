@@ -14,7 +14,7 @@
 
 ## Overview
 
-Virtual Grand Piano is a browser-based 3D instrument experience focused on two ideas: the expressive feel of a concert grand and the engineering hidden inside it. The first release provides a playable procedural grand piano, a free inspection camera, an exploded anatomy view, a modeled music desk and score, and a chamber concert hall with stage lighting, an organ and raked seating.
+Virtual Grand Piano is a browser-based 3D instrument experience focused on two ideas: the expressive feel of a concert grand and the engineering hidden inside it. The first release provides a playable procedural grand piano, a free inspection camera, an exploded anatomy view, a modeled music desk and score, and a European court-style concert hall (gilded columns, coffered ceiling, crystal chandeliers, an organ and raked velvet seating) with the piano side-on to the audience as at a recital.
 
 The current model is procedural and intentionally lightweight. Future releases can replace or extend individual systems with higher-fidelity meshes, physically based textures, sampled audio, mechanical animation, and more accurate piano-action behavior without changing the overall product concept.
 
@@ -29,7 +29,9 @@ The current model is procedural and intentionally lightweight. Future releases c
   a traditional hymn) with hand-coloured key glow, falling
   crystal light columns and star-dust sparkles
 - An engraved, page-turning score book on the music desk (click a page to turn)
-- Free orbit, zoom, and pan inspection camera
+- Free orbit, zoom-to-cursor and pan camera with view presets (pianist,
+  keyboard, front row, balcony, whole hall) and double-click to orbit a spot
+- Exploded view: pick a part’s name to fly the camera to it
 - Normal inspection mode
 - Exploded-parts inspection mode
 - Individually modeled major systems:
@@ -101,6 +103,8 @@ virtual-grand-piano/
 │   │   └── materials.js        # material palette + procedural canvas textures
 │   ├── scene/
 │   │   ├── hall.js             # concert hall, stage and lighting rig
+│   │   ├── royalDecor.js       # gilt, chandeliers, sconces, balustrades, drapes
+│   │   ├── surfaces.js         # procedural PBR sets (boards, damask, velvet…)
 │   │   └── noteEffects.js      # autoplay key glow, light columns, star dust
 │   ├── audio/
 │   │   ├── pianoAudio.js       # sampler voices, buses, reverb, sustain, pedal noise

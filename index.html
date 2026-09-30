@@ -99,6 +99,13 @@
                   <button id="explodeBtn" aria-pressed="false">Exploded</button>
                 </div>
                 <button id="lidBtn" aria-pressed="true">Close lid</button>
+                <select id="viewSelect" aria-label="Camera view">
+                  <option value="pianist">Pianist view</option>
+                  <option value="keys">Keyboard close-up</option>
+                  <option value="frontRow">Front row</option>
+                  <option value="balcony">Balcony</option>
+                  <option value="overview">Whole hall</option>
+                </select>
                 <button id="resetBtn">Reset view</button>
               </div>
             </section>
@@ -147,7 +154,9 @@
         <section>
           <h3>View</h3>
           <p>
-            Orbit and zoom freely. Exploded mode separates parts for inspection.
+            Drag to orbit, right-drag or two fingers to pan, scroll to zoom
+            toward the cursor. Double-click any spot to orbit around it. In
+            Exploded mode, pick a part’s name to fly to it.
           </p>
         </section>
       </div>
@@ -173,7 +182,7 @@
       </div>
     </div>
 
-    <div id="labels" aria-hidden="true"></div>
+    <div id="labels"></div>
     <script type="module" src="/src/bootstrap.js"></script>
   </body>
 </html>

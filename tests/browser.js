@@ -52,8 +52,11 @@ async function run() {
   });
   const board = desk.getObjectByName("music-desk-board");
   p.scene.updateMatrixWorld(true);
-  const boardTop = board.localToWorld(new p.THREE.Vector3(0, 0.6, 0));
-  const boardBottom = board.localToWorld(new p.THREE.Vector3(0, -0.6, 0));
+  const inPiano = (v) => p.stageSet.worldToLocal(v);
+  const boardTop = inPiano(board.localToWorld(new p.THREE.Vector3(0, 0.6, 0)));
+  const boardBottom = inPiano(
+    board.localToWorld(new p.THREE.Vector3(0, -0.6, 0)),
+  );
   assert(boardTop.z < boardBottom.z, "music desk leans toward player");
   const railBounds = new p.THREE.Box3().setFromObject(fallboard);
   assert(boardBottom.y > railBounds.max.y, "rack base intersects fallboard");
@@ -77,7 +80,8 @@ async function run() {
   ]) {
     for (const x of [-0.35, 0, 0.35]) {
       const target = logo.localToWorld(new p.THREE.Vector3(x, -0.08, 0));
-      const eye = new p.THREE.Vector3(...origin);
+      // Review angles are given in the piano's own frame.
+      const eye = p.stageSet.localToWorld(new p.THREE.Vector3(...origin));
       ray.set(eye, target.sub(eye).normalize());
       assert(
         ray.intersectObject(p.piano.group, true)[0]?.object === logo,
@@ -312,10 +316,11 @@ async function run() {
     );
   }
   c.noteOn(60, 0.8, "test:resonance", "test");
-  await wait(40);
+  // A few frames, not a fixed 40 ms: a slow frame must not fail the check.
+  for (let n = 0; n < 20 && !p.resonance.poolUsage; n++) await wait(25);
   assert(
     p.resonance.poolUsage > 0 && p.resonance.poolUsage <= 20,
-    "resonance pool invalid",
+    `resonance pool invalid (${p.resonance.poolUsage} in use, ${p.resonance.activeCourses} active)`,
   );
   assert(
     p.resonance.group.parent ===
@@ -442,6 +447,7 @@ async function run() {
   frame.style.height = "900px";
   await wait(100);
   click("resetBtn");
+
   let meshes = 0,
     shadowCasters = 0;
   const geometries = new Set(),
@@ -549,8 +555,12 @@ for (const button of document.querySelectorAll("[data-view]")) {
       ],
     };
     const [position, target] = views[button.dataset.view];
-    p.camera.position.set(...position);
-    p.controls.target.set(...target);
+    p.camera.position.copy(
+      p.stageSet.localToWorld(new p.THREE.Vector3(...position)),
+    );
+    p.controls.target.copy(
+      p.stageSet.localToWorld(new p.THREE.Vector3(...target)),
+    );
     p.controls.update();
   };
 }

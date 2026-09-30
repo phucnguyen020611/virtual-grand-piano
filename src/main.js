@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { createMaterials, makeCanvasTexture } from "./piano/materials.js";
-import { DIM } from "./piano/geometry.js";
+import { DIM, STAGE_YAW, onStage } from "./piano/geometry.js";
 import { createPiano } from "./piano/createPiano.js";
 import { createBench } from "./scene/bench.js";
 import { createHall } from "./scene/hall.js";
@@ -89,11 +89,18 @@ controls.enableDamping = !reducedMotion.matches;
 reducedMotion.addEventListener("change", () => {
   controls.enableDamping = !reducedMotion.matches;
 });
-controls.dampingFactor = 0.055;
+// Free viewing: soft inertia, zoom toward the cursor, screen-space panning,
+// and enough reach to take in the whole hall from the back.
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.6;
+controls.zoomSpeed = 1.15;
+controls.panSpeed = 0.9;
+controls.zoomToCursor = true;
+controls.screenSpacePanning = true;
 controls.target.copy(NORMAL_DEFAULT_TARGET);
-controls.minDistance = 4;
-controls.maxDistance = 70; // room to take in the hall
-controls.maxPolarAngle = Math.PI * 0.49;
+controls.minDistance = 1.2;
+controls.maxDistance = 140;
+controls.maxPolarAngle = Math.PI * 0.495;
 
 // --- World -----------------------------------------------------------------
 const environment = createReflectionEnvironment(renderer);
@@ -102,10 +109,14 @@ const mats = createMaterials(renderer.capabilities.getMaxAnisotropy());
 const hall = createHall(scene, mats);
 const { stageTopY } = hall;
 const bench = createBench(mats, stageTopY);
-scene.add(bench);
-
 const piano = createPiano(mats, stageTopY);
-scene.add(piano.group);
+// Side-on to the audience, as at a recital (see STAGE_YAW).
+const stageSet = new THREE.Group();
+stageSet.name = "stage-set";
+stageSet.rotation.y = STAGE_YAW;
+stageSet.add(piano.group, bench);
+scene.add(stageSet);
+scene.updateMatrixWorld(true);
 const { midiToKey, lidPivot } = piano;
 
 // Dev-only inspection hook for geometry validation (stripped from production).
@@ -119,6 +130,7 @@ if (import.meta.env.DEV) {
     piano,
     stageTopY,
     bench,
+    stageSet,
     hall,
     mats,
     environment,
@@ -453,7 +465,89 @@ playRecordingBtn.onclick = () => {
   else recorder.play();
   updateRecordingUi();
 };
+// --- Camera flights: presets, double-click focus, part labels ----------------
+const flight = {
+  fromPosition: new THREE.Vector3(),
+  fromTarget: new THREE.Vector3(),
+  toPosition: new THREE.Vector3(),
+  toTarget: new THREE.Vector3(),
+  t: 1,
+  seconds: 1.2,
+};
+function flyTo(position, target, seconds = 1.2) {
+  explodedView.cancelCameraAssist();
+  flight.fromPosition.copy(camera.position);
+  flight.fromTarget.copy(controls.target);
+  flight.toPosition.copy(position);
+  flight.toTarget.copy(target);
+  flight.seconds = seconds;
+  flight.t = reducedMotion.matches ? 1 : 0;
+  if (flight.t === 1) {
+    camera.position.copy(position);
+    controls.target.copy(target);
+  }
+}
+function updateFlight(dt) {
+  if (flight.t >= 1) return;
+  flight.t = Math.min(1, flight.t + dt / flight.seconds);
+  const e =
+    flight.t < 0.5 ? 4 * flight.t ** 3 : 1 - (-2 * flight.t + 2) ** 3 / 2;
+  camera.position.lerpVectors(flight.fromPosition, flight.toPosition, e);
+  controls.target.lerpVectors(flight.fromTarget, flight.toTarget, e);
+}
+// Any drag, wheel or pinch hands the camera straight back to the viewer.
+controls.addEventListener("start", () => (flight.t = 1));
+
+/** Frame an object's bounds from the current viewing direction. */
+function flyToObject(object) {
+  const box = new THREE.Box3().setFromObject(object);
+  const center = box.getCenter(new THREE.Vector3());
+  const radius = Math.max(0.4, box.getSize(new THREE.Vector3()).length() / 2);
+  const fov = THREE.MathUtils.degToRad(camera.getEffectiveFOV());
+  const distance = (radius / Math.sin(fov / 2)) * 1.1;
+  const direction = camera.position.clone().sub(controls.target).normalize();
+  flyTo(center.clone().addScaledVector(direction, distance), center);
+}
+inspection.onLabelPick = (component) => flyToObject(component.object);
+
+const viewSelect = document.querySelector("#viewSelect");
+const views = {
+  pianist: {
+    position: NORMAL_DEFAULT_CAMERA_POSITION,
+    target: NORMAL_DEFAULT_TARGET,
+  },
+  keys: {
+    position: onStage(0.6, 3.4, 5.4),
+    target: onStage(0.2, 1.5, 2.5),
+  },
+  ...hall.views,
+};
+viewSelect.addEventListener("change", () => {
+  const view = views[viewSelect.value];
+  flyTo(view.position, view.target);
+});
+
+// Double-click a spot to orbit around it, drawing closer if far away.
+const focusRay = new THREE.Raycaster();
+renderer.domElement.addEventListener("dblclick", (event) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+  focusRay.setFromCamera(
+    new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    ),
+    camera,
+  );
+  const hit = focusRay.intersectObjects([stageSet, hall.group], true)[0];
+  if (!hit) return;
+  const offset = camera.position.clone().sub(controls.target);
+  offset.setLength(Math.min(offset.length(), 14));
+  flyTo(hit.point.clone().add(offset), hit.point, 0.8);
+});
+
 document.querySelector("#resetBtn").onclick = () => {
+  flight.t = 1;
+  viewSelect.value = "pianist";
   explodedView.cancelCameraAssist();
   explodedView.resetCamera();
 };
@@ -467,7 +561,12 @@ document.querySelector("#enterBtn").onclick = async (event) => {
   button.disabled = true;
   button.textContent = "Preparing piano…";
   prepareAudio();
-  await audio.warmFallbacks();
+  // Compile every shader now, behind "Preparing piano…", so the first
+  // orbit across the hall or first exploded frame does not stall.
+  await Promise.all([
+    audio.warmFallbacks(),
+    renderer.compileAsync?.(scene, camera).catch(() => {}),
+  ]);
   audioGate.classList.add("hidden");
   audioGate.setAttribute("aria-hidden", "true");
   gatedInterface.forEach((element) => element.removeAttribute("inert"));
@@ -518,7 +617,11 @@ function animate(timestamp) {
   requestAnimationFrame(animate);
   timer.update(timestamp);
   const dt = Math.min(timer.getDelta(), 0.035);
+  updateFlight(dt);
   controls.update();
+  // Never pass through a wall, the ceiling or a floor.
+  hall.keepInside(camera.position, 0.8);
+  hall.keepInside(controls.target, 0.2);
 
   explodedView.update(dt, reducedMotion.matches);
   hall.update(reducedMotion.matches ? 100 : dt);

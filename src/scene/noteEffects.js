@@ -109,11 +109,15 @@ export function createNoteEffects(scene, piano, renderer, camera) {
   const anchor = new THREE.Vector3();
   const anchorOf = (info) => info.key.localToWorld(anchor.copy(info.local));
   const keyTop = Math.max(...[...keyInfo.values()].map((k) => anchorOf(k).y));
-  const whiteBack = Math.min(
-    ...[...keyInfo.values()]
-      .filter((k) => !k.key.userData.isBlack)
-      .map((k) => anchorOf(k).z),
-  );
+  // The key line lives in the keyboard's own frame, so it turns with the
+  // piano on stage and follows the keyboard in the exploded layout.
+  const keyboard = piano.explodedComponents.find(
+    (c) => c.id === "keyboard",
+  ).object;
+  const toKeyboard = (info) => keyboard.worldToLocal(anchorOf(info).clone());
+  const whites = [...keyInfo.values()].filter((k) => !k.key.userData.isBlack);
+  const lineY = Math.max(...whites.map((k) => toKeyboard(k).y));
+  const whiteBack = Math.min(...whites.map((k) => toKeyboard(k).z));
 
   // --- Key glow ---------------------------------------------------------------
   const glowMaterials = new Map();
@@ -193,8 +197,8 @@ export function createNoteEffects(scene, piano, renderer, camera) {
     }),
   );
   keyLine.rotation.x = -Math.PI / 2;
-  keyLine.position.set(0, keyTop + 0.004, whiteBack - 0.16);
-  group.add(keyLine);
+  keyLine.position.set(0, lineY + 0.004, whiteBack - 0.16);
+  keyboard.add(keyLine);
 
   // --- Star dust ----------------------------------------------------------------
   const positions = new Float32Array(MAX_PARTICLES * 3);

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { onStage } from "../piano/geometry.js";
 
 const GAP = 0.32;
 const FRAMING_MARGIN = 1.14;
@@ -6,12 +7,9 @@ const CAMERA_EXPANSION = 1.04;
 const CAMERA_POSITION_EPSILON = 0.018;
 const CAMERA_TARGET_EPSILON = 0.012;
 
-export const NORMAL_DEFAULT_CAMERA_POSITION = new THREE.Vector3(
-  7.7,
-  5.45,
-  9.75,
-);
-export const NORMAL_DEFAULT_TARGET = new THREE.Vector3(0, 1.25, -0.4);
+// The pianist's-eye review angle, turned with the piano on stage.
+export const NORMAL_DEFAULT_CAMERA_POSITION = onStage(7.7, 5.45, 9.75);
+export const NORMAL_DEFAULT_TARGET = onStage(0, 1.25, -0.4);
 
 function captureTransform(object) {
   return {

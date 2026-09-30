@@ -133,18 +133,24 @@ export function buildCaseRim(mats) {
   logo.name = "fallboard-logo";
   fallboard.add(logo);
 
-  // Bass-side hinge knuckles along the spine.
-  for (let i = 0; i < 7; i++) {
-    box(
-      0.26,
-      0.05,
-      0.08,
+  // Three slim brass butt hinges along the straight bass side, as on a real
+  // grand: barrel knuckles sitting flush at the rim edge, not blocks.
+  for (const z of [0.7, -1.7, -4.1]) {
+    const knuckle = cyl(
+      0.022,
+      0.022,
+      0.34,
       mats.gold,
       g,
-      -3.58,
-      DIM.lidHingeY - 0.015,
-      1.1 - i * 0.8,
+      -3.665,
+      DIM.lidHingeY - 0.012,
+      z,
+      Math.PI / 2,
+      0,
+      "",
+      12,
     );
+    knuckle.castShadow = false;
   }
 
   return tag(

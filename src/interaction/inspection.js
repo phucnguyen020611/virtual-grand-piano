@@ -36,10 +36,18 @@ export function createInspection(
   let hovered = null;
 
   // Build floating DOM labels, one per bounds-aware exploded component.
+  // Each label is a button: picking it selects and frames that part.
+  let onLabelPick = () => {};
   const labels = piano.explodedComponents.map((component) => {
-    const el = document.createElement("div");
+    const el = document.createElement("button");
+    el.type = "button";
     el.className = "label3d";
     el.textContent = component.label;
+    el.setAttribute("aria-label", `Zoom to ${component.label}`);
+    el.addEventListener("click", () => {
+      selectPart(component.object);
+      onLabelPick(component);
+    });
     dom.labelRoot.appendChild(el);
     return { component, el };
   });
@@ -379,6 +387,9 @@ export function createInspection(
     selectPart,
     setMode,
     updateLabels,
+    set onLabelPick(fn) {
+      onLabelPick = fn;
+    },
     get exploded() {
       return exploded;
     },

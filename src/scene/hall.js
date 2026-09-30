@@ -1,7 +1,16 @@
 import * as THREE from "three";
 import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { makeCanvasTexture } from "../piano/materials.js";
+import { onStage } from "../piano/geometry.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import {
+  damaskSet,
+  plasterSet,
+  repeatSet,
+  stageBoardSet,
+  velvetSet,
+} from "./surfaces.js";
+import { buildRoyalInterior } from "./royalDecor.js";
 
 // One scene unit is ~0.21 m (the keyboard is 5.9 units, 1.22 m wide).
 const STAGE_TOP = -0.045; // legs and casters sit on this plane
@@ -13,60 +22,9 @@ const HALL_BACK_Z = 100;
 const CEILING_Y = 72;
 const RAKE = 0.1; // stalls rise toward the back
 
-/** Honey maple stage boards with staggered butt joints. */
-function stageBoards(maxAniso) {
-  const texture = makeCanvasTexture(
-    (g, w, h) => {
-      const boards = 8;
-      const bw = w / boards;
-      for (let b = 0; b < boards; b++) {
-        const tone = 150 + ((b * 37) % 5) * 9;
-        g.fillStyle = `rgb(${tone + 30},${tone - 12},${tone - 62})`;
-        g.fillRect(b * bw, 0, bw, h);
-        for (let i = 0; i < 40; i++) {
-          g.fillStyle = `rgba(90,52,24,${0.05 + Math.random() * 0.08})`;
-          g.fillRect(
-            b * bw + Math.random() * bw,
-            0,
-            1 + Math.random() * 1.5,
-            h,
-          );
-        }
-        g.fillStyle = "rgba(40,22,10,.55)";
-        g.fillRect(b * bw, 0, 2, h);
-        const joint = ((b * 0.37) % 1) * h;
-        g.fillRect(b * bw, joint, bw, 2);
-      }
-    },
-    512,
-    512,
-    maxAniso,
-  );
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  return texture;
-}
-
 const stallsY = (z) => STAGE_TOP - STAGE_RISE + (z - STAGE_FRONT_Z) * RAKE;
-
-function panelTexture(maxAniso, { base, line, slats, grain = 0.05 }) {
-  const texture = makeCanvasTexture(
-    (g, w, h) => {
-      g.fillStyle = base;
-      g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 260; i++) {
-        g.fillStyle = `rgba(40,22,10,${grain * Math.random()})`;
-        g.fillRect(Math.random() * w, 0, 1 + Math.random() * 2, h);
-      }
-      g.fillStyle = line;
-      for (let x = 0; x < w; x += w / slats) g.fillRect(x, 0, 3, h);
-    },
-    512,
-    512,
-    maxAniso,
-  );
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  return texture;
-}
+const floorY = (z) => (z < STAGE_FRONT_Z ? STAGE_TOP : stallsY(z));
+const BALCONY_Y = 24;
 
 function mesh(geometry, material, x, y, z, parent) {
   const m = new THREE.Mesh(geometry, material);
@@ -80,26 +38,32 @@ function mesh(geometry, material, x, y, z, parent) {
 function seatGeometries() {
   const velvet = [];
   const frame = [];
-  const cushion = new THREE.BoxGeometry(2.1, 0.45, 1.9);
+  // Rounded upholstery: box edges are what made the seats read as blocks.
+  // Two edge segments: round at viewing distance, ~1/2 the triangles of 3
+  // across 340 instanced seats.
+  const cushion = new RoundedBoxGeometry(2.1, 0.5, 1.9, 2, 0.2);
   cushion.translate(0, 2.1, 0.1);
-  const back = new THREE.BoxGeometry(2.1, 2.8, 0.42);
+  const back = new RoundedBoxGeometry(2.1, 2.8, 0.5, 2, 0.22);
   back.rotateX(-0.16);
   back.translate(0, 3.75, 1.05);
   velvet.push(cushion, back);
   for (const side of [-1, 1]) {
-    const arm = new THREE.BoxGeometry(0.26, 0.2, 1.9);
+    const arm = new RoundedBoxGeometry(0.28, 0.22, 1.9, 1, 0.08);
     arm.translate(side * 1.18, 3.0, 0.3);
     const post = new THREE.BoxGeometry(0.22, 3.0, 0.22);
     post.translate(side * 1.18, 1.5, 0.9);
     frame.push(arm, post);
   }
-  return { velvet: mergeGeometries(velvet), frame: mergeGeometries(frame) };
+  // Rounded and plain boxes differ in indexing; merge them as triangle soup.
+  const merge = (parts) =>
+    mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)));
+  return { velvet: merge(velvet), frame: merge(frame) };
 }
 
 /**
- * A shoebox chamber-music hall around the stage: wooden stage and back wall
- * with an organ, panelled side walls with balconies, acoustic reflectors,
- * raked stalls of velvet seats, and a theatrical lighting rig.
+ * A shoebox concert hall in the European court style (see royalDecor.js):
+ * wooden stage and gilded organ, crimson damask and ivory walls, balconies,
+ * raked stalls of velvet seats, chandeliers and a theatrical lighting rig.
  */
 export function createHall(scene, mats) {
   RectAreaLightUniformsLib.init();
@@ -108,20 +72,26 @@ export function createHall(scene, mats) {
   scene.add(hall);
 
   const aniso = mats.maxAniso;
+  const velvet = velvetSet(aniso);
 
   // --- Stage -------------------------------------------------------------------
-  const floorTex = stageBoards(aniso);
-  floorTex.repeat.set(12, 4);
+  // Board width ~0.13 m: eight boards (one tile) span ~5 units.
+  const boards = stageBoardSet(aniso);
+  const woodSet = (x, y, color = 0xffffff, rough = 1) =>
+    new THREE.MeshStandardMaterial({
+      color,
+      ...repeatSet(boards, x, y),
+      roughness: rough,
+    });
   const stageDepth = STAGE_FRONT_Z - STAGE_BACK_Z;
   const stage = mesh(
     new THREE.BoxGeometry(HALL_HALF_WIDTH * 2, 0.55, stageDepth),
     new THREE.MeshPhysicalMaterial({
-      color: 0x8c6f58, // stained, so the pool of light does the work
-      map: floorTex,
-      roughness: 0.55,
-      clearcoat: 0.25,
-      clearcoatRoughness: 0.5,
-      envMapIntensity: 0.3,
+      ...repeatSet(boards, (HALL_HALF_WIDTH * 2) / 5, stageDepth / 19),
+      roughness: 1,
+      // Satin polyurethane over stained oak.
+      clearcoat: 0.3,
+      clearcoatRoughness: 0.38,
     }),
     0,
     STAGE_TOP - 0.275,
@@ -129,10 +99,7 @@ export function createHall(scene, mats) {
     hall,
   );
   stage.name = "stage-floor";
-  const darkWood = new THREE.MeshStandardMaterial({
-    color: 0x24170f,
-    roughness: 0.6,
-  });
+  const darkWood = woodSet(12, 1, 0x4a3a30);
   mesh(
     new THREE.BoxGeometry(HALL_HALF_WIDTH * 2, STAGE_RISE, 0.5),
     darkWood,
@@ -143,30 +110,21 @@ export function createHall(scene, mats) {
   );
 
   // --- Walls -------------------------------------------------------------------
-  const wood = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    map: panelTexture(aniso, {
-      base: "#5e3521",
-      line: "rgba(22,11,5,.6)",
-      slats: 16,
-    }),
-    roughness: 0.62,
-  });
-  wood.map.repeat.set(20, 3);
-  const plaster = new THREE.MeshStandardMaterial({
-    color: 0x8a7d6a,
-    roughness: 0.9,
-  });
-  const gold = new THREE.MeshStandardMaterial({
-    color: 0x9a7a45,
-    metalness: 0.75,
-    roughness: 0.35,
-  });
+  // Crimson silk damask to balcony height, ivory lime plaster above.
+  const damask = damaskSet(aniso);
+  const plasterTiles = plasterSet(aniso);
+  const plasterWall = (width, height) =>
+    new THREE.MeshStandardMaterial({
+      ...repeatSet(plasterTiles, width / 10, height / 10),
+      color: 0xe8dcc0,
+      roughness: 1,
+    });
   const wallHeight = CEILING_Y - (STAGE_TOP - STAGE_RISE);
   const wallBase = STAGE_TOP - STAGE_RISE;
+  const dadoHeight = BALCONY_Y - wallBase;
   const backWall = mesh(
     new THREE.PlaneGeometry(HALL_HALF_WIDTH * 2, wallHeight),
-    wood,
+    plasterWall(HALL_HALF_WIDTH * 2, wallHeight),
     0,
     wallBase + wallHeight / 2,
     STAGE_BACK_Z,
@@ -174,104 +132,73 @@ export function createHall(scene, mats) {
   );
   backWall.name = "stage-back-wall";
   const hallLength = HALL_BACK_Z - STAGE_BACK_Z;
+  const damaskWall = new THREE.MeshStandardMaterial({
+    ...repeatSet(damask, hallLength / 6, dadoHeight / 9),
+    roughness: 1,
+  });
+  const upperPlaster = plasterWall(hallLength, wallHeight - dadoHeight);
   for (const side of [-1, 1]) {
-    // Wood dado below, plaster above, pilasters every ~2.5 m.
     const dado = mesh(
-      new THREE.PlaneGeometry(hallLength, 22),
-      wood,
+      new THREE.PlaneGeometry(hallLength, dadoHeight),
+      damaskWall,
       side * HALL_HALF_WIDTH,
-      wallBase + 11,
+      wallBase + dadoHeight / 2,
       (HALL_BACK_Z + STAGE_BACK_Z) / 2,
       hall,
     );
     dado.rotation.y = -side * (Math.PI / 2);
     const upper = mesh(
-      new THREE.PlaneGeometry(hallLength, wallHeight - 22),
-      plaster,
+      new THREE.PlaneGeometry(hallLength, wallHeight - dadoHeight),
+      upperPlaster,
       side * HALL_HALF_WIDTH,
-      wallBase + 22 + (wallHeight - 22) / 2,
+      BALCONY_Y + (wallHeight - dadoHeight) / 2,
       (HALL_BACK_Z + STAGE_BACK_Z) / 2,
       hall,
     );
     upper.rotation.y = -side * (Math.PI / 2);
-    for (let z = STAGE_BACK_Z + 6; z < HALL_BACK_Z; z += 12)
-      mesh(
-        new THREE.BoxGeometry(1.2, wallHeight - 22, 2.2),
-        plaster,
-        side * (HALL_HALF_WIDTH - 0.6),
-        wallBase + 22 + (wallHeight - 22) / 2,
-        z,
-        hall,
-      );
-    // Side balcony with a gilded parapet.
+    // Balcony deck; its gilded balustrade comes with the royal interior.
     const balconyZ0 = 16;
     const balconyLength = HALL_BACK_Z - balconyZ0;
     mesh(
       new THREE.BoxGeometry(6, 1, balconyLength),
       darkWood,
       side * (HALL_HALF_WIDTH - 3),
-      24,
-      balconyZ0 + balconyLength / 2,
-      hall,
-    );
-    mesh(
-      new THREE.BoxGeometry(0.4, 3.2, balconyLength),
-      wood,
-      side * (HALL_HALF_WIDTH - 6),
-      26.1,
-      balconyZ0 + balconyLength / 2,
-      hall,
-    );
-    mesh(
-      new THREE.BoxGeometry(0.6, 0.3, balconyLength),
-      gold,
-      side * (HALL_HALF_WIDTH - 6),
-      27.8,
+      BALCONY_Y,
       balconyZ0 + balconyLength / 2,
       hall,
     );
   }
   const rear = mesh(
     new THREE.PlaneGeometry(HALL_HALF_WIDTH * 2, wallHeight),
-    wood,
+    damaskWall,
     0,
     wallBase + wallHeight / 2,
     HALL_BACK_Z,
     hall,
   );
   rear.rotation.y = Math.PI;
-  const ceiling = mesh(
-    new THREE.PlaneGeometry(HALL_HALF_WIDTH * 2, hallLength),
-    new THREE.MeshStandardMaterial({ color: 0x3a2e25, roughness: 0.9 }),
+
+  const royal = buildRoyalInterior(hall, scene, {
+    halfWidth: HALL_HALF_WIDTH,
+    stageFrontZ: STAGE_FRONT_Z,
+    stageBackZ: STAGE_BACK_Z,
+    backZ: HALL_BACK_Z,
+    ceilingY: CEILING_Y,
+    floorY,
+    balconyY: BALCONY_Y,
+    aniso,
+    velvet,
+  });
+  const gold = royal.gilt;
+  // Gilded nosing along the stage front.
+  mesh(
+    new THREE.BoxGeometry(HALL_HALF_WIDTH * 2, 0.35, 0.7),
+    gold,
     0,
-    CEILING_Y,
-    (HALL_BACK_Z + STAGE_BACK_Z) / 2,
+    STAGE_TOP - 0.2,
+    STAGE_FRONT_Z + 0.35,
     hall,
   );
-  ceiling.rotation.x = Math.PI / 2;
-
-  // Acoustic reflector "clouds" over the stage.
-  const reflector = new THREE.MeshStandardMaterial({
-    color: 0xd8cfbf,
-    roughness: 0.7,
-  });
-  [
-    [-16, -14, 0.12],
-    [0, -12, 0.08],
-    [16, -14, -0.12],
-    [-10, 2, 0.1],
-    [10, 2, -0.1],
-  ].forEach(([x, z, tilt]) => {
-    const cloud = mesh(
-      new THREE.BoxGeometry(13, 0.5, 9),
-      reflector,
-      x,
-      50,
-      z,
-      hall,
-    );
-    cloud.rotation.set(0.18, 0, tilt);
-  });
 
   // --- Organ on the back wall ------------------------------------------------------
   const pipes = [];
@@ -290,11 +217,7 @@ export function createHall(scene, mats) {
   pipeGeometry.translate(0, 0.5, 0);
   const pipeMesh = new THREE.InstancedMesh(
     pipeGeometry,
-    new THREE.MeshStandardMaterial({
-      color: 0xcfc8bb,
-      metalness: 0.92,
-      roughness: 0.28,
-    }),
+    gold, // gilded display pipes, as in the Golden Hall
     pipes.length,
   );
   const matrix = new THREE.Matrix4();
@@ -319,7 +242,12 @@ export function createHall(scene, mats) {
       HALL_HALF_WIDTH * 2,
       Math.hypot(rakeLength, rakeLength * RAKE),
     ),
-    new THREE.MeshStandardMaterial({ color: 0x4a1a1e, roughness: 1 }),
+    // Low-pile carpet: the velvet weave, tighter and darker.
+    new THREE.MeshStandardMaterial({
+      ...repeatSet(velvet, 120, 160),
+      color: 0x5a4040,
+      roughness: 1,
+    }),
     0,
     (stallsY(STAGE_FRONT_Z) + stallsY(HALL_BACK_Z)) / 2,
     STAGE_FRONT_Z + rakeLength / 2,
@@ -327,7 +255,7 @@ export function createHall(scene, mats) {
   );
   stalls.rotation.x = -Math.PI / 2 - Math.atan(RAKE);
 
-  const { velvet, frame } = seatGeometries();
+  const { velvet: seatShape, frame } = seatGeometries();
   const seats = [];
   for (let row = 0; row < 17; row++) {
     const rowZ = STAGE_FRONT_Z + 6 + row * 4.6;
@@ -340,31 +268,39 @@ export function createHall(scene, mats) {
       }
   }
   const velvetSeats = new THREE.InstancedMesh(
-    velvet,
+    seatShape,
     new THREE.MeshPhysicalMaterial({
-      color: 0x6e1420,
-      roughness: 0.85,
+      ...repeatSet(velvet, 5, 5),
+      roughness: 1,
+      // Pile sheen: velvet lights up at grazing angles.
       sheen: 1,
-      sheenRoughness: 0.5,
-      sheenColor: 0xd0485a,
+      sheenRoughness: 0.32,
+      sheenColor: 0xe0707e,
     }),
     seats.length,
   );
-  const frameSeats = new THREE.InstancedMesh(frame, darkWood, seats.length);
+  const frameSeats = new THREE.InstancedMesh(frame, gold, seats.length);
   const q = new THREE.Quaternion();
+  const tint = new THREE.Color();
   const up = new THREE.Vector3(0, 1, 0);
   const pos = new THREE.Vector3();
   const one = new THREE.Vector3(1, 1, 1);
   seats.forEach(([x, y, z, yaw], i) => {
     matrix.compose(pos.set(x, y, z), q.setFromAxisAngle(up, yaw), one);
     velvetSeats.setMatrixAt(i, matrix);
+    // Years of use: no two seats fade quite alike.
+    velvetSeats.setColorAt(
+      i,
+      tint.setScalar(0.9 + (((i * 7919) % 97) / 97) * 0.2),
+    );
     frameSeats.setMatrixAt(i, matrix);
   });
   hall.add(velvetSeats, frameSeats);
 
   // --- Lighting rig ------------------------------------------------------------------
-  const normalFocus = new THREE.Vector3(0, 1.2, -0.35);
-  const explodedFocus = new THREE.Vector3(0, 4.35, -0.65);
+  // Piano and bench together: the pool of light covers the whole stage set.
+  const normalFocus = onStage(0, 1.2, 0.3);
+  const explodedFocus = onStage(0, 4.35, -0.65);
   const focus = normalFocus.clone();
 
   const spot = (color, intensity, position, angle, penumbra) => {
@@ -394,36 +330,16 @@ export function createHall(scene, mats) {
   wallGlaze.lookAt(0, 22, STAGE_BACK_Z);
   scene.add(wash, wallGlaze);
 
-  // House lights down: the room falls into a dim, hazy dusk around the spot.
+  // House lights: the chandeliers (royalDecor) carry the room; this is only
+  // the faint bounce from the gilt and the damask.
   scene.add(new THREE.HemisphereLight(0x9a8672, 0x2a1c14, 0.1));
-  const houseGlow = new THREE.PointLight(0xffd7a8, 6, 0, 1.4);
-  houseGlow.position.set(0, 36, 55);
-  scene.add(houseGlow);
-
-  // Parapet lamps along both balconies.
-  const lampPositions = [];
-  for (const side of [-1, 1])
-    for (let z = 20; z < HALL_BACK_Z; z += 8)
-      lampPositions.push([side * (HALL_HALF_WIDTH - 6), 28.4, z]);
-  const lamps = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(0.35, 10, 8),
-    new THREE.MeshBasicMaterial({
-      color: new THREE.Color(0xffd9a0).multiplyScalar(2.2),
-      toneMapped: false,
-    }),
-    lampPositions.length,
-  );
-  lampPositions.forEach(([x, y, z], i) => {
-    matrix.makeTranslation(x, y, z);
-    lamps.setMatrixAt(i, matrix);
-  });
-  hall.add(lamps);
 
   // The studio reflection map is tuned for the lacquer; on the room's matte
   // surfaces it reads as ambient fill, so the hall takes only a trace of it.
   hall.traverse((o) => {
     for (const m of [o.material].flat())
-      if (m && "envMapIntensity" in m) m.envMapIntensity = 0.08;
+      if (m && "envMapIntensity" in m && !m.userData.keepEnv)
+        m.envMapIntensity = 0.08;
   });
 
   let target = 0;
@@ -439,6 +355,41 @@ export function createHall(scene, mats) {
   return {
     group: hall,
     stageTopY: STAGE_TOP,
+    /** Keep a point inside the room and above whichever floor lies below. */
+    keepInside(v, margin = 1) {
+      v.x = THREE.MathUtils.clamp(
+        v.x,
+        -HALL_HALF_WIDTH + margin,
+        HALL_HALF_WIDTH - margin,
+      );
+      v.z = THREE.MathUtils.clamp(
+        v.z,
+        STAGE_BACK_Z + margin,
+        HALL_BACK_Z - margin,
+      );
+      const floor = floorY(v.z);
+      v.y = THREE.MathUtils.clamp(
+        v.y,
+        floor + margin * 0.6,
+        CEILING_Y - margin,
+      );
+      return v;
+    },
+    /** Seats with a view: eye heights ~1.2 m above each floor. */
+    views: {
+      frontRow: {
+        position: new THREE.Vector3(3, stallsY(20) + 5.6, 20),
+        target: new THREE.Vector3(0, 2.2, 0),
+      },
+      balcony: {
+        position: new THREE.Vector3(-HALL_HALF_WIDTH + 7, 30, 42),
+        target: new THREE.Vector3(0, 2, 0),
+      },
+      overview: {
+        position: new THREE.Vector3(0, 46, HALL_BACK_Z - 6),
+        target: new THREE.Vector3(0, 4, 18),
+      },
+    },
     key,
     setExploded(value) {
       target = value ? 1 : 0;

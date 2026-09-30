@@ -14,6 +14,17 @@ import * as THREE from "three";
  * `extrudeFlat` they lie in the XZ plane with world.x = sx, world.z = -sy and
  * the extruded thickness growing upward from the mesh's base (y ≈ 0).
  */
+/**
+ * Concert placement: the piano stands side-on to the audience, keyboard at
+ * stage left, bentside and raised lid opening toward the hall (+Z). Piano and
+ * bench are modelled facing +Z and turned by this yaw as one stage set.
+ */
+export const STAGE_YAW = -Math.PI / 2;
+const STAGE_AXIS = new THREE.Vector3(0, 1, 0);
+/** A point given in the piano's own (unturned) frame, placed on the stage. */
+export const onStage = (x, y, z) =>
+  new THREE.Vector3(x, y, z).applyAxisAngle(STAGE_AXIS, STAGE_YAW);
+
 export const DIM = {
   // Case / rim -------------------------------------------------------------
   caseBottomY: 0.86, // underside of the rim (legs reach down from here)
