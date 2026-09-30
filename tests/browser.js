@@ -303,7 +303,6 @@ async function run() {
 
   click("explodeBtn");
   await wait(2500);
-  assert(!p.lighting.lamp.visible, "fixture collides with exploded assembly");
   for (const component of p.piano.explodedComponents) {
     assert(
       !benchBounds.intersectsBox(
@@ -331,7 +330,6 @@ async function run() {
   click("normalBtn");
   await wait(2500);
   click("resetBtn");
-  assert(p.lighting.lamp.visible, "normal fixture not restored");
   log("Normal/Exploded, resonance parenting, lid, reset", { pass: true });
 
   p.explodedView.setExploded(true);

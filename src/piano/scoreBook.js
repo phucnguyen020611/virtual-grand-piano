@@ -1,10 +1,11 @@
 import * as THREE from "three";
 import { makeCanvasTexture } from "./materials.js";
-import { MEASURES, MUSIC_PAGES, parsePitch } from "../performance/furElise.js";
+import { parsePitch } from "../performance/songs.js";
 
 // --- Engraving -------------------------------------------------------------
-// A small engraver for this one score: grand staff, beams, accidentals, rests,
-// voltas and repeats, drawn onto canvas like a printed urtext page.
+// A small engraver for the repertoire: grand staff, key and time signatures,
+// chords, beams, flags, dots, accidentals, rests, voltas and repeats, drawn
+// onto canvas like a printed urtext page.
 
 const PAGE_W = 1024;
 const PAGE_H = 1366;
@@ -17,11 +18,23 @@ const MARGIN_X = 86;
 const STAFF_GAP = 8.5 * SP; // treble bottom line to bass top line
 const TREBLE_BOTTOM_STEP = parsePitch("E4").step;
 const BASS_BOTTOM_STEP = parsePitch("G2").step;
+// Key-signature sharps in order (F C G D A E B), as staff steps.
+const SHARP_STEPS = {
+  treble: ["F5", "C5", "G5", "D5", "A4", "E5", "B4"].map(
+    (p) => parsePitch(p).step,
+  ),
+  bass: ["F3", "C3", "G3", "D3", "A2", "E3", "B2"].map(
+    (p) => parsePitch(p).step,
+  ),
+};
+const SHARP_ORDER = "FCGDAEB";
 
 const GLYPH = {
   treble: "\u{1D11E}",
   bass: "\u{1D122}",
   wholeRest: "\u{1D13B}",
+  halfRest: "\u{1D13C}",
+  quarterRest: "\u{1D13D}",
   eighthRest: "\u{1D13E}",
   sixteenthRest: "\u{1D13F}",
   sharp: "♯",
@@ -125,15 +138,13 @@ function brace(g, x, top, bottom) {
   g.fill();
 }
 
-function noteY(step, staff) {
-  return staff.clef === "treble"
-    ? staff.top + 4 * SP - (step - TREBLE_BOTTOM_STEP) * (SP / 2)
-    : staff.top + 4 * SP - (step - BASS_BOTTOM_STEP) * (SP / 2);
-}
+const bottomStep = (staff) =>
+  staff.clef === "treble" ? TREBLE_BOTTOM_STEP : BASS_BOTTOM_STEP;
+const noteY = (step, staff) =>
+  staff.top + 4 * SP - (step - bottomStep(staff)) * (SP / 2);
 
 function ledgerLines(g, x, step, staff) {
-  const bottom =
-    staff.clef === "treble" ? TREBLE_BOTTOM_STEP : BASS_BOTTOM_STEP;
+  const bottom = bottomStep(staff);
   const top = bottom + 8;
   g.lineWidth = 1.2;
   const draw = (s) => {
@@ -147,10 +158,19 @@ function ledgerLines(g, x, step, staff) {
   for (let s = top + 2; s <= step; s += 2) draw(s);
 }
 
-function notehead(g, x, y) {
+function notehead(g, x, y, hollow) {
   g.beginPath();
   g.ellipse(x, y, SP * 0.66, SP * 0.46, -0.36, 0, Math.PI * 2);
   g.fill();
+  if (hollow) {
+    // Open head: a tilted counter punched out of the oval.
+    g.save();
+    g.fillStyle = PAPER;
+    g.beginPath();
+    g.ellipse(x, y, SP * 0.46, SP * 0.2, -0.62, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
 }
 
 function flag(g, stemX, tipY, up) {
@@ -176,13 +196,17 @@ function flag(g, stemX, tipY, up) {
   g.fill();
 }
 
-function drawRests(g, measure, notes, staff, slotX) {
-  if (!notes.length) {
-    if (measure.pickup) {
-      glyph(g, GLYPH.eighthRest, slotX(0.5), staff.top + 3 * SP, SP * 4);
-      return;
-    }
-    // Whole-bar rest hangs from the fourth line.
+// Rest glyphs and their baseline on the staff, by length in sixteenths.
+const RESTS = [
+  [8, GLYPH.halfRest, 2],
+  [4, GLYPH.quarterRest, 2.9],
+  [2, GLYPH.eighthRest, 3],
+  [1, GLYPH.sixteenthRest, 3],
+];
+
+function drawRests(g, measure, chords, staff, slotX) {
+  if (!chords.length && !measure.pickup) {
+    // Whole-bar rest hangs from the fourth line, whatever the metre.
     glyph(
       g,
       GLYPH.wholeRest,
@@ -193,130 +217,167 @@ function drawRests(g, measure, notes, staff, slotX) {
     return;
   }
   const occupied = new Array(measure.length).fill(false);
-  for (const note of notes)
-    for (let p = note.pos; p < note.pos + note.dur; p++) occupied[p] = true;
+  for (const c of chords)
+    for (let p = c.pos; p < Math.min(measure.length, c.pos + c.dur); p++)
+      occupied[p] = true;
   for (let p = 0; p < measure.length;) {
     if (occupied[p]) {
       p++;
       continue;
     }
-    if (p % 2 === 0 && p + 1 < measure.length && !occupied[p + 1]) {
-      glyph(g, GLYPH.eighthRest, slotX(p + 0.5), staff.top + 3 * SP, SP * 4);
-      p += 2;
-    } else {
-      glyph(g, GLYPH.sixteenthRest, slotX(p), staff.top + 3 * SP, SP * 4);
-      p++;
-    }
+    let free = 0;
+    while (p + free < measure.length && !occupied[p + free]) free++;
+    const [size, mark, line] = RESTS.find(([s]) => s <= free && p % s === 0);
+    glyph(g, mark, slotX(p + (size - 1) / 2), staff.top + line * SP, SP * 4);
+    p += size;
   }
 }
 
-function drawStaffNotes(g, measure, notes, staff, slotX) {
+/** Notes of one hand grouped into chords by onset. */
+function chordsOf(notes, staff, keySharps) {
   const accidentals = new Map();
-  const placed = notes.map((note) => {
+  const byPos = new Map();
+  for (const note of notes) {
     const p = parsePitch(note.pitch);
-    const x = slotX(note.pos);
-    const y = noteY(p.step, staff);
     const key = p.letter + p.octave;
-    const previous = accidentals.get(key) ?? "";
-    let mark = null;
-    if (p.accidental !== previous)
-      mark = p.accidental ? GLYPH.sharp : GLYPH.natural;
+    const previous = accidentals.has(key)
+      ? accidentals.get(key)
+      : keySharps.has(p.letter)
+        ? "#"
+        : "";
+    const mark =
+      p.accidental !== previous
+        ? p.accidental
+          ? GLYPH.sharp
+          : GLYPH.natural
+        : null;
     accidentals.set(key, p.accidental);
-    return { ...note, ...p, x, y, mark };
-  });
-
-  // Beam maximal runs of consecutive sixteenths.
-  const groups = [];
-  for (const note of placed) {
-    const last = groups.at(-1);
-    if (
-      note.dur === 1 &&
-      last &&
-      last[0].dur === 1 &&
-      last.at(-1).pos + 1 === note.pos &&
-      last.length < 6
-    )
-      last.push(note);
-    else groups.push([note]);
+    if (!byPos.has(note.pos))
+      byPos.set(note.pos, { pos: note.pos, dur: note.dur, heads: [] });
+    byPos.get(note.pos).heads.push({ ...p, y: noteY(p.step, staff), mark });
   }
-  const middle =
-    staff.clef === "treble" ? TREBLE_BOTTOM_STEP + 4 : BASS_BOTTOM_STEP + 4;
+  return [...byPos.values()]
+    .sort((a, b) => a.pos - b.pos)
+    .map((c) => ({ ...c, heads: c.heads.sort((a, b) => a.step - b.step) }));
+}
+
+function drawStaffNotes(g, chords, staff, slotX, beamEvery) {
+  const middle = bottomStep(staff) + 4;
+  // Beam consecutive eighths (or sixteenths) of the same value within a beat.
+  const groups = [];
+  for (const c of chords) {
+    const last = groups.at(-1);
+    const beamable = c.dur <= 2;
+    const joins =
+      beamable &&
+      last &&
+      last[0].dur === c.dur &&
+      last.at(-1).pos + last.at(-1).dur === c.pos &&
+      Math.floor(last[0].pos / beamEvery) === Math.floor(c.pos / beamEvery);
+    if (joins) last.push(c);
+    else groups.push([c]);
+  }
 
   for (const group of groups) {
-    const avg = group.reduce((sum, n) => sum + n.step, 0) / group.length;
-    const up = avg < middle;
+    const steps = group.flatMap((c) => c.heads.map((h) => h.step));
+    const up = steps.reduce((a, b) => a + b, 0) / steps.length < middle;
     const stemLength = SP * 3.4;
-    for (const note of group) {
-      ledgerLines(g, note.x, note.step, staff);
-      notehead(g, note.x, note.y);
-      if (note.mark)
-        glyph(g, note.mark, note.x - SP * 1.75, note.y + SP * 0.9, SP * 3);
-      if (note.dur === 3 || note.dur === 6) {
-        g.beginPath();
-        const dotY = note.step % 2 === 0 ? note.y - SP / 2 : note.y;
-        g.arc(note.x + SP * 1.25, dotY, SP * 0.22, 0, Math.PI * 2);
-        g.fill();
-      }
+    for (const c of group) {
+      c.x = slotX(c.pos);
+      const hollow = c.dur >= 8;
+      c.heads.forEach((head, i) => {
+        // A second in a chord puts the upper head on the far side of the stem.
+        const clash =
+          i > 0 &&
+          head.step - c.heads[i - 1].step === 1 &&
+          !c.heads[i - 1].shifted;
+        head.shifted = clash;
+        const hx = c.x + (clash ? (up ? 1 : -1) * SP * 1.3 : 0);
+        ledgerLines(g, hx, head.step, staff);
+        notehead(g, hx, head.y, hollow);
+        if (head.mark)
+          glyph(g, head.mark, c.x - SP * 1.75, head.y + SP * 0.9, SP * 3);
+        if ([3, 6, 12].includes(c.dur)) {
+          g.beginPath();
+          const dotY = head.step % 2 === 0 ? head.y - SP / 2 : head.y;
+          g.arc(
+            c.x + SP * (clash ? 2.5 : 1.25),
+            dotY,
+            SP * 0.22,
+            0,
+            Math.PI * 2,
+          );
+          g.fill();
+        }
+      });
+      // Stems run from the far head to beyond the near one.
+      c.stemX = c.x + (up ? SP * 0.6 : -SP * 0.6);
+      c.farY = up ? c.heads[0].y : c.heads.at(-1).y;
+      c.nearY = up ? c.heads.at(-1).y : c.heads[0].y;
     }
-    const stemX = (note) => note.x + (up ? SP * 0.6 : -SP * 0.6);
+    if (group[0].dur >= 16) continue; // whole notes have no stem
     const first = group[0];
     const last = group.at(-1);
-    let tipA = first.y + (up ? -stemLength : stemLength);
-    let tipB = last.y + (up ? -stemLength : stemLength);
+    let tipA = first.nearY + (up ? -stemLength : stemLength);
+    let tipB = last.nearY + (up ? -stemLength : stemLength);
     if (group.length > 1) {
       // Gentle beam slope, then push the beam clear of every notehead.
-      const dx = stemX(last) - stemX(first) || 1;
+      const dx = last.stemX - first.stemX || 1;
       const slope = THREE.MathUtils.clamp((tipB - tipA) / dx, -0.12, 0.12);
       tipB = tipA + slope * dx;
       let shift = 0;
-      for (const note of group) {
-        const beamY = tipA + slope * (stemX(note) - stemX(first));
+      for (const c of group) {
+        const beamY = tipA + slope * (c.stemX - first.stemX);
         const need = up
-          ? note.y - SP * 2.8 - beamY
-          : beamY - (note.y + SP * 2.8);
+          ? c.nearY - SP * 2.8 - beamY
+          : beamY - (c.nearY + SP * 2.8);
         shift = Math.min(shift, need);
       }
       tipA += up ? shift : -shift;
       tipB += up ? shift : -shift;
     }
-    const tipAt = (note) =>
+    const tipAt = (c) =>
       group.length > 1
         ? tipA +
-          ((tipB - tipA) * (stemX(note) - stemX(first))) /
-            (stemX(last) - stemX(first) || 1)
+          ((tipB - tipA) * (c.stemX - first.stemX)) /
+            (last.stemX - first.stemX || 1)
         : tipA;
     g.lineWidth = 1.3;
-    for (const note of group) {
+    for (const c of group) {
       g.beginPath();
-      g.moveTo(stemX(note), note.y + (up ? -SP * 0.15 : SP * 0.15));
-      g.lineTo(stemX(note), tipAt(note));
+      g.moveTo(c.stemX, c.farY + (up ? -SP * 0.15 : SP * 0.15));
+      g.lineTo(c.stemX, tipAt(c));
       g.stroke();
     }
     if (group.length > 1) {
-      for (let beam = 0; beam < 2; beam++) {
+      const beams = first.dur === 1 ? 2 : 1;
+      for (let beam = 0; beam < beams; beam++) {
         const offset = beam * SP * 0.78 * (up ? 1 : -1);
+        const thick = up ? SP * 0.48 : -SP * 0.48;
         g.beginPath();
-        g.moveTo(stemX(first), tipA + offset);
-        g.lineTo(stemX(last), tipB + offset);
-        g.lineTo(stemX(last), tipB + offset + (up ? SP * 0.48 : -SP * 0.48));
-        g.lineTo(stemX(first), tipA + offset + (up ? SP * 0.48 : -SP * 0.48));
+        g.moveTo(first.stemX, tipA + offset);
+        g.lineTo(last.stemX, tipB + offset);
+        g.lineTo(last.stemX, tipB + offset + thick);
+        g.lineTo(first.stemX, tipA + offset + thick);
         g.closePath();
         g.fill();
       }
-    } else if (first.dur === 1 || first.dur === 2 || first.dur === 3) {
-      flag(g, stemX(first), tipA, up);
+    } else if (first.dur <= 3) {
+      flag(g, first.stemX, tipA, up);
       if (first.dur === 1)
-        flag(g, stemX(first), tipA + (up ? SP * 0.9 : -SP * 0.9), up);
+        flag(g, first.stemX, tipA + (up ? SP * 0.9 : -SP * 0.9), up);
     }
   }
 }
 
-function drawSystem(g, measures, top, first, { finalPage = false } = {}) {
+function drawSystem(g, song, measures, top, first) {
   const treble = { clef: "treble", top };
   const bass = { clef: "bass", top: top + 4 * SP + STAFF_GAP };
   const bottom = bass.top + 4 * SP;
   const x0 = MARGIN_X;
   const x1 = PAGE_W - MARGIN_X;
+  const barLength = (16 * song.time[0]) / song.time[1];
+  const keySharps = new Set(SHARP_ORDER.slice(0, song.sharps));
   g.strokeStyle = g.fillStyle = INK;
   staffLines(g, x0, x1, treble.top);
   staffLines(g, x0, x1, bass.top);
@@ -329,13 +390,40 @@ function drawSystem(g, measures, top, first, { finalPage = false } = {}) {
 
   glyph(g, GLYPH.treble, x0 + 22, treble.top + 3 * SP, SP * 4.1);
   glyph(g, GLYPH.bass, x0 + 22, bass.top + SP, SP * 4.1);
-  let header = 54;
+  let header = 46;
+  for (const [staff, clef] of [
+    [treble, "treble"],
+    [bass, "bass"],
+  ])
+    for (let i = 0; i < song.sharps; i++)
+      glyph(
+        g,
+        GLYPH.sharp,
+        x0 + header + i * 9,
+        noteY(SHARP_STEPS[clef][i], staff) + SP * 0.9,
+        SP * 3,
+      );
+  header += song.sharps * 9 + 8;
   if (first) {
     for (const staff of [treble, bass]) {
-      text(g, "3", x0 + 66, staff.top + 2 * SP - 1, SP * 2.9, { weight: 700 });
-      text(g, "8", x0 + 66, staff.top + 4 * SP - 1, SP * 2.9, { weight: 700 });
+      text(
+        g,
+        String(song.time[0]),
+        x0 + header + 12,
+        staff.top + 2 * SP - 1,
+        SP * 2.9,
+        { weight: 700 },
+      );
+      text(
+        g,
+        String(song.time[1]),
+        x0 + header + 12,
+        staff.top + 4 * SP - 1,
+        SP * 2.9,
+        { weight: 700 },
+      );
     }
-    header = 88;
+    header += 34;
   } else {
     text(g, String(measures[0]), x0 + 2, treble.top - SP * 1.4, 15, {
       italic: true,
@@ -343,12 +431,14 @@ function drawSystem(g, measures, top, first, { finalPage = false } = {}) {
     });
   }
 
-  const weights = measures.map((i) => (MEASURES[i].pickup ? 0.5 : 1));
+  const weights = measures.map((i) =>
+    Math.max(0.5, song.measures[i].length / barLength),
+  );
   const total = weights.reduce((a, b) => a + b, 0);
   let cursor = x0 + header;
   const width = x1 - cursor;
   measures.forEach((index, k) => {
-    const measure = MEASURES[index];
+    const measure = song.measures[index];
     const mx0 = cursor;
     const mx1 = cursor + (width * weights[k]) / total;
     cursor = mx1;
@@ -360,8 +450,9 @@ function drawSystem(g, measures, top, first, { finalPage = false } = {}) {
       [treble, "rh"],
       [bass, "lh"],
     ]) {
-      drawStaffNotes(g, measure, measure[hand], staff, slotX);
-      drawRests(g, measure, measure[hand], staff, slotX);
+      const chords = chordsOf(measure[hand], staff, keySharps);
+      drawStaffNotes(g, chords, staff, slotX, song.beamEvery);
+      drawRests(g, measure, chords, staff, slotX);
     }
 
     // Barline, repeat or final double bar.
@@ -401,30 +492,29 @@ function drawSystem(g, measures, top, first, { finalPage = false } = {}) {
       });
     }
   });
-  if (finalPage) return bottom;
-  return bottom;
+  return { x0: x0 + header };
 }
 
-function drawMusicPage(g, w, h, pageIndex) {
+function drawMusicPage(g, w, h, song, pageIndex) {
   paper(g, w, h, 11 + pageIndex * 7);
   g.fillStyle = g.strokeStyle = INK;
   let top = 150;
   if (pageIndex === 0) {
-    text(g, "Für Elise", w / 2, 128, 60, { weight: 600 });
-    text(g, "Bagatelle in A minor · WoO 59", w / 2, 166, 22, { italic: true });
-    text(g, "Ludwig van Beethoven", w - MARGIN_X, 214, 21, { align: "right" });
-    text(g, "(1770–1827)", w - MARGIN_X, 236, 15, {
+    text(g, song.title, w / 2, 128, 56, { weight: 600 });
+    text(g, song.subtitle, w / 2, 166, 22, { italic: true });
+    text(g, song.composer, w - MARGIN_X, 214, 21, { align: "right" });
+    text(g, song.dates, w - MARGIN_X, 236, 15, {
       align: "right",
       italic: true,
     });
-    text(g, "Poco moto", MARGIN_X, 250, 21, { weight: 700, align: "left" });
+    text(g, song.tempo, MARGIN_X, 250, 21, { weight: 700, align: "left" });
     top = 300;
   }
-  MUSIC_PAGES[pageIndex].forEach((system, s) => {
+  song.pages[pageIndex].forEach((system, s) => {
     const first = pageIndex === 0 && s === 0;
-    drawSystem(g, system, top, first);
-    if (first)
-      text(g, "pp", MARGIN_X + 205, top + 4 * SP + STAFF_GAP / 2 + 6, 22, {
+    const { x0 } = drawSystem(g, song, system, top, first);
+    if (first && song.dynamic)
+      text(g, song.dynamic, x0 + 110, top + 4 * SP + STAFF_GAP / 2 + 6, 22, {
         weight: 700,
         italic: true,
       });
@@ -433,10 +523,13 @@ function drawMusicPage(g, w, h, pageIndex) {
   text(g, String(pageIndex + 2), w / 2, h - 58, 16);
 }
 
-function drawTitlePage(g, w, h) {
+function drawTitlePage(g, w, h, song) {
   paper(g, w, h, 3);
   g.fillStyle = g.strokeStyle = INK;
-  text(g, "LUDWIG VAN BEETHOVEN", w / 2, 330, 26, { weight: 600, spacing: 6 });
+  text(g, song.composer.toUpperCase(), w / 2, 330, 26, {
+    weight: 600,
+    spacing: 6,
+  });
   g.lineWidth = 1;
   for (const y of [372, 378]) {
     g.beginPath();
@@ -444,9 +537,12 @@ function drawTitlePage(g, w, h) {
     g.lineTo(w / 2 + 170, y);
     g.stroke();
   }
-  text(g, "Für Elise", w / 2, 520, 104, { weight: 600 });
-  text(g, "Bagatelle in A minor", w / 2, 590, 32, { italic: true });
-  text(g, "WoO 59", w / 2, 632, 24);
+  text(g, song.title, w / 2, 520, song.title.length > 12 ? 78 : 104, {
+    weight: 600,
+  });
+  const [primary, secondary] = song.subtitle.split(" · ");
+  text(g, primary, w / 2, 590, 30, { italic: true });
+  if (secondary) text(g, secondary, w / 2, 632, 24);
   glyph(g, GLYPH.treble, w / 2, 790, 90);
   text(g, "Simplified performing edition", w / 2, 930, 22, { italic: true });
   text(g, "VIRTUAL GRAND PIANO EDITION", w / 2, h - 140, 16, {
@@ -458,33 +554,49 @@ function drawTitlePage(g, w, h) {
   });
 }
 
-function drawNotesPage(g, w, h) {
+function drawNotesPage(g, w, h, song, pageNumber) {
   paper(g, w, h, 29);
   g.fillStyle = g.strokeStyle = INK;
   text(g, "Performance notes", MARGIN_X, 150, 34, {
     weight: 600,
     align: "left",
   });
-  const lines = [
-    "Composed in 1810 and published only in 1867, forty years after",
-    "Beethoven’s death, from a manuscript that has since been lost.",
-    "Poco moto — with a little motion. Keep the sixteenths even and",
-    "let the broken chords of the left hand flow beneath the melody.",
-    "Pedal lightly, changing with each new harmony.",
-  ];
-  lines.forEach((line, i) =>
+  song.notes.forEach((line, i) =>
     text(g, line, MARGIN_X, 214 + i * 34, 21, { align: "left" }),
   );
   for (let s = 0; s < 6; s++)
     staffLines(g, MARGIN_X, w - MARGIN_X, 470 + s * 130);
-  text(g, "5", w / 2, h - 58, 16);
+  text(g, String(pageNumber), w / 2, h - 58, 16);
+}
+
+function drawManuscriptPage(g, w, h, pageNumber) {
+  paper(g, w, h, 41);
+  g.fillStyle = g.strokeStyle = INK;
+  for (let s = 0; s < 9; s++)
+    staffLines(g, MARGIN_X, w - MARGIN_X, 150 + s * 125);
+  text(g, String(pageNumber), w / 2, h - 58, 16);
+}
+
+/** The four printed pages for a song: title, music (1–2), notes, manuscript. */
+function pageDrawers(song) {
+  const pages = [
+    (g, w, h) => drawTitlePage(g, w, h, song),
+    ...song.pages.map((_, i) => (g, w, h) => drawMusicPage(g, w, h, song, i)),
+  ];
+  pages.push((g, w, h) => drawNotesPage(g, w, h, song, pages.length + 1));
+  while (pages.length < 4) {
+    const number = pages.length + 1;
+    pages.push((g, w, h) => drawManuscriptPage(g, w, h, number));
+  }
+  return pages;
 }
 
 /**
- * Draw a page; `mirrored` renders the verso so it reads correctly on a
+ * A page texture; `mirrored` renders the verso so it reads correctly on a
  * BackSide face. The gutter darkens toward the spine like a bound book.
  */
-function pageTexture(draw, maxAniso, mirrored) {
+function pageTexture(maxAniso, mirrored) {
+  let draw = () => {};
   const paint = (g, w, h) => {
     g.save();
     if (mirrored) {
@@ -501,7 +613,8 @@ function pageTexture(draw, maxAniso, mirrored) {
     g.fillRect(0, 0, w * 0.09, h);
   };
   const texture = makeCanvasTexture(paint, PAGE_W, PAGE_H, maxAniso);
-  texture.userData.repaint = () => {
+  texture.userData.paint = (next) => {
+    if (next) draw = next;
     paint(texture.image.getContext("2d"), PAGE_W, PAGE_H);
     texture.needsUpdate = true;
   };
@@ -516,10 +629,11 @@ const SEGMENTS = 24;
 const TURN_SECONDS = 0.95;
 
 /**
- * An open score on the music desk. Two leaves (title / page 2, page 3 /
- * notes) turn about the spine with a travelling curl. Opens at the music.
+ * An open score on the music desk. Two leaves (title / music, music or notes
+ * / notes or manuscript) turn about the spine with a travelling curl.
+ * Opens at the music; `setSong` reprints the pages for another piece.
  */
-export function createScoreBook(maxAniso) {
+export function createScoreBook(maxAniso, song) {
   const group = new THREE.Group();
   group.name = "score-book";
 
@@ -539,18 +653,8 @@ export function createScoreBook(maxAniso) {
   cover.castShadow = cover.receiveShadow = true;
   group.add(cover);
 
-  const faces = [
-    [
-      (g, w, h) => drawTitlePage(g, w, h),
-      (g, w, h) => drawMusicPage(g, w, h, 0),
-    ],
-    [
-      (g, w, h) => drawMusicPage(g, w, h, 1),
-      (g, w, h) => drawNotesPage(g, w, h),
-    ],
-  ];
   const textures = [];
-  const leaves = faces.map(([front, back], index) => {
+  const leaves = [0, 1].map((index) => {
     const geometry = new THREE.PlaneGeometry(
       PAGE_WIDTH,
       PAGE_HEIGHT,
@@ -559,8 +663,8 @@ export function createScoreBook(maxAniso) {
     );
     geometry.translate(PAGE_WIDTH / 2, 0, 0);
     const base = geometry.attributes.position.array.slice();
-    const frontTex = pageTexture(front, maxAniso, false);
-    const backTex = pageTexture(back, maxAniso, true);
+    const frontTex = pageTexture(maxAniso, false);
+    const backTex = pageTexture(maxAniso, true);
     textures.push(frontTex, backTex);
     const material = (map, side) =>
       new THREE.MeshStandardMaterial({
@@ -587,6 +691,13 @@ export function createScoreBook(maxAniso) {
       direction: 1,
     };
   });
+
+  let current = song;
+  function setSong(next) {
+    current = next;
+    pageDrawers(next).forEach((draw, i) => textures[i].userData.paint(draw));
+  }
+  setSong(song);
 
   let turned = 1; // leaves lying on the left: opens at the music spread
   const restAngle = (leaf) => {
@@ -668,7 +779,7 @@ export function createScoreBook(maxAniso) {
     turnTo(turned + (local.x >= 0 ? 1 : -1));
   };
 
-  // Web fonts arrive after first paint; repaint once they are ready.
+  // Web fonts arrive after first paint; reprint once they are ready.
   if (typeof document !== "undefined" && document.fonts?.load) {
     Promise.all([
       document.fonts.load(`600 40px ${TEXT_FONT}`),
@@ -678,7 +789,7 @@ export function createScoreBook(maxAniso) {
         GLYPH.treble + GLYPH.bass + GLYPH.eighthRest,
       ),
     ])
-      .then(() => textures.forEach((texture) => texture.userData.repaint()))
+      .then(() => setSong(current))
       .catch(() => {});
   }
 
@@ -686,6 +797,7 @@ export function createScoreBook(maxAniso) {
     group,
     turnTo,
     update,
+    setSong,
     get spread() {
       return turned;
     },

@@ -15,6 +15,7 @@ import {
 } from "./geometry.js";
 import { createLogoTexture } from "./materials.js";
 import { createScoreBook } from "./scoreBook.js";
+import { SONGS } from "../performance/songs.js";
 
 const RIM_H = DIM.caseTopY - DIM.caseBottomY;
 
@@ -697,7 +698,7 @@ export function buildMusicDesk(mats) {
 
   board.name = "music-desk-board";
   // The book rests on the ledge and leans on the board's face.
-  const book = createScoreBook(mats.maxAniso);
+  const book = createScoreBook(mats.maxAniso, SONGS[0]);
   book.group.position.set(0, -0.58 + book.height / 2, 0.042);
   board.add(book.group);
   g.userData.book = book;
@@ -705,7 +706,7 @@ export function buildMusicDesk(mats) {
   return tag(
     g,
     "Music desk & score",
-    "An engraved edition of Für Elise on the music rack. Click the right page to turn forward, the left page to turn back; autoplay follows this score.",
+    "An engraved edition of the selected piece on the music rack. Click the right page to turn forward, the left page to turn back; autoplay follows this score.",
     "Score",
   );
 }

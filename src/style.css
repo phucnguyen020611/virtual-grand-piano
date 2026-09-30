@@ -568,8 +568,9 @@ kbd {
     align-self: end;
   }
 
+  /* Sits above the bottom-right tool row, which can span most of the width. */
   .inspector {
-    bottom: 18px;
+    bottom: 112px;
     left: 18px;
   }
 

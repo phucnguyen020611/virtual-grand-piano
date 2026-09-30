@@ -14,7 +14,7 @@
 
 ## Overview
 
-Virtual Grand Piano is a browser-based 3D instrument experience focused on two ideas: the expressive feel of a concert grand and the engineering hidden inside it. The first release provides a playable procedural grand piano, a free inspection camera, an exploded anatomy view, a modeled music desk and score, and a cinematic wooden-stage presentation.
+Virtual Grand Piano is a browser-based 3D instrument experience focused on two ideas: the expressive feel of a concert grand and the engineering hidden inside it. The first release provides a playable procedural grand piano, a free inspection camera, an exploded anatomy view, a modeled music desk and score, and a chamber concert hall with stage lighting, an organ and raked seating.
 
 The current model is procedural and intentionally lightweight. Future releases can replace or extend individual systems with higher-fidelity meshes, physically based textures, sampled audio, mechanical animation, and more accurate piano-action behavior without changing the overall product concept.
 
@@ -25,7 +25,8 @@ The current model is procedural and intentionally lightweight. Future releases c
 - Mouse/touch key interaction
 - Computer-keyboard performance controls
 - Recorded acoustic piano samples with a bounded generated fallback
-- Autoplay of a simplified _Für Elise_ with hand-coloured key glow, falling
+- Autoplay playlist of five simplified pieces (Beethoven, Pachelbel, Bach and
+  a traditional hymn) with hand-coloured key glow, falling
   crystal light columns and star-dust sparkles
 - An engraved, page-turning score book on the music desk (click a page to turn)
 - Free orbit, zoom, and pan inspection camera
@@ -64,7 +65,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Separate systems        | **Exploded**                                     |
 | Restore assembled piano | **Normal**                                       |
 | Toggle lid              | **Open Lid / Close Lid**                         |
-| Autoplay                | **Für Elise**                                    |
+| Autoplay                | **5-piece playlist**                             |
 | Restore camera          | **Reset View**                                   |
 
 ## Tech stack
@@ -99,8 +100,8 @@ virtual-grand-piano/
 │   │   ├── geometry.js         # dimension table, footprint shapes, mesh helpers
 │   │   └── materials.js        # material palette + procedural canvas textures
 │   ├── scene/
-│   │   ├── stage.js            # wooden concert stage
-│   │   └── lighting.js         # overhead lamp + key/fill/rim/hemisphere lights
+│   │   ├── hall.js             # concert hall, stage and lighting rig
+│   │   └── noteEffects.js      # autoplay key glow, light columns, star dust
 │   ├── audio/
 │   │   ├── pianoAudio.js       # sampler voices, buses, reverb, sustain, pedal noise
 │   │   └── pianoSamples.js     # sample manifest + offline sample/IR rendering
@@ -376,7 +377,7 @@ and lid movement while retaining musical key/action feedback.
 The model is an educational representation: one string course per key, evenly
 spaced at the strike line; soft and sostenuto pedals animate but do not affect
 audio. The score book is engraved from the same data autoplay plays
-(`src/performance/furElise.js`). No guided tour, extra song,
+(`src/performance/songs.js`). No guided tour,
 presentation mode or graphics menu is included in this pass.
 
 See [the Phase 9 audit](docs/PHASE9_AUDIT.md) for evidence, decisions and

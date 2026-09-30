@@ -5,8 +5,7 @@ import { createMaterials, makeCanvasTexture } from "./piano/materials.js";
 import { DIM } from "./piano/geometry.js";
 import { createPiano } from "./piano/createPiano.js";
 import { createBench } from "./scene/bench.js";
-import { createStage } from "./scene/stage.js";
-import { createLighting } from "./scene/lighting.js";
+import { createHall } from "./scene/hall.js";
 import { createReflectionEnvironment } from "./scene/environment.js";
 import { createAudioEngine } from "./audio/pianoAudio.js";
 import { createMechanics } from "./piano/mechanics.js";
@@ -14,7 +13,7 @@ import { createPerformanceController } from "./performance/performanceController
 import { createComputerKeyboard } from "./performance/computerKeyboard.js";
 import { createMidiInput } from "./performance/midiInput.js";
 import { createPerformanceRecorder } from "./performance/performanceRecorder.js";
-import { scoreEvents } from "./performance/furElise.js";
+import { SONGS, scoreEvents } from "./performance/songs.js";
 import { createNoteEffects } from "./scene/noteEffects.js";
 import { createInspection } from "./interaction/inspection.js";
 import {
@@ -45,13 +44,13 @@ scene.background = makeCanvasTexture(
   512,
   512,
 );
-scene.fog = new THREE.FogExp2(0x050506, 0.007);
+scene.fog = new THREE.FogExp2(0x0a0807, 0.009);
 
 const camera = new THREE.PerspectiveCamera(
   38,
   innerWidth / innerHeight,
   0.1,
-  80,
+  320,
 );
 camera.position.copy(NORMAL_DEFAULT_CAMERA_POSITION);
 // Include the forward bench in portrait without resetting a user’s orbit.
@@ -93,18 +92,17 @@ reducedMotion.addEventListener("change", () => {
 controls.dampingFactor = 0.055;
 controls.target.copy(NORMAL_DEFAULT_TARGET);
 controls.minDistance = 4;
-controls.maxDistance = 26;
+controls.maxDistance = 70; // room to take in the hall
 controls.maxPolarAngle = Math.PI * 0.49;
 
 // --- World -----------------------------------------------------------------
 const environment = createReflectionEnvironment(renderer);
 scene.environment = environment.texture;
 const mats = createMaterials(renderer.capabilities.getMaxAnisotropy());
-const { stageTopY } = createStage(scene, mats);
+const hall = createHall(scene, mats);
+const { stageTopY } = hall;
 const bench = createBench(mats, stageTopY);
 scene.add(bench);
-const lighting = createLighting(scene);
-lighting.lamp.visible = camera.aspect >= 0.9;
 
 const piano = createPiano(mats, stageTopY);
 scene.add(piano.group);
@@ -121,7 +119,7 @@ if (import.meta.env.DEV) {
     piano,
     stageTopY,
     bench,
-    lighting,
+    hall,
     mats,
     environment,
   };
@@ -174,22 +172,39 @@ const inspection = createInspection(
 const explodedView = createExplodedView({ piano, camera, controls });
 if (import.meta.env.DEV) window.__vgp.explodedView = explodedView;
 
-// --- Für Elise autoplay, read from the engraved score -----------------------
-const songEvents = scoreEvents(0.2);
+// --- Autoplay, read from the engraved score ---------------------------------
 const LEAD_IN = 2.2; // seconds for the first light columns to fall
-const songLength = Math.max(...songEvents.map((e) => e.time + e.duration));
 const noteEffects = createNoteEffects(scene, piano, renderer, camera);
+let song = SONGS[0];
+let songEvents = scoreEvents(song);
+let songLength = Math.max(...songEvents.map((e) => e.time + e.duration));
 let autoplay = false,
   autoTimers = [],
   songStart = 0;
 const autoBtn = document.querySelector("#autoBtn"),
+  songSelect = document.querySelector("#songSelect"),
   progressEl = document.querySelector("#songProgress");
+for (const piece of SONGS)
+  songSelect.add(
+    new Option(
+      `${piece.title} — ${piece.composer.split(" ").at(-1)}`,
+      piece.id,
+    ),
+  );
+songSelect.addEventListener("change", () => {
+  if (autoplay) stopAutoplay();
+  song = SONGS.find((piece) => piece.id === songSelect.value);
+  songEvents = scoreEvents(song);
+  songLength = Math.max(...songEvents.map((e) => e.time + e.duration));
+  piano.scoreBook.setSong(song);
+  piano.scoreBook.turnTo(1);
+});
 
 function stopAutoplay() {
   autoplay = false;
   autoTimers.forEach(clearTimeout);
   autoTimers = [];
-  autoBtn.textContent = "Play Für Elise";
+  autoBtn.textContent = "Play";
   autoBtn.setAttribute("aria-pressed", "false");
   pianoPerformance.stopSource("autoplay");
   noteEffects.stop();
@@ -202,7 +217,7 @@ function startAutoplay() {
   }
   prepareAudio();
   autoplay = true;
-  autoBtn.textContent = "Stop Für Elise";
+  autoBtn.textContent = "Stop";
   autoBtn.setAttribute("aria-pressed", "true");
   piano.scoreBook.turnTo(1); // open at the music
   songStart = performance.now() + LEAD_IN * 1000;
@@ -412,7 +427,7 @@ recorder.subscribe(updateRecordingUi);
 function setExplodedMode(exploded) {
   inspection.setMode(exploded, { normalBtn, explodeBtn });
   explodedView.setExploded(exploded);
-  lighting.setExploded(exploded);
+  hall.setExploded(exploded);
   normalBtn.setAttribute("aria-pressed", String(!exploded));
   explodeBtn.setAttribute("aria-pressed", String(exploded));
 }
@@ -506,12 +521,7 @@ function animate(timestamp) {
   controls.update();
 
   explodedView.update(dt, reducedMotion.matches);
-  lighting.update(reducedMotion.matches ? 100 : dt);
-  // Keep the decorative fixture out of the entire exploded transition.
-  lighting.lamp.visible =
-    camera.aspect >= 0.9 &&
-    !explodedView.exploded &&
-    !explodedView.isTransitioning;
+  hall.update(reducedMotion.matches ? 100 : dt);
 
   const targetLid = lidOpen ? DIM.lidOpenAngle : 0;
   piano.setLidAngle(
@@ -544,6 +554,5 @@ addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(renderPixelRatio());
-  lighting.lamp.visible = camera.aspect >= 0.9;
   explodedView.handleResize();
 });

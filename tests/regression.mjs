@@ -8,6 +8,7 @@ import {
   validateSampleCoverage,
   velocityLayerWeights,
 } from "../src/audio/pianoSamples.js";
+import { SONGS, parsePitch, scoreEvents } from "../src/performance/songs.js";
 
 const calls = [];
 const audio = {
@@ -179,6 +180,31 @@ check("sample coverage and equal-power velocity blends", () => {
         velocityLayerWeights(v).reduce((sum, l) => sum + l.weight ** 2, 0) - 1,
       ) < 1e-10,
     );
+});
+check("repertoire: bars fill their metre, pages hold every bar once", () => {
+  for (const song of SONGS) {
+    const barLength = (16 * song.time[0]) / song.time[1];
+    song.measures.forEach((measure, index) => {
+      if (!measure.pickup)
+        assert.equal(measure.length, barLength, `${song.id} bar ${index}`);
+      for (const note of [...measure.rh, ...measure.lh]) {
+        const { midi } = parsePitch(note.pitch);
+        assert(midi >= 21 && midi <= 108, `${song.id} ${note.pitch}`);
+        assert(
+          note.pos >= 0 && note.pos + note.dur <= measure.length,
+          `${song.id} bar ${index} overflows at ${note.pitch}`,
+        );
+      }
+    });
+    const printed = song.pages.flat(2).sort((a, b) => a - b);
+    assert.deepEqual(
+      printed,
+      song.measures.map((_, i) => i),
+      `${song.id} pages`,
+    );
+    assert(song.pages.length <= 2, `${song.id} needs more than two pages`);
+    assert(scoreEvents(song).length > 20, `${song.id} events`);
+  }
 });
 controller.stopAll();
 console.log(`${passed} regression checks passed`);
