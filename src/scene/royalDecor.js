@@ -291,6 +291,7 @@ export function buildRoyalInterior(hall, scene, room) {
   // Each wall takes its four sitters in order from the stage end.
   const sitters = { [-1]: COMPOSERS.slice(0, 4), 1: COMPOSERS.slice(4) };
   const paintings = [];
+  const portraitMaps = {}; // sitter's name → their portrait
   const plates = [];
   for (const [x, y, z, yaw, side] of portraits) {
     const [file, name, dates] = sitters[side].shift();
@@ -304,6 +305,7 @@ export function buildRoyalInterior(hall, scene, room) {
     );
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = aniso;
+    portraitMaps[name] = map;
     // A faint glow of its own, as if under a picture light.
     const paint = new THREE.MeshStandardMaterial({
       map,
@@ -630,6 +632,7 @@ export function buildRoyalInterior(hall, scene, room) {
   const lightPower = lights.map((light) => light.intensity);
   return {
     gilt,
+    portraitMaps,
     lights,
     bulbCount: bulbs.length,
     /** 0 = curtain closed across the stage, 1 = drawn open into the wings. */

@@ -13,7 +13,7 @@ import {
   stageBoardSet,
   velvetSet,
 } from "./surfaces.js";
-import { buildRoyalInterior, COMPOSERS } from "./royalDecor.js";
+import { buildRoyalInterior } from "./royalDecor.js";
 import { createComposerProjection } from "./composerProjection.js";
 
 // One scene unit is ~0.21 m (the keyboard is 5.9 units, 1.22 m wide).
@@ -313,16 +313,6 @@ export function createHall(scene, mats) {
     hall,
   );
   rear.rotation.y = Math.PI;
-  // Autoplay casts the composer's portrait, lantern-show style, on the bare
-  // wall behind the stalls, clear of the back rows and the balconies.
-  const projection = createComposerProjection(
-    hall,
-    // Off the wall by a hand's breadth: that far from the camera, depth
-    // precision is too coarse to tell a decal from the wall behind it.
-    new THREE.Vector3(0, 40, HALL_BACK_Z - 0.6),
-    30,
-    Object.fromEntries(COMPOSERS.map(([file, name]) => [name, file])),
-  );
 
   const royal = buildRoyalInterior(hall, scene, {
     halfWidth: HALL_HALF_WIDTH,
@@ -336,6 +326,16 @@ export function createHall(scene, mats) {
     velvet,
     glowWall: upperPlaster, // the stained glass lights it
   });
+  // Autoplay casts the composer's portrait, lantern-show style, on the bare
+  // wall behind the stalls, clear of the back rows and the balconies.
+  const projection = createComposerProjection(
+    hall,
+    // Off the wall by a hand's breadth: that far from the camera, depth
+    // precision is too coarse to tell a decal from the wall behind it.
+    new THREE.Vector3(0, 40, HALL_BACK_Z - 0.6),
+    30,
+    royal.portraitMaps,
+  );
   const gold = royal.gilt;
   // Gilded nosing along the stage front.
   mesh(

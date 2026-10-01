@@ -74,24 +74,15 @@ function slide(song, portrait) {
     g.shadowBlur = 0;
     texture.needsUpdate = true;
   };
-  // Shown once its portrait is in (or has failed); redrawn when the script
-  // face arrives, whenever that is.
-  let image = null;
-  const paint = () => draw(image);
+  // The wall's own portrait texture: drawn, and shown, once its image is in;
+  // redrawn when the script face arrives, whenever that is.
+  const paint = () => texture.userData.ready && draw(portrait?.image);
   document.fonts?.load(`100px ${SCRIPT}`).then(paint, () => {});
-  const ready = () => {
-    paint();
+  texture.userData.poll = () => {
+    if (texture.userData.ready || (portrait && !portrait.image)) return;
     texture.userData.ready = true;
+    paint();
   };
-  if (portrait) {
-    const photo = new Image();
-    photo.onload = () => {
-      image = photo;
-      ready();
-    };
-    photo.onerror = ready;
-    photo.src = `${import.meta.env.BASE_URL}art/composers/${portrait}.jpg`;
-  } else ready();
   return texture;
 }
 
@@ -121,7 +112,7 @@ const fragmentShader = /* glsl */ `
 /**
  * @param parent the hall group
  * @param at centre of the disc on the wall; the disc faces −z (the stage)
- * @param portraits composer name → portrait file (without extension)
+ * @param portraits composer name → their portrait texture on the wall
  */
 export function createComposerProjection(parent, at, diameter, portraits) {
   const uniforms = {
@@ -166,6 +157,7 @@ export function createComposerProjection(parent, at, diameter, portraits) {
     update(dt) {
       uniforms.time.value += Math.min(dt, 0.1);
       const pending = wanted && slides.get(wanted.id);
+      pending?.userData.poll();
       const next = pending?.userData.ready ? pending : null;
       // Fade out before changing slides; fade the new one in.
       const target = next && uniforms.map.value === next ? 1 : 0;
