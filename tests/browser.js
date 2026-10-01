@@ -465,7 +465,7 @@ async function run() {
     details.open = true;
     await wait(20);
     const hidden = [];
-    for (const e of d.querySelectorAll("#pianoControls button")) {
+    for (const e of d.querySelectorAll("#pianoControls button, #hudBtn")) {
       if (e.disabled) continue;
       e.focus();
       e.scrollIntoView({ block: "nearest", inline: "nearest" });

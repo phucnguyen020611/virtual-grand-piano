@@ -658,6 +658,12 @@ fallBtn.onclick = () => {
   fallBtn.textContent = fallboardOpen ? "Close fallboard" : "Open fallboard";
   fallBtn.setAttribute("aria-pressed", String(fallboardOpen));
 };
+const hudBtn = document.querySelector("#hudBtn");
+hudBtn.onclick = () => {
+  const hidden = document.body.classList.toggle("hudHidden");
+  hudBtn.textContent = hidden ? "Show HUD" : "Hide HUD";
+  hudBtn.setAttribute("aria-pressed", String(hidden));
+};
 const curtainBtn = document.querySelector("#curtainBtn");
 curtainBtn.onclick = () => {
   const open = !hall.curtainOpen;

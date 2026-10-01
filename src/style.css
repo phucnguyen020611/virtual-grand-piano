@@ -121,8 +121,35 @@ canvas {
 }
 
 .brand,
-.status {
+.topActions {
   pointer-events: auto;
+}
+
+.topActions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Hide HUD: everything but its own toggle fades out for a clean view. */
+.brand,
+.status,
+.hud,
+.inspector,
+.helpPanel {
+  transition:
+    opacity 200ms ease,
+    visibility 200ms;
+}
+
+.hudHidden :is(.brand, .status, .hud, .inspector, .helpPanel, .label3d) {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.hudHidden .hudToggle:not(:hover, :focus-visible) {
+  opacity: 0.6;
 }
 
 .eyebrow,

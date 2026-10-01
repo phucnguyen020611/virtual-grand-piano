@@ -69,6 +69,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Restore assembled piano | **Normal**                                       |
 | Toggle lid              | **Open Lid / Close Lid**                         |
 | Cover the keys          | **Close fallboard / Open fallboard**             |
+| Clean view              | **Hide HUD / Show HUD** (top right)              |
 | House curtain & lights  | **Close curtain / Open curtain**                 |
 | Adjust bench height     | Click a knob at either end of the bench          |
 | Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift` |
