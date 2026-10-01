@@ -14,11 +14,12 @@ Thank you for helping improve Virtual Grand Piano.
 
 ## Commit style
 
-Use short, imperative commit messages. Examples:
+Use one-line [Conventional Commits](https://www.conventionalcommits.org/):
+`type(scope): summary`, with no body. Examples:
 
-- `add pedal interaction`
-- `improve string material`
-- `fix exploded-view labels`
+- `feat(hall): cast coloured sunbeams through the stained glass`
+- `fix(piano): close the fallboard over the keys`
+- `docs: move the project documents into docs/`
 
 ## Code guidelines
 

@@ -135,12 +135,12 @@ virtual-grand-piano/
 │   │   ├── dropdown.js         # styled, accessible dropdowns over native selects
 │   │   └── inspection.js       # raycasting selection, labels, mode switching
 │   └── style.css
+├── docs/                   # project documents (see Documentation)
+├── tests/                  # regression checks and browser test pages
 ├── .editorconfig
 ├── .gitignore
-├── CONTRIBUTING.md
 ├── LICENSE
 ├── README.md
-├── SECURITY.md
 ├── index.html
 ├── package.json
 └── vite.config.js
@@ -260,7 +260,7 @@ PCM reserved for a cold load or a failed recorded asset.
 
 **Attribution.** “Salamander Grand Piano V3 by Alexander Holm, licensed under
 CC BY 3.0.” The compact local Ogg/Opus assets are format/channel/bitrate
-conversions of the source recordings. See [third-party audio attribution](THIRD_PARTY_AUDIO.md)
+conversions of the source recordings. See [third-party audio attribution](docs/THIRD_PARTY_AUDIO.md)
 for source URLs, licence details, source velocity layers, and modifications.
 The repository's MIT licence covers this project's code; the included recorded
 sample derivatives remain available under their CC BY 3.0 attribution terms.
@@ -375,7 +375,7 @@ emulation.
   recording/playback, autoplay, inspection, and browser console/network errors.
 - Check keyboard focus, help dismissal, reduced motion, and responsive layouts
   at desktop, tablet, and mobile dimensions.
-- Confirm audio attribution remains in [THIRD_PARTY_AUDIO.md](THIRD_PARTY_AUDIO.md)
+- Confirm audio attribution remains in [THIRD_PARTY_AUDIO.md](docs/THIRD_PARTY_AUDIO.md)
   when audio assets change.
 
 ### Performance guidance
@@ -400,16 +400,29 @@ and lid movement while retaining musical key/action feedback.
 The model is an educational representation: one string course per key, evenly
 spaced at the strike line; soft and sostenuto pedals animate but do not affect
 audio. The score book is engraved from the same data autoplay plays
-(`src/performance/songs.js`). No guided tour,
-presentation mode or graphics menu is included in this pass.
+(`src/performance/songs.js`). No guided tour or presentation mode is included
+in this pass.
 
 See [the Phase 9 audit](docs/PHASE9_AUDIT.md) for evidence, decisions and
 regression coverage. Hardware MIDI, real mobile/touch behavior, listening tests
 and prolonged multi-hour sessions still require human/device validation.
 
+## Documentation
+
+Everything beyond this README lives in [`docs/`](docs/):
+
+| Document                                          | What it covers                                        |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| [CONTRIBUTING.md](docs/CONTRIBUTING.md)           | Workflow, commit convention and code guidelines       |
+| [SECURITY.md](docs/SECURITY.md)                   | Supported version and how to report a vulnerability   |
+| [THIRD_PARTY_AUDIO.md](docs/THIRD_PARTY_AUDIO.md) | Salamander Grand Piano samples: source and licence    |
+| [THIRD_PARTY_ART.md](docs/THIRD_PARTY_ART.md)     | Paintings and portraits in the hall, and the credits  |
+| [MODEL_CORRECTIONS.md](docs/MODEL_CORRECTIONS.md) | Corrections made to the piano model, and why          |
+| [PHASE9_AUDIT.md](docs/PHASE9_AUDIT.md)           | Phase 9 audit: evidence, decisions, regression checks |
+
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Contributions are welcome. Please read [CONTRIBUTING.md](docs/CONTRIBUTING.md) before opening a pull request.
 
 ## Contributors
 
@@ -430,10 +443,11 @@ See the repository's [contributors graph](https://github.com/phucnguyen020611/vi
 ## License
 
 Project code is licensed under the [MIT License](LICENSE). The Salamander
-recording derivatives remain CC BY 3.0; see [audio attribution](THIRD_PARTY_AUDIO.md).
+recording derivatives remain CC BY 3.0; see [audio attribution](docs/THIRD_PARTY_AUDIO.md).
 The stage painting, Anton Raphael Mengs's _Parnassus_ (1761), and the eight
-composer portraits on the side walls are in the public domain; see
-[art attribution](THIRD_PARTY_ART.md).
+composer portraits on the side walls are in the public domain; the developer's
+picture in the credits is their own. See
+[art attribution](docs/THIRD_PARTY_ART.md).
 
 ## Trademark notice
 

@@ -392,7 +392,7 @@ export function createHall(scene, mats) {
 
   // --- Parnassus above the organ ----------------------------------------------------
   // Anton Raphael Mengs, "Parnassus" (1761): Apollo and the nine Muses, the
-  // patrons of music, in a deep gilt frame (see THIRD_PARTY_ART.md).
+  // patrons of music, in a deep gilt frame (see docs/THIRD_PARTY_ART.md).
   const PAINTING_H = 24;
   const PAINTING_W = PAINTING_H * (2000 / 1115);
   const PAINTING_Y = ORGAN_Y + 23 + 3.4 + PAINTING_H / 2;
