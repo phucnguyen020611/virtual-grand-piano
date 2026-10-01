@@ -551,6 +551,72 @@ async function run() {
   );
   log("curtain dims and restores the house", { pass: true });
 
+  // Graphics presets trade resolution, shadows and glows for speed.
+  {
+    const select = d.querySelector("#qualitySelect");
+    const pick = (value) => {
+      select.value = value;
+      select.dispatchEvent(new w.Event("change"));
+    };
+    let glow;
+    p.scene.traverse((o) => (glow ??= o.material?.userData?.glassGlow));
+    pick("low");
+    assert(
+      p.renderer.getPixelRatio() === Math.min(w.devicePixelRatio, 0.75) &&
+        !p.hall.key.castShadow &&
+        glow.value === 0,
+      "Low quality kept its costly extras",
+    );
+    pick("high");
+    assert(
+      p.hall.key.castShadow && glow.value === 1,
+      "High quality lost the shadow or the glass light",
+    );
+    log("graphics quality presets", { pass: true });
+  }
+
+  // Styled dropdowns drive their native select by mouse and keyboard.
+  {
+    const select = d.querySelector("#qualitySelect");
+    const trigger = d.querySelector("#qualitySelectButton");
+    const list = d.querySelector("#qualitySelectList");
+    const press = (key) =>
+      trigger.dispatchEvent(
+        new w.KeyboardEvent("keydown", {
+          key,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    let changes = 0;
+    const count = () => changes++;
+    select.addEventListener("change", count);
+    trigger.click();
+    assert(
+      !list.hidden && list.children.length === select.options.length,
+      "dropdown did not open with every option",
+    );
+    press("ArrowDown");
+    press("Enter");
+    assert(
+      list.hidden &&
+        select.value === "ultra" &&
+        changes === 1 &&
+        trigger.textContent === "Graphics: Ultra",
+      "keyboard choice did not reach the select",
+    );
+    select.value = "high"; // programmatic: no event, label must follow
+    assert(trigger.textContent === "Graphics: High", "label missed a set");
+    select.dispatchEvent(new w.Event("change"));
+    trigger.click();
+    list.children[1].click();
+    assert(select.value === "medium" && list.hidden, "click choice failed");
+    select.removeEventListener("change", count);
+    select.value = "high";
+    select.dispatchEvent(new w.Event("change"));
+    log("styled dropdown: mouse, keyboard, programmatic", { pass: true });
+  }
+
   // Bench knobs step the seat up and back down.
   let knob;
   p.bench.traverse((o) => (knob ??= o.userData.onPick && o));

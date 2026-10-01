@@ -58,11 +58,45 @@ camera.position.copy(NORMAL_DEFAULT_CAMERA_POSITION);
 camera.zoom = Math.min(1, camera.aspect / 1.6);
 camera.updateProjectionMatrix();
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+// Graphics quality: render resolution, shadows, and the hall's costliest
+// lights and glows. High is the original look and the default.
+const handheld = () =>
+  matchMedia("(pointer: coarse)").matches || innerWidth < 768;
+const QUALITY = {
+  low: {
+    pixelRatio: () => 0.75,
+    shadow: 0,
+    areaLights: false,
+    glassGlow: false,
+  },
+  medium: {
+    pixelRatio: () => 1,
+    shadow: 1024,
+    areaLights: true,
+    glassGlow: true,
+  },
+  high: {
+    pixelRatio: () => (handheld() ? 1.5 : 2),
+    shadow: 2048,
+    areaLights: true,
+    glassGlow: true,
+  },
+  ultra: {
+    pixelRatio: () => 3,
+    shadow: 4096,
+    areaLights: true,
+    glassGlow: true,
+  },
+};
+let quality = "high";
+try {
+  if (localStorage.getItem("vgp.quality") in QUALITY)
+    quality = localStorage.getItem("vgp.quality");
+} catch {
+  // Storage blocked: keep the default.
+}
 const renderPixelRatio = () =>
-  Math.min(
-    devicePixelRatio,
-    matchMedia("(pointer: coarse)").matches || innerWidth < 768 ? 1.5 : 2,
-  );
+  Math.min(devicePixelRatio, QUALITY[quality].pixelRatio());
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -668,6 +702,22 @@ hudBtn.onclick = () => {
   hudBtn.textContent = hidden ? "Show HUD" : "Hide HUD";
   hudBtn.setAttribute("aria-pressed", String(hidden));
 };
+const qualitySelect = document.querySelector("#qualitySelect");
+function applyQuality(level) {
+  quality = level;
+  qualitySelect.value = level;
+  renderer.setPixelRatio(renderPixelRatio());
+  hall.setQuality(QUALITY[level]);
+  try {
+    localStorage.setItem("vgp.quality", level);
+  } catch {
+    // Storage blocked: the choice lasts for this visit.
+  }
+}
+qualitySelect.addEventListener("change", () =>
+  applyQuality(qualitySelect.value),
+);
+applyQuality(quality);
 const curtainBtn = document.querySelector("#curtainBtn");
 curtainBtn.onclick = () => {
   const open = !hall.curtainOpen;

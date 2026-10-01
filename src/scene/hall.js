@@ -807,6 +807,18 @@ export function createHall(scene, mats) {
     setCurtainOpen(open) {
       curtainTarget = open ? 1 : 0;
     },
+    /** Graphics quality: key-light shadow size (0 = none), the two broad
+     *  area lights and the stained glass's wall light, the costliest parts. */
+    setQuality({ shadow, areaLights, glassGlow }) {
+      key.castShadow = shadow > 0;
+      if (shadow && key.shadow.mapSize.x !== shadow) {
+        key.shadow.mapSize.set(shadow, shadow);
+        key.shadow.map?.dispose();
+        key.shadow.map = null;
+      }
+      wash.visible = wallGlaze.visible = areaLights;
+      royal.setGlow(glassGlow);
+    },
     update(dt) {
       // Reduced motion arrives as one huge step: hold the glass still then.
       royal.update(dt < 1 ? dt : 0);
