@@ -1,12 +1,13 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { cofferSet, repeatSet } from "./surfaces.js";
+import { buildStainedGlass } from "./stainedGlass.js";
 
 /**
  * A European court-style interior after the Vienna Musikverein's Golden Hall:
- * gilded columns and cornices, arched niches, a coffered ceiling, gilded
- * balustrades, crimson drapes, and crystal chandeliers, wall sconces and
- * balcony globes whose every bulb is lit.
+ * gilded columns and cornices, stained-glass lancets between portraits of the
+ * great composers, a coffered ceiling, gilded balustrades, crimson drapes, and
+ * crystal chandeliers, wall sconces and balcony globes whose every bulb is lit.
  */
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -43,6 +44,50 @@ function haloTexture() {
   const t = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
   t.needsUpdate = true;
   return t;
+}
+
+/** Great composers along the side walls, stage end first: left, then right. */
+const COMPOSERS = [
+  ["bach", "Johann Sebastian Bach", "1685 – 1750"],
+  ["haydn", "Joseph Haydn", "1732 – 1809"],
+  ["mozart", "Wolfgang Amadeus Mozart", "1756 – 1791"],
+  ["beethoven", "Ludwig van Beethoven", "1770 – 1827"],
+  ["schubert", "Franz Schubert", "1797 – 1828"],
+  ["chopin", "Frédéric Chopin", "1810 – 1849"],
+  ["liszt", "Franz Liszt", "1811 – 1886"],
+  ["debussy", "Claude Debussy", "1862 – 1918"],
+];
+
+/** An engraved gilt nameplate for a portrait. */
+function plaqueTexture(name, dates, aniso) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 112;
+  const g = canvas.getContext("2d");
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = aniso;
+  const draw = () => {
+    const metal = g.createLinearGradient(0, 0, 0, 112);
+    metal.addColorStop(0, "#f2d891");
+    metal.addColorStop(0.5, "#c99a45");
+    metal.addColorStop(1, "#8e6a2c");
+    g.fillStyle = metal;
+    g.fillRect(0, 0, 512, 112);
+    g.strokeStyle = "#6d4f1f";
+    g.lineWidth = 4;
+    g.strokeRect(8, 8, 496, 96);
+    g.fillStyle = "#2a1c0c";
+    g.textAlign = "center";
+    g.font = '600 38px "Cormorant Garamond", Georgia, serif';
+    g.fillText(name, 256, 54);
+    g.font = '500 24px "Cormorant Garamond", Georgia, serif';
+    g.fillText(dates, 256, 88);
+    texture.needsUpdate = true;
+  };
+  draw();
+  document.fonts?.ready.then(draw); // redraw once the display face arrives
+  return texture;
 }
 
 export function buildRoyalInterior(hall, scene, room) {
@@ -138,7 +183,8 @@ export function buildRoyalInterior(hall, scene, room) {
   band(ceilingY - 4.2, 0.5, 1.8, gilt);
   band(balconyY - 0.9, 0.35, 0.9, gilt);
 
-  // --- Arched niches between the columns (night-dark glazing, gilt frames) -------
+  // --- Between the columns: lit stained-glass lancets alternate with the
+  // great composers' portraits in gilt frames --------------------------------------
   const archW = 5;
   const archH = 16;
   const arch = new THREE.Shape();
@@ -155,31 +201,88 @@ export function buildRoyalInterior(hall, scene, room) {
       ),
   );
   frameShape.holes.push(new THREE.Path(arch.getPoints(24)));
-  const niches = [];
+  const windows = [];
+  const portraits = [];
   for (let i = 0; i < columnZ.length - 1; i++)
-    for (const side of [-1, 1])
-      niches.push([
+    for (const side of [-1, 1]) {
+      const bay = [
         side * (halfWidth - 0.08),
         balconyY + 9,
         (columnZ[i] + columnZ[i + 1]) / 2,
         -side * (Math.PI / 2),
-      ]);
-  instanced(
-    new THREE.ShapeGeometry(arch, 24),
-    new THREE.MeshStandardMaterial({
-      color: 0x141a2a,
-      roughness: 0.15,
-      metalness: 0.2,
-    }),
-    niches,
-    hall,
-  );
+      ];
+      if (i % 2) portraits.push([...bay, side]);
+      else windows.push(bay);
+    }
+  const glass = buildStainedGlass(hall, windows, arch);
   instanced(
     new THREE.ExtrudeGeometry(frameShape, { depth: 0.3, bevelEnabled: false }),
     gilt,
-    niches,
+    windows,
     hall,
   );
+
+  // Portraits: 6 × 7.5 canvases (4:5) in moulded gilt frames, with nameplates.
+  const [pw, ph, rail] = [6, 7.5, 0.7];
+  const outer = new THREE.Shape();
+  outer.moveTo(-pw / 2 - rail, -ph / 2 - rail);
+  outer.lineTo(pw / 2 + rail, -ph / 2 - rail);
+  outer.lineTo(pw / 2 + rail, ph / 2 + rail);
+  outer.lineTo(-pw / 2 - rail, ph / 2 + rail);
+  const opening = new THREE.Path();
+  opening.moveTo(-pw / 2, -ph / 2);
+  opening.lineTo(-pw / 2, ph / 2);
+  opening.lineTo(pw / 2, ph / 2);
+  opening.lineTo(pw / 2, -ph / 2);
+  outer.holes.push(opening);
+  const portraitFrame = new THREE.ExtrudeGeometry(outer, {
+    depth: 0.3,
+    bevelThickness: 0.15,
+    bevelSize: 0.18,
+    bevelSegments: 3,
+  });
+  const canvasGeometry = new THREE.PlaneGeometry(pw, ph);
+  const plaqueGeometry = new THREE.PlaneGeometry(3.6, 0.79);
+  const loader = new THREE.TextureLoader();
+  // Each wall takes its four sitters in order from the stage end.
+  const sitters = { [-1]: COMPOSERS.slice(0, 4), 1: COMPOSERS.slice(4) };
+  const paintings = [];
+  for (const [x, y, z, yaw, side] of portraits) {
+    const [file, name, dates] = sitters[side].shift();
+    const piece = new THREE.Group();
+    piece.position.set(x, y + 7.5, z);
+    piece.rotation.y = yaw;
+    hall.add(piece);
+    piece.add(new THREE.Mesh(portraitFrame, gilt));
+    const map = loader.load(
+      `${import.meta.env.BASE_URL}art/composers/${file}.jpg`,
+    );
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = aniso;
+    // A faint glow of its own, as if under a picture light.
+    const paint = new THREE.MeshStandardMaterial({
+      map,
+      emissiveMap: map,
+      emissive: 0xffffff,
+      emissiveIntensity: 0.4,
+      roughness: 0.75,
+    });
+    paintings.push(paint);
+    const canvas = new THREE.Mesh(canvasGeometry, paint);
+    canvas.position.z = 0.12;
+    canvas.name = `portrait-${file}`;
+    piece.add(canvas);
+    const plaque = new THREE.Mesh(
+      plaqueGeometry,
+      new THREE.MeshStandardMaterial({
+        map: plaqueTexture(name, dates, aniso),
+        metalness: 0.6,
+        roughness: 0.35,
+      }),
+    );
+    plaque.position.set(0, -ph / 2 - rail - 0.75, 0.08);
+    piece.add(plaque);
+  }
 
   // --- Coffered ceiling: a painted field under a grid of deep ribs --------------
   const coffers = cofferSet(aniso);
@@ -477,12 +580,16 @@ export function buildRoyalInterior(hall, scene, room) {
     setCurtain(open) {
       for (const m of curtain) m.scale.x = m.userData.side * (1 - 0.9 * open);
     },
+    /** Animate the stained glass. */
+    update: glass.update,
     /** Dim every lamp in the room: 0 = dark, 1 = full house. */
     setHouseLights(level) {
       lights.forEach((light, i) => (light.intensity = lightPower[i] * level));
       bulbGlow.color.lerpColors(coldBulb, litBulb, level);
       halos.material.opacity = level;
       crystal.emissiveIntensity = 0.35 * level;
+      glass.setLevel(level);
+      for (const m of paintings) m.emissiveIntensity = 0.4 * level;
     },
   };
 }

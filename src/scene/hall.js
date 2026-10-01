@@ -807,6 +807,8 @@ export function createHall(scene, mats) {
       curtainTarget = open ? 1 : 0;
     },
     update(dt) {
+      // Reduced motion arrives as one huge step: hold the glass still then.
+      royal.update(dt < 1 ? dt : 0);
       // The traveller takes a few seconds to cross; lights follow it.
       curtain = THREE.MathUtils.clamp(
         curtain + Math.sign(curtainTarget - curtain) * (dt / 3.2),
