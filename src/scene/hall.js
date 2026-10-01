@@ -807,6 +807,11 @@ export function createHall(scene, mats) {
         position: new THREE.Vector3(0, 46, HALL_BACK_Z - 6),
         target: new THREE.Vector3(0, 4, 18),
       },
+      // Turned to the rear wall, where the lantern casts its slides.
+      projection: {
+        position: new THREE.Vector3(0, 30, 38),
+        target: new THREE.Vector3(0, 40, HALL_BACK_Z),
+      },
     },
     key,
     setExploded(value) {
@@ -834,6 +839,7 @@ export function createHall(scene, mats) {
     },
     /** Project the playing song's composer on the rear wall (null: none). */
     showComposer: projection.show,
+    rollCredits: projection.rollCredits,
     update(dt) {
       projection.update(dt);
       // Reduced motion arrives as one huge step: hold the glass still then.

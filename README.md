@@ -29,6 +29,9 @@ The current model is procedural and intentionally lightweight. Future releases c
   a traditional hymn) with hand-coloured key glow, falling
   crystal light columns, star-dust sparkles and the composer's portrait
   projected, lantern-show style, on the rear wall
+- Closing credits that roll up the same lantern projection, worn like old film
+  (gate weave, grain, scratches, dust and flicker), ending on the developer's
+  card
 - An engraved, page-turning score book on the music desk (click a page to turn)
 - Free orbit, zoom-to-cursor and pan camera with view presets (pianist,
   keyboard, front row, balcony, whole hall) and double-click to orbit a spot
@@ -71,6 +74,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Toggle lid              | **Open Lid / Close Lid**                         |
 | Cover the keys          | **Close fallboard / Open fallboard**             |
 | Clean view              | **Hide HUD / Show HUD** (top right)              |
+| Closing credits         | **Credits** (top right); press again to close    |
 | Graphics quality        | **Graphics: Low / Medium / High / Ultra**        |
 | House curtain & lights  | **Close curtain / Open curtain**                 |
 | Adjust bench height     | Click a knob at either end of the bench          |
@@ -102,6 +106,7 @@ virtual-grand-piano/
 ├── public/
 │   ├── art/parnassus.jpg   # Mengs, Parnassus (public domain)
 │   ├── art/composers/      # eight composer portraits (public domain)
+│   ├── art/developer.jpg   # the developer's GitHub picture, for the credits
 │   └── logo.svg
 ├── src/
 │   ├── main.js                # scene/renderer/camera bootstrap + wiring + render loop
@@ -115,7 +120,8 @@ virtual-grand-piano/
 │   │   ├── hall.js             # concert hall, stage and lighting rig
 │   │   ├── royalDecor.js       # gilt, chandeliers, sconces, balustrades, drapes, portraits
 │   │   ├── stainedGlass.js     # stained-glass lancets, their wall light and sunbeams
-│   │   ├── composerProjection.js # autoplay's composer, projected on the rear wall
+│   │   ├── composerProjection.js # old-film lantern on the rear wall: composer or credits
+│   │   ├── credits.js          # the closing credits roll and the developer's card
 │   │   ├── surfaces.js         # procedural PBR sets (parquet, damask, velvet, runner…)
 │   │   └── noteEffects.js      # autoplay key glow, light columns, star dust
 │   ├── audio/

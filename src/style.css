@@ -125,9 +125,14 @@ canvas {
   pointer-events: auto;
 }
 
+.brand {
+  min-width: 0;
+}
+
+/* The toggles keep their size; the title wraps to make room. */
 .topActions {
   display: flex;
-  min-width: 0;
+  flex-shrink: 0;
   align-items: center;
   gap: 8px;
 }
@@ -146,6 +151,20 @@ canvas {
 .hudHidden :is(.brand, .status, .hud, .inspector, .helpPanel, .label3d) {
   opacity: 0;
   visibility: hidden;
+}
+
+/* The top-bar toggles sit over bright chandeliers too: give them the
+   status pill's solid ground. */
+.hudToggle {
+  white-space: nowrap;
+  background: var(--ui-bg);
+}
+
+.hudToggle:hover:not(:disabled),
+.hudToggle[aria-pressed="true"] {
+  background:
+    linear-gradient(rgba(215, 185, 120, 0.14), rgba(215, 185, 120, 0.14)),
+    var(--ui-bg);
 }
 
 .hudHidden .hudToggle:not(:hover, :focus-visible) {
@@ -859,8 +878,19 @@ kbd {
     font-size: 28px;
   }
 
+  /* Room for the toggles: the dot alone shows the state; the words stay
+     for screen readers. */
   .status {
-    max-width: 48vw;
+    padding: 8px;
+  }
+
+  #statusText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .controlDeck {

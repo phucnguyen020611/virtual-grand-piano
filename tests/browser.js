@@ -608,6 +608,37 @@ async function run() {
     settle();
     assert(!disc.visible, "stopping autoplay left the projection on");
     log("composer projection follows autoplay", { pass: true });
+
+    // Credits roll up the same disc, end on the developer's card, and give
+    // way to autoplay.
+    const creditsBtn = d.querySelector("#creditsBtn");
+    click("creditsBtn");
+    for (let i = 0; i < 50 && !disc.visible; i++) {
+      await wait(100);
+      settle();
+    }
+    const roll = disc.material.uniforms.map.value;
+    assert(
+      disc.visible && creditsBtn.getAttribute("aria-pressed") === "true",
+      "the credits did not roll",
+    );
+    for (let i = 0; i < 2000; i++) roll.userData.tick(0.1);
+    const card = roll.image.getContext("2d").getImageData(412, 300, 200, 200);
+    assert(
+      card.data.some((v, i) => i % 4 === 0 && v > 60),
+      "the credits did not end on the developer's card",
+    );
+    click("autoBtn");
+    assert(
+      creditsBtn.getAttribute("aria-pressed") === "false",
+      "autoplay left the credits button pressed",
+    );
+    click("autoBtn");
+    click("creditsBtn");
+    click("creditsBtn");
+    settle();
+    assert(!disc.visible, "closing the credits left the projection on");
+    log("credits roll on the projection", { pass: true });
   }
 
   // Styled dropdowns drive their native select by mouse and keyboard.

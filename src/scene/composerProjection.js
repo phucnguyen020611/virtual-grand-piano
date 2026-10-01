@@ -1,9 +1,11 @@
 import * as THREE from "three";
+import { creditsSlide } from "./credits.js";
 
 /**
- * A round, lantern-show projection of the playing piece's composer on the
- * hall's rear wall: their portrait (or, failing one, a title card) with the
- * name in glowing script, cast as warm light that fades in with autoplay.
+ * A round, lantern-show projection on the hall's rear wall, cast as warm,
+ * worn old-film light: the playing piece's composer (their portrait or,
+ * failing one, a title card) with the name in glowing script, or the closing
+ * credits rolling up the disc.
  */
 
 const SCRIPT = '"Pinyon Script", "Cormorant Garamond", Georgia, cursive';
@@ -90,21 +92,46 @@ const fragmentShader = /* glsl */ `
   uniform sampler2D map;
   uniform float fade;
   uniform float time;
+  uniform float wear; // 1 = worn old film, 0 = steady (reduced motion)
   varying vec2 vUv;
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+  }
   void main() {
     vec2 p = vUv * 2.0 - 1.0;
     float r = length(p);
     // A lantern's disc: soft edge, a brighter rim, a darker falloff inward.
     float disc = smoothstep(1.0, 0.9, r);
     float rim = smoothstep(0.86, 0.97, r) * smoothstep(1.0, 0.95, r);
-    vec3 image = texture2D(map, vUv).rgb;
+    // Hand-cranked at 18 frames a second, each frame shivering in the gate.
+    float frame = floor(time * 18.0) * wear;
+    vec2 weave = (vec2(hash(vec2(frame, 1.0)), hash(vec2(frame, 2.0))) - 0.5)
+      * vec2(0.003, 0.006) * wear;
+    vec3 image = texture2D(map, vUv + weave).rgb;
     vec3 warm = vec3(1.0, 0.83, 0.58);
-    // Old carbon-arc light: a little sepia and a faint, uneven flicker.
+    // Carbon-arc light: a little sepia, a deep vignette.
     float grey = dot(image, vec3(0.299, 0.587, 0.114));
-    vec3 color = mix(image, grey * warm, 0.3) * (1.0 - 0.35 * r * r);
+    vec3 color = mix(image, grey * warm, 0.3) * (1.0 - 0.45 * r * r);
+    // Wear on the print: grain, two scratches that wander down the reel,
+    // and the odd fleck of dust.
+    color *= 1.0 + (hash(vUv * 613.0 + frame) - 0.5) * 0.35 * wear;
+    for (int i = 0; i < 2; i++) {
+      float n = float(i);
+      float x = hash(vec2(floor(time * 0.7 + n * 0.5), n + 3.0));
+      x += 0.01 * sin(time * 2.0 + n * 4.0);
+      float shows = step(0.35, hash(vec2(frame, n + 5.0)));
+      float line = 1.0 - smoothstep(0.0, 0.0018, abs(vUv.x - x));
+      color += warm * line * shows * 0.05 * wear;
+    }
+    vec2 cell = floor(vUv * 14.0);
+    vec2 at = fract(vUv * 14.0) - 0.5;
+    float fleck = step(0.993, hash(cell + frame * 0.37));
+    color *= 1.0 - fleck * (1.0 - smoothstep(0.05, 0.12, length(at))) * wear;
+    // An uneven flicker, frame to frame.
     float flicker = 0.95 + 0.03 * sin(time * 23.0) + 0.02 * sin(time * 7.3);
+    flicker += (hash(vec2(frame, 9.0)) - 0.5) * 0.07 * wear;
     color = (color * disc + warm * (0.06 * disc + 0.18 * rim)) * flicker;
-    gl_FragColor = vec4(color * fade * 1.4, 1.0);
+    gl_FragColor = vec4(max(color, 0.0) * fade * 1.4, 1.0);
     #include <colorspace_fragment>
   }
 `;
@@ -119,7 +146,9 @@ export function createComposerProjection(parent, at, diameter, portraits) {
     map: { value: null },
     fade: { value: 0 },
     time: { value: 0 },
+    wear: { value: 1 },
   };
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   const disc = new THREE.Mesh(
     new THREE.PlaneGeometry(diameter, diameter),
     new THREE.ShaderMaterial({
@@ -146,18 +175,26 @@ export function createComposerProjection(parent, at, diameter, portraits) {
   parent.add(disc);
 
   const slides = new Map();
-  let wanted = null; // the song to show, or null for none
+  let wanted = null; // the slide's key, or null for none
+  const cast = (key, make) => {
+    wanted = key;
+    if (key && !slides.has(key)) slides.set(key, make());
+  };
   return {
     /** Show the song's composer, or fade out with `null`. */
     show(song) {
-      wanted = song;
-      if (song && !slides.has(song.id))
-        slides.set(song.id, slide(song, portraits[song.composer]));
+      cast(song?.id, () => slide(song, portraits[song.composer]));
+    },
+    /** Roll the closing credits from the top. */
+    rollCredits() {
+      cast("credits", creditsSlide);
+      slides.get("credits").userData.restart();
     },
     update(dt) {
       uniforms.time.value += Math.min(dt, 0.1);
-      const pending = wanted && slides.get(wanted.id);
-      pending?.userData.poll();
+      uniforms.wear.value = reducedMotion.matches ? 0 : 1;
+      const pending = wanted && slides.get(wanted);
+      pending?.userData.poll?.();
       const next = pending?.userData.ready ? pending : null;
       // Fade out before changing slides; fade the new one in.
       const target = next && uniforms.map.value === next ? 1 : 0;
@@ -168,6 +205,7 @@ export function createComposerProjection(parent, at, diameter, portraits) {
         1,
       );
       if (uniforms.fade.value === 0) uniforms.map.value = next ?? null;
+      uniforms.map.value?.userData.tick?.(dt);
       disc.visible = uniforms.fade.value > 0;
     },
   };

@@ -38,3 +38,14 @@ is itself public domain (PD-Art).
 Each was taken from Commons' 960 px rendition, scaled and centre-cropped to
 512 × 640 px (4:5) to fit the frames. The white ground around Scheffer's oval
 Chopin portrait was filled with a dark tone so it sits in a rectangular frame.
+
+## The developer's picture
+
+`public/art/developer.jpg` is the GitHub profile picture of the project's
+developer, Phuc Nguyen Hoang
+([@phucnguyen020611](https://github.com/phucnguyen020611)), shown on the last
+card of the closing credits. It is their own picture, used with their
+permission, and is not covered by the project's MIT licence.
+
+- Source: <https://github.com/phucnguyen020611.png>, 460 × 460 px, used as
+  published

@@ -277,6 +277,7 @@ function startAutoplay() {
   piano.scoreBook.turnTo(1); // open at the music
   songStart = performance.now() + LEAD_IN * 1000;
   noteEffects.start(songEvents);
+  setCredits(false);
   hall.showComposer(song);
   for (const event of songEvents) {
     autoTimers.push(
@@ -707,6 +708,24 @@ hudBtn.onclick = () => {
   const hidden = document.body.classList.toggle("hudHidden");
   hudBtn.textContent = hidden ? "Show HUD" : "Hide HUD";
   hudBtn.setAttribute("aria-pressed", String(hidden));
+};
+// Credits roll up the lantern's disc on the rear wall; the camera turns to it.
+const creditsBtn = document.querySelector("#creditsBtn");
+let credits = false;
+function setCredits(on) {
+  credits = on;
+  creditsBtn.setAttribute("aria-pressed", String(on));
+}
+creditsBtn.onclick = () => {
+  if (credits) {
+    setCredits(false);
+    hall.showComposer(null);
+    return;
+  }
+  if (autoplay) stopAutoplay();
+  setCredits(true);
+  hall.rollCredits();
+  flyTo(hall.views.projection.position, hall.views.projection.target, 2);
 };
 const qualitySelect = document.querySelector("#qualitySelect");
 function applyQuality(level) {
