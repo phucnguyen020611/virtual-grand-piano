@@ -1,14 +1,14 @@
 import * as THREE from "three";
 
 /**
- * Autoplay visuals: crystal light columns fall from above onto the key that
- * will sound, the key glows in its hand's colour while the note lasts, and
+ * Autoplay visuals: precious-metal light columns fall from above onto the key
+ * that will sound, the key glows in its hand's colour while the note lasts, and
  * each strike throws up twinkling star dust. Driven by song time, so the
  * visuals stay locked to the scheduled notes.
  */
 export const HAND_COLORS = {
-  right: new THREE.Color("#8fe9ff"), // ice
-  left: new THREE.Color("#c29bff"), // amethyst
+  right: new THREE.Color("#ffc65c"), // gold
+  left: new THREE.Color("#c9d6ea"), // platinum: a cool silver against the gold
 };
 
 const FALL_SPEED = 1.7; // world units per second
@@ -85,7 +85,7 @@ const waveFragment = /* glsl */ `
     float body = 1.0 - smoothstep(amp - 0.04, amp, y);
     float core = exp(-y * 5.0 / max(amp, 0.05));
     float line = exp(-y * 60.0) * 0.35;
-    vec3 hand = sum > 0.001 ? mix(right, left, e.g / sum) : vec3(0.75, 0.93, 1.0);
+    vec3 hand = sum > 0.001 ? mix(right, left, e.g / sum) : vec3(1.0, 0.88, 0.66);
     vec3 color = mix(hand, vec3(1.0), 0.45 * core);
     float a = (column * body * (0.55 + 1.1 * core) + line) * opacity;
     gl_FragColor = vec4(color * a * 1.8, a);
