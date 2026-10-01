@@ -58,35 +58,72 @@ const COMPOSERS = [
   ["debussy", "Claude Debussy", "1862 – 1918"],
 ];
 
-/** An engraved gilt nameplate for a portrait. */
+const SCRIPT = '"Pinyon Script", "Cormorant Garamond", Georgia, cursive';
+const SERIF = '"Cormorant Garamond", Georgia, serif';
+
+/** An ebony nameplate: the composer's name in glowing gilt script. */
 function plaqueTexture(name, dates, aniso) {
+  const [w, h] = [1024, 300];
   const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 112;
+  canvas.width = w;
+  canvas.height = h;
   const g = canvas.getContext("2d");
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = aniso;
+  const gilt = g.createLinearGradient(0, 40, 0, h - 40);
+  gilt.addColorStop(0, "#fff1c4");
+  gilt.addColorStop(0.5, "#f0c66a");
+  gilt.addColorStop(1, "#b98a3a");
   const draw = () => {
-    const metal = g.createLinearGradient(0, 0, 0, 112);
-    metal.addColorStop(0, "#f2d891");
-    metal.addColorStop(0.5, "#c99a45");
-    metal.addColorStop(1, "#8e6a2c");
-    g.fillStyle = metal;
-    g.fillRect(0, 0, 512, 112);
-    g.strokeStyle = "#6d4f1f";
-    g.lineWidth = 4;
-    g.strokeRect(8, 8, 496, 96);
-    g.fillStyle = "#2a1c0c";
+    g.clearRect(0, 0, w, h);
+    const ebony = g.createLinearGradient(0, 0, 0, h);
+    ebony.addColorStop(0, "#1d150e");
+    ebony.addColorStop(1, "#0c0806");
+    g.fillStyle = ebony;
+    g.fillRect(0, 0, w, h);
+    // A double gilt rule with a dot at each corner.
+    g.strokeStyle = "#c99a45";
+    g.lineWidth = 6;
+    g.strokeRect(14, 14, w - 28, h - 28);
+    g.lineWidth = 2;
+    g.strokeRect(30, 30, w - 60, h - 60);
+    g.fillStyle = "#e9c46f";
+    for (const [x, y] of [
+      [30, 30],
+      [w - 30, 30],
+      [30, h - 30],
+      [w - 30, h - 30],
+    ]) {
+      g.beginPath();
+      g.arc(x, y, 7, 0, 2 * Math.PI);
+      g.fill();
+    }
     g.textAlign = "center";
-    g.font = '600 38px "Cormorant Garamond", Georgia, serif';
-    g.fillText(name, 256, 54);
-    g.font = '500 24px "Cormorant Garamond", Georgia, serif';
-    g.fillText(dates, 256, 88);
+    g.textBaseline = "alphabetic";
+    // The name, twice over a gold blur: the glow, then the crisp letters.
+    g.font = `400 ${name.length > 18 ? 104 : 118}px ${SCRIPT}`;
+    g.shadowColor = "rgba(255, 200, 110, 0.95)";
+    for (const blur of [34, 12]) {
+      g.shadowBlur = blur;
+      g.fillStyle = gilt;
+      g.fillText(name, w / 2, 172, w - 120);
+    }
+    g.shadowBlur = 10;
+    g.font = `600 34px ${SERIF}`;
+    g.letterSpacing = "6px";
+    g.fillStyle = "#e9c46f";
+    g.fillText(`— ${dates.replace(" – ", " · ")} —`, w / 2, 242);
+    g.letterSpacing = "0px";
+    g.shadowBlur = 0;
     texture.needsUpdate = true;
   };
   draw();
-  document.fonts?.ready.then(draw); // redraw once the display face arrives
+  // Redraw once the script and serif faces have arrived.
+  document.fonts
+    ?.load(`118px ${SCRIPT}`)
+    .then(() => document.fonts.load(`600 34px ${SERIF}`))
+    .then(draw);
   return texture;
 }
 
@@ -214,7 +251,7 @@ export function buildRoyalInterior(hall, scene, room) {
       if (i % 2) portraits.push([...bay, side]);
       else windows.push(bay);
     }
-  const glass = buildStainedGlass(hall, windows, arch);
+  const glass = buildStainedGlass(hall, windows, arch, room.glowWall);
   instanced(
     new THREE.ExtrudeGeometry(frameShape, { depth: 0.3, bevelEnabled: false }),
     gilt,
@@ -242,11 +279,12 @@ export function buildRoyalInterior(hall, scene, room) {
     bevelSegments: 3,
   });
   const canvasGeometry = new THREE.PlaneGeometry(pw, ph);
-  const plaqueGeometry = new THREE.PlaneGeometry(3.6, 0.79);
+  const plaqueGeometry = new THREE.PlaneGeometry(6.4, 1.875); // 1024 × 300
   const loader = new THREE.TextureLoader();
   // Each wall takes its four sitters in order from the stage end.
   const sitters = { [-1]: COMPOSERS.slice(0, 4), 1: COMPOSERS.slice(4) };
   const paintings = [];
+  const plates = [];
   for (const [x, y, z, yaw, side] of portraits) {
     const [file, name, dates] = sitters[side].shift();
     const piece = new THREE.Group();
@@ -272,15 +310,19 @@ export function buildRoyalInterior(hall, scene, room) {
     canvas.position.z = 0.12;
     canvas.name = `portrait-${file}`;
     piece.add(canvas);
-    const plaque = new THREE.Mesh(
-      plaqueGeometry,
-      new THREE.MeshStandardMaterial({
-        map: plaqueTexture(name, dates, aniso),
-        metalness: 0.6,
-        roughness: 0.35,
-      }),
-    );
-    plaque.position.set(0, -ph / 2 - rail - 0.75, 0.08);
+    // Its own light, like the portrait: the gilt script glows on the ebony.
+    const plaqueMap = plaqueTexture(name, dates, aniso);
+    const plate = new THREE.MeshStandardMaterial({
+      map: plaqueMap,
+      emissiveMap: plaqueMap,
+      emissive: 0xffffff,
+      emissiveIntensity: 1,
+      roughness: 0.45,
+      metalness: 0.2,
+    });
+    plates.push(plate);
+    const plaque = new THREE.Mesh(plaqueGeometry, plate);
+    plaque.position.set(0, -ph / 2 - rail - 1.2, 0.08);
     piece.add(plaque);
   }
 
@@ -582,6 +624,7 @@ export function buildRoyalInterior(hall, scene, room) {
     },
     /** Animate the stained glass. */
     update: glass.update,
+    setGlow: glass.setGlow,
     /** Dim every lamp in the room: 0 = dark, 1 = full house. */
     setHouseLights(level) {
       lights.forEach((light, i) => (light.intensity = lightPower[i] * level));
@@ -590,6 +633,7 @@ export function buildRoyalInterior(hall, scene, room) {
       crystal.emissiveIntensity = 0.35 * level;
       glass.setLevel(level);
       for (const m of paintings) m.emissiveIntensity = 0.4 * level;
+      for (const m of plates) m.emissiveIntensity = level;
     },
   };
 }

@@ -323,6 +323,7 @@ export function createHall(scene, mats) {
     balconyY: BALCONY_Y,
     aniso,
     velvet,
+    glowWall: upperPlaster, // the stained glass lights it
   });
   const gold = royal.gilt;
   // Gilded nosing along the stage front.

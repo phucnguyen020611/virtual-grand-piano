@@ -3,9 +3,9 @@ import * as THREE from "three";
 /**
  * Sainte-Chapelle-style lancets: a dense mosaic ground, jewelled borders, a
  * tiered rose in the arch and a column of medallions, each a kaleidoscope of
- * concentric rings. A shader turns the rings against one another, lets the
- * panes twinkle, sweeps a sheen across the glass and shifts it through an
- * iridescent sheen with the viewing angle; an additive halo blooms round it.
+ * concentric rings. A shader lets the panes twinkle, sweeps a sheen across
+ * the glass and shifts it through an iridescent sheen with the viewing angle;
+ * the wall round it takes on their light.
  *
  * Everything is authored in the opening's own units: x −2.5…2.5, y 0…16.
  */
@@ -35,9 +35,6 @@ const PALETTES = [
 ].map((names) => names.map((n) => JEWELS[n]));
 const GROUNDS = ["checker", "scales", "lozenges", "roundels", "checker"];
 const SHAPES = ["circle", "quatrefoil", "lozenge", "star"];
-
-/** Up to six turning wheels per window: centre x, y, radius, ring count. */
-const MAX_WHEELS = 6;
 
 function drawWindow(variant) {
   const canvas = document.createElement("canvas");
@@ -155,7 +152,6 @@ function drawWindow(variant) {
       }
     }
   };
-  const wheels = [];
   const medallion = (x, y, r, shape) => {
     // Frame: a pearl-studded rim in the medallion's outline.
     const outline = new Path2D();
@@ -203,13 +199,11 @@ function drawWindow(variant) {
     }
     const count = shape === "circle" ? 5 : 4;
     rings(x, y, core, count, palette);
-    wheels.push([x, y, core, count]);
   };
 
   // Rose in the arch: the grandest wheel.
   pane(circle(0, SPRING, W / 2 - 0.36), accent);
   rings(0, SPRING, W / 2 - 0.5, 6, palette);
-  wheels.push([0, SPRING, W / 2 - 0.5, 6]);
   // A column of medallions, shapes cycling from window to window.
   const ys = [10.0, 6.9, 3.8]; // the top one clears the rose (its foot at 11.5)
   ys.forEach((y, i) =>
@@ -230,7 +224,19 @@ function drawWindow(variant) {
 
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
-  return { map, wheels };
+  // The window's average colour, for the light it throws on the wall.
+  const probe = document.createElement("canvas");
+  probe.width = probe.height = 1;
+  const pg = probe.getContext("2d");
+  pg.drawImage(canvas, 40, CANVAS_H * 0.2, 432, CANVAS_H * 0.75, 0, 0, 1, 1);
+  const [r, gr, b] = pg.getImageData(0, 0, 1, 1).data;
+  const tint = new THREE.Color().setRGB(
+    r / 255,
+    gr / 255,
+    b / 255,
+    THREE.SRGBColorSpace,
+  );
+  return { map, tint };
 }
 
 const vertexShader = /* glsl */ `
@@ -261,23 +267,8 @@ const common = /* glsl */ `
 
 const glassFragment = /* glsl */ `
   ${common}
-  uniform vec4 wheels[${MAX_WHEELS}];
   void main() {
-    vec2 p = vShape;
-    // Neighbouring rings counter-rotate: the wheels seem to turn and breathe.
-    for (int i = 0; i < ${MAX_WHEELS}; i++) {
-      vec4 w = wheels[i];
-      vec2 d = p - w.xy;
-      float r = length(d);
-      if (w.z > 0.0 && r < w.z) {
-        float ring = floor(r / w.z * w.w);
-        float dir = mod(ring, 2.0) < 1.0 ? 1.0 : -1.0;
-        float a = time * dir * 0.22 / (1.0 + ring * 0.3);
-        p = w.xy + mat2(cos(a), sin(a), -sin(a), cos(a)) * d;
-        break;
-      }
-    }
-    vec3 glass = texture2D(map, toUv(p)).rgb;
+    vec3 glass = texture2D(map, toUv(vShape)).rgb;
     float lum = dot(glass, vec3(0.299, 0.587, 0.114));
     // Panes twinkle on their own clocks.
     vec2 cell = floor(vShape * 5.0);
@@ -295,82 +286,105 @@ const glassFragment = /* glsl */ `
   }
 `;
 
-const haloFragment = /* glsl */ `
-  ${common}
-  void main() {
-    // Signed distance to the lancet: a rectangle and the half circle on it.
-    vec2 p = vShape;
-    vec2 q = vec2(abs(p.x) - ${(W / 2).toFixed(2)}, max(-p.y, p.y - ${SPRING.toFixed(2)}));
-    float rect = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
-    float cap = length(p - vec2(0.0, ${SPRING.toFixed(2)})) - ${(W / 2).toFixed(2)};
-    float d = max(min(rect, cap), 0.0);
-    // The glass's own colours, heavily blurred, spill round it.
-    vec2 inside = vec2(clamp(p.x, -2.2, 2.2), clamp(p.y, 0.3, ${(H - 0.4).toFixed(1)}));
-    vec3 tint = texture2D(map, toUv(inside), 7.0).rgb;
-    float pulse = 0.85 + 0.15 * sin(time * 0.9);
-    // Fades to nothing well before the quad's edge (3 units out).
-    float edge = 1.0 - smoothstep(0.4, 2.9, d);
-    float glow = (d > 0.0 ? 0.8 * exp(-d * 2.2) : 0.1) * edge * pulse;
-    gl_FragColor = vec4(tint * glow * 1.9 * level, 1.0);
-    #include <colorspace_fragment>
-  }
-`;
+/**
+ * The light each window throws on the wall, computed in the wall's own
+ * shader from its distance to the lancet: it lies on the surface, so frames
+ * and columns in front occlude it as they would real light.
+ */
+function glowOnto(material, bays, tints, time, level, strength) {
+  const n = bays.length;
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, {
+      glowBays: { value: bays.map(([x, y, z]) => new THREE.Vector3(x, y, z)) },
+      glowTints: { value: tints },
+      glowTime: time,
+      glowLevel: level,
+      glowStrength: strength,
+    });
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying vec3 vGlowWorld;",
+      )
+      .replace(
+        "#include <project_vertex>",
+        "#include <project_vertex>\nvGlowWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;",
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+        varying vec3 vGlowWorld;
+        uniform vec3 glowBays[${n}];
+        uniform vec3 glowTints[${n}];
+        uniform float glowTime, glowLevel, glowStrength;`,
+      )
+      .replace(
+        "#include <emissivemap_fragment>",
+        `#include <emissivemap_fragment>
+        float pulse = 0.9 + 0.1 * sin(glowTime * 0.9);
+        for (int i = 0; i < ${n}; i++) {
+          vec3 b = glowBays[i];
+          if (abs(vGlowWorld.x - b.x) > 1.0) continue; // this wall only
+          // Signed distance to the lancet: a rectangle and its half circle.
+          vec2 p = vec2(vGlowWorld.z - b.z, vGlowWorld.y - b.y);
+          vec2 q = vec2(abs(p.x) - ${(W / 2).toFixed(2)}, max(-p.y, p.y - ${SPRING.toFixed(2)}));
+          float rect = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+          float cap = length(p - vec2(0.0, ${SPRING.toFixed(2)})) - ${(W / 2).toFixed(2)};
+          float d = max(min(rect, cap), 0.0);
+          totalEmissiveRadiance += glowTints[i] * 1.5 * exp(-d * 1.1) * pulse * glowLevel * glowStrength;
+        }`,
+      );
+  };
+  material.customProgramCacheKey = () => "stained-glass-glow";
+  material.userData.glassGlow = strength; // for inspection and tests
+  material.needsUpdate = true;
+}
 
 /**
- * Glaze each bay ([x, y, z, yaw]) with a lancet and its halo.
- * @returns setLevel(0..1) to follow the house lights, update(dt) to animate.
+ * Glaze each bay ([x, y, z, yaw]) with a lancet, and light the `wall`
+ * material round it.
+ * @returns setLevel(0..1) to follow the house lights, setGlow(on) for the
+ *   wall light, update(dt) to animate.
  */
-export function buildStainedGlass(parent, bays, shape) {
+export function buildStainedGlass(parent, bays, shape, wall) {
   const variants = PALETTES.map((_, i) => drawWindow(i));
   const glassGeometry = new THREE.ShapeGeometry(shape, 32);
-  const haloGeometry = new THREE.PlaneGeometry(W + 6, H + 6).translate(
-    0,
-    H / 2,
-    0,
-  );
   const time = { value: 0 };
   const level = { value: 1 };
+  const strength = { value: 1 };
   bays.forEach(([x, y, z, yaw], i) => {
-    const { map, wheels } = variants[i % variants.length];
-    const packed = Array.from(
-      { length: MAX_WHEELS },
-      (_, k) => new THREE.Vector4(...(wheels[k] ?? [0, 0, 0, 0])),
-    );
     const glass = new THREE.Mesh(
       glassGeometry,
       new THREE.ShaderMaterial({
         uniforms: {
-          map: { value: map },
+          map: { value: variants[i % variants.length].map },
           time,
           level,
-          wheels: { value: packed },
         },
         vertexShader,
         fragmentShader: glassFragment,
       }),
     );
-    const halo = new THREE.Mesh(
-      haloGeometry,
-      new THREE.ShaderMaterial({
-        uniforms: { map: { value: map }, time, level },
-        vertexShader,
-        fragmentShader: haloFragment,
-        transparent: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    );
-    halo.position.z = 0.34; // over the gilt frame, into the room
-    halo.renderOrder = 3;
-    const bay = new THREE.Group();
-    bay.position.set(x, y, z);
-    bay.rotation.y = yaw;
-    bay.add(glass, halo);
-    parent.add(bay);
+    glass.position.set(x, y, z);
+    glass.rotation.y = yaw;
+    parent.add(glass);
   });
+  glowOnto(
+    wall,
+    bays,
+    bays.map((_, i) => variants[i % variants.length].tint),
+    time,
+    level,
+    strength,
+  );
   return {
     setLevel(value) {
       level.value = 0.1 + 0.9 * value;
+    },
+    /** The wall light is the glass's one optional cost: off at Low quality. */
+    setGlow(on) {
+      strength.value = on ? 1 : 0;
     },
     update(dt) {
       time.value += dt;
