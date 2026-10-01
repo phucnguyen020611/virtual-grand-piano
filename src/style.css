@@ -327,18 +327,133 @@ canvas {
   border-left: 1px solid var(--ui-border);
 }
 
-.controlRow select {
-  min-height: 44px;
+/* Styled dropdowns (interaction/dropdown.js): the native select hides behind
+   a combobox button; its listbox opens on the body, above every panel. */
+.nativeSelect {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dropdown {
+  position: relative;
   min-width: 0;
+}
+
+.dropdown[hidden] {
+  display: none;
+}
+
+.dropdownTrigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
   max-width: min(250px, 72vw);
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  padding: 9px 34px 9px 12px;
-  color: var(--ui-text);
   background: #27231f;
+  text-align: left;
+}
+
+.dropdownTrigger span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dropdownTrigger::after {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-right: 1.5px solid var(--ui-accent);
+  border-bottom: 1.5px solid var(--ui-accent);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.dropdownTrigger[aria-expanded="true"] {
+  border-color: rgba(215, 185, 120, 0.72);
+}
+
+.dropdownTrigger[aria-expanded="true"]::after {
+  transform: translateY(2px) rotate(-135deg);
+}
+
+.dropdownList {
+  position: fixed;
+  z-index: 40;
+  max-width: min(340px, calc(100vw - 16px));
+  max-height: min(300px, 55dvh);
+  overflow: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid rgba(215, 185, 120, 0.42);
+  border-radius: 12px;
+  background: #1b1915; /* opaque: the panels beneath must not show through */
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(244, 228, 189, 0.08);
+  animation: dropdownIn 150ms ease-out;
+}
+
+.dropdownList.up {
+  animation-name: dropdownUp;
+}
+
+.dropdownList li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 14px 8px 32px;
+  border-radius: 8px;
+  color: var(--ui-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dropdownList li.active {
+  background: rgba(215, 185, 120, 0.14);
+}
+
+.dropdownList li[aria-selected="true"] {
+  color: var(--ui-accent-strong);
+}
+
+.dropdownList li[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 5px;
+  height: 10px;
+  border: solid var(--ui-accent);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-62%) rotate(45deg);
+}
+
+.dropdownList li[aria-disabled="true"] {
+  color: var(--ui-muted);
+  cursor: default;
+}
+
+@keyframes dropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes dropdownUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 #midiBtn {

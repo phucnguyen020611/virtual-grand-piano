@@ -123,6 +123,7 @@ virtual-grand-piano/
 │   │   ├── midiInput.js        # selected Web MIDI input + CC64 handling
 │   │   └── performanceRecorder.js # in-memory musical event recording/playback
 │   ├── interaction/
+│   │   ├── dropdown.js         # styled, accessible dropdowns over native selects
 │   │   └── inspection.js       # raycasting selection, labels, mode switching
 │   └── style.css
 ├── .editorconfig

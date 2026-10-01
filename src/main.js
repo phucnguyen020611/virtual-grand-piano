@@ -15,6 +15,7 @@ import { createMidiInput } from "./performance/midiInput.js";
 import { createPerformanceRecorder } from "./performance/performanceRecorder.js";
 import { SONGS, scoreEvents, scorePedal } from "./performance/songs.js";
 import { createNoteEffects } from "./scene/noteEffects.js";
+import { enhanceSelect } from "./interaction/dropdown.js";
 import { createInspection } from "./interaction/inspection.js";
 import {
   createExplodedView,
@@ -197,6 +198,8 @@ let autoplay = false,
 const autoBtn = document.querySelector("#autoBtn"),
   songSelect = document.querySelector("#songSelect"),
   progressEl = document.querySelector("#songProgress");
+// Every HUD dropdown gets the styled listbox; the native select stays behind it.
+document.querySelectorAll("#pianoControls select").forEach(enhanceSelect);
 for (const piece of SONGS)
   songSelect.add(
     new Option(
@@ -597,7 +600,8 @@ addEventListener("keydown", (event) => {
   // Read Shift from every event: its own keydown may land elsewhere.
   freeCam.shift = event.shiftKey;
   if (!freeCam.on || !FREE_CAM_KEYS.test(event.code)) return;
-  if (event.target.closest?.("input, select, textarea")) return;
+  if (event.target.closest?.("input, select, textarea, [role=combobox]"))
+    return;
   event.preventDefault();
   freeCam.held.add(event.code);
   freeCam.released.delete(event.code);
