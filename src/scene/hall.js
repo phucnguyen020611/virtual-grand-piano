@@ -598,12 +598,13 @@ export function createHall(scene, mats) {
   const seats = [];
   for (let row = 0; row < 17; row++) {
     const rowZ = FIRST_ROW_Z + row * ROW_PITCH;
-    for (let x = 3.9; x < 27; x += 2.55)
+    // 3.2 apart (the seat with its arms is 2.64 wide), so neighbours on the
+    // curve never touch; each faces square to its row, as in a real hall.
+    for (let x = 3.9; x < 27; x += 3.2)
       for (const side of [-1, 1]) {
         const sx = side * x;
-        // Gently curved rows, each seat turned toward the piano.
         const z = rowZ + rowCurve(sx);
-        seats.push([sx, tierY(row), z, Math.atan2(sx, z)]);
+        seats.push([sx, tierY(row), z, Math.atan(sx / 80)]); // rowCurve' = x/80
       }
   }
   const velvetSeats = new THREE.InstancedMesh(
