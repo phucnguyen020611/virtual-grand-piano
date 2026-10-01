@@ -143,6 +143,8 @@ function knobGeometry() {
 }
 
 const LIFTS = [0, 0.1, 0.2]; // seat heights the knobs step through
+// Long legs put the seat at ~50 cm, a hand's span below the keys.
+const LEG_EXTRA = 1.3;
 
 /**
  * A concert artist bench with a tufted black leather seat. The seat rides a
@@ -167,8 +169,12 @@ export function createBench(mats, stageTopY) {
     envMapIntensity: 0.9,
   });
 
+  // Frame, lift and seat, standing on the legs.
+  const frame = new THREE.Group();
+  frame.position.y = LEG_EXTRA;
+  bench.add(frame);
   const carriage = new THREE.Group(); // everything the lift carries
-  bench.add(carriage);
+  frame.add(carriage);
   box(2.48, 0.14, 1.22, mats.blackLacquer, carriage, 0, 0.83);
   const base = new THREE.Mesh(
     new RoundedBoxGeometry(2.6, 0.2, 1.34, 3, 0.06),
@@ -198,11 +204,11 @@ export function createBench(mats, stageTopY) {
     carriage.add(button);
   }
 
-  const legGeometry = new THREE.BoxGeometry(0.14, 0.8, 0.14);
+  const legGeometry = new THREE.BoxGeometry(0.18, 0.8 + LEG_EXTRA, 0.18);
   for (const x of [-1.08, 1.08]) {
     for (const z of [-0.48, 0.48]) {
       const leg = new THREE.Mesh(legGeometry, mats.blackLacquer);
-      leg.position.set(x, 0.4, z);
+      leg.position.set(x, (0.8 + LEG_EXTRA) / 2, z);
       leg.castShadow = leg.receiveShadow = true;
       bench.add(leg);
     }
@@ -210,9 +216,9 @@ export function createBench(mats, stageTopY) {
 
   // Lower frame, spindle and scissor arms, bared as the seat rises.
   for (const z of [-0.48, 0.48])
-    box(2.02, 0.1, 0.08, mats.blackLacquer, bench, 0, 0.7, z);
+    box(2.02, 0.1, 0.08, mats.blackLacquer, frame, 0, 0.7, z);
   for (const x of [-1.08, 1.08])
-    box(0.1, 0.1, 0.82, mats.blackLacquer, bench, x, 0.7, 0);
+    box(0.1, 0.1, 0.82, mats.blackLacquer, frame, x, 0.7, 0);
   const steel = new THREE.MeshStandardMaterial({
     color: 0x8a8d90,
     metalness: 1,
@@ -223,13 +229,13 @@ export function createBench(mats, stageTopY) {
     steel,
   );
   spindle.position.y = 0.7;
-  bench.add(spindle);
+  frame.add(spindle);
   const arms = [-0.4, 0.4].flatMap((z) =>
     [-1, 1].map((slope) => {
       const arm = new THREE.Mesh(new THREE.BoxGeometry(1, 0.035, 0.03), steel);
       arm.position.z = z;
       arm.userData.slope = slope;
-      bench.add(arm);
+      frame.add(arm);
       return arm;
     }),
   );
@@ -254,7 +260,7 @@ export function createBench(mats, stageTopY) {
         step += direction;
       },
     });
-    bench.add(knob);
+    frame.add(knob);
     return knob;
   });
 

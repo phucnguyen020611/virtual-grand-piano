@@ -1,9 +1,20 @@
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import { DIM, outerFootprint } from "../src/piano/geometry.js";
+import {
+  DIM,
+  PIANO_LIFT,
+  outerFootprint,
+  cavityShape,
+} from "../src/piano/geometry.js";
 import { buildKeyboard } from "../src/piano/keyboard.js";
-import { buildAction, buildPedals, buildLid } from "../src/piano/anatomy.js";
-import { createStringLayout } from "../src/piano/strings.js";
+import {
+  buildAction,
+  buildPedals,
+  buildLid,
+  buildSoundboard,
+  buildPlate,
+} from "../src/piano/anatomy.js";
+import { buildStringSystem, createStringLayout } from "../src/piano/strings.js";
 import { createMechanics } from "../src/piano/mechanics.js";
 
 const material = new THREE.MeshStandardMaterial();
@@ -81,7 +92,7 @@ for (const [type, pivot] of pedals.pedalPivots) {
 for (let i = 0; i < 180; i++) mechanics.update(1 / 60);
 for (const pivot of pedals.pedalPivots.values()) {
   bounds.setFromObject(pivot);
-  assert(bounds.min.y > 0, "pedal crossed floor");
+  assert(bounds.min.y > -PIANO_LIFT, "pedal crossed floor");
 }
 console.log(
   "PASS three connected horizontal pedal plates, depressed floor clearance",
@@ -93,7 +104,9 @@ for (const angle of [0, 0.1, 0.2, DIM.lidOpenAngle]) {
   lid.group.updateMatrixWorld(true);
   const base = new THREE.Vector3(0, -0.5, 0).applyMatrix4(lid.prop.matrixWorld);
   const top = new THREE.Vector3(0, 0.5, 0).applyMatrix4(lid.prop.matrixWorld);
-  assert(base.distanceTo(new THREE.Vector3(3.7, 1.43, -0.2)) < 1e-8);
+  assert(
+    base.distanceTo(new THREE.Vector3(3.42, DIM.rimTopY + 0.03, -0.2)) < 1e-8,
+  );
   const attachment = new THREE.Vector3(7.05, 0, -0.2).applyMatrix4(
     lid.pivot.matrixWorld,
   );
@@ -101,7 +114,7 @@ for (const angle of [0, 0.1, 0.2, DIM.lidOpenAngle]) {
 }
 lid.setAngle(0);
 const closed = new THREE.Box3().setFromObject(lid.pivot);
-assert(closed.min.y > DIM.caseTopY + 0.02, "closed lid clips rim trim");
+assert(closed.min.y > DIM.rimTopY + 0.02, "closed lid clips rim trim");
 assert(closed.max.z < 1.48, "closed lid extends into music desk");
 const outline = outerFootprint()
   .getPoints(48)
@@ -148,6 +161,46 @@ const { createBench } = await import("../src/scene/bench.js");
 const bench = createBench(mats, -0.045);
 const benchBounds = new THREE.Box3().setFromObject(bench);
 assert(Math.abs(benchBounds.min.y + 0.045) < 1e-6);
-assert(benchBounds.max.y < DIM.whiteKeyTopY);
+assert(benchBounds.max.y < DIM.whiteKeyTopY + PIANO_LIFT);
 assert(benchBounds.min.z > 3.05 + 1.2, "bench blocks exploded key fronts");
 console.log("PASS grounded bench with seat below keys and exploded clearance");
+
+// Behind the belly rail, the harp must sit inside the concave bentside.
+{
+  const any = new Proxy({}, { get: () => material });
+  const layout = createStringLayout();
+  const poly = cavityShape(0).getPoints(64);
+  const inside = (x, y) => {
+    let c = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i],
+        b = poly[j];
+      if (
+        a.y > y !== b.y > y &&
+        x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x
+      )
+        c = !c;
+    }
+    return c;
+  };
+  const v = new THREE.Vector3();
+  for (const part of [
+    buildSoundboard(any, layout),
+    buildPlate(any),
+    buildStringSystem(any, layout),
+  ]) {
+    part.updateMatrixWorld(true);
+    part.traverse((o) => {
+      if (!o.isMesh || o.isInstancedMesh) return;
+      const pos = o.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+        assert(
+          v.z > 1.44 || inside(v.x, -v.z),
+          `${part.userData.partName} leaves the cavity`,
+        );
+      }
+    });
+  }
+}
+console.log("PASS soundboard, plate and strings stay inside the cavity");

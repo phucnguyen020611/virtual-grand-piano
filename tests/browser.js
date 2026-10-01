@@ -52,14 +52,17 @@ async function run() {
   });
   const board = desk.getObjectByName("music-desk-board");
   p.scene.updateMatrixWorld(true);
-  const inPiano = (v) => p.stageSet.worldToLocal(v);
+  const inPiano = (v) => p.piano.group.worldToLocal(v);
   const boardTop = inPiano(board.localToWorld(new p.THREE.Vector3(0, 0.6, 0)));
   const boardBottom = inPiano(
     board.localToWorld(new p.THREE.Vector3(0, -0.6, 0)),
   );
   assert(boardTop.z < boardBottom.z, "music desk leans toward player");
   const railBounds = new p.THREE.Box3().setFromObject(fallboard);
-  assert(boardBottom.y > railBounds.max.y, "rack base intersects fallboard");
+  assert(
+    boardBottom.y > railBounds.max.y - p.piano.group.position.y,
+    "rack base intersects fallboard",
+  );
   for (const page of board.getObjectByName("score-book").children) {
     const pageBounds = new p.THREE.Box3().setFromObject(page);
     assert(pageBounds.min.y > railBounds.max.y, "fallboard hides lower score");
@@ -81,7 +84,7 @@ async function run() {
     for (const x of [-0.35, 0, 0.35]) {
       const target = logo.localToWorld(new p.THREE.Vector3(x, -0.08, 0));
       // Review angles are given in the piano's own frame.
-      const eye = p.stageSet.localToWorld(new p.THREE.Vector3(...origin));
+      const eye = p.piano.group.localToWorld(new p.THREE.Vector3(...origin));
       ray.set(eye, target.sub(eye).normalize());
       assert(
         ray.intersectObject(p.piano.group, true)[0]?.object === logo,
@@ -107,7 +110,10 @@ async function run() {
   await wait(5000);
   const heldKey = p.piano.midiToKey.get(48);
   const keyBounds = new p.THREE.Box3().setFromObject(heldKey);
-  assert(keyBounds.min.y > 1.4, "held key sinks into case");
+  assert(
+    keyBounds.min.y - p.piano.group.position.y > 1.4,
+    "held key sinks into case",
+  );
   key("keyup", "KeyZ");
   log(
     "rack leans backward; score clears fallboard; five-second held key clears bed",
@@ -337,6 +343,45 @@ async function run() {
   click("resetBtn");
   log("Normal/Exploded, resonance parenting, lid, reset", { pass: true });
 
+  // The fallboard slides clear of the keys, then its flap drops over them.
+  {
+    let board;
+    p.piano.group.traverse((o) => {
+      if (o.userData.partName === "Fallboard") board = o;
+    });
+    const keyBox = new p.THREE.Box3();
+    for (const k of p.piano.keyMeshes) keyBox.expandByObject(k);
+    const fall = new p.THREE.Box3();
+    for (let t = 0; t <= 0.7; t += 0.05) {
+      p.piano.setFallboard(t);
+      p.piano.group.updateMatrixWorld(true);
+      fall.setFromObject(board.parent);
+      assert(fall.min.y > keyBox.max.y, "fallboard sweeps through the keys");
+    }
+    // The flap swings up and over the front, not down through the keys.
+    const flap = board.parent.children.find((o) => o !== board);
+    for (let t = 0.7; t <= 1; t += 0.02) {
+      p.piano.setFallboard(t);
+      p.piano.group.updateMatrixWorld(true);
+      assert(
+        !fall.setFromObject(flap).intersectsBox(keyBox),
+        `fallboard flap cuts the keys at ${t.toFixed(2)}`,
+      );
+    }
+    click("fallBtn");
+    await wait(3000);
+    fall.setFromObject(board.parent);
+    assert(
+      fall.min.z < keyBox.min.z + 0.05 &&
+        fall.max.z > keyBox.max.z &&
+        fall.min.y < keyBox.max.y,
+      "closed fallboard leaves keys bare",
+    );
+    click("fallBtn");
+    await wait(3000);
+    log("fallboard slides out and covers the keys", { pass: true });
+  }
+
   p.explodedView.setExploded(true);
   p.explodedView.update(1 / 60, true);
   assert(
@@ -491,7 +536,8 @@ async function run() {
   log("curtain dims and restores the house", { pass: true });
 
   // Bench knobs step the seat up and back down.
-  const knob = p.bench.children.find((o) => o.userData.onPick);
+  let knob;
+  p.bench.traverse((o) => (knob ??= o.userData.onPick && o));
   const seatTop = () => new p.THREE.Box3().setFromObject(p.bench).max.y;
   const rest = seatTop();
   const heights = [1, 2, 3, 4].map(() => {
@@ -607,16 +653,16 @@ for (const button of document.querySelectorAll("[data-view]")) {
         [-1, 1.6, -0.8],
       ],
       pedals: [
-        [1.7, 0.85, 5],
-        [0, 0.45, 2.45],
+        [1.7, -1.05, 5],
+        [0, -1.45, 2.45],
       ],
     };
     const [position, target] = views[button.dataset.view];
     p.camera.position.copy(
-      p.stageSet.localToWorld(new p.THREE.Vector3(...position)),
+      p.piano.group.localToWorld(new p.THREE.Vector3(...position)),
     );
     p.controls.target.copy(
-      p.stageSet.localToWorld(new p.THREE.Vector3(...target)),
+      p.piano.group.localToWorld(new p.THREE.Vector3(...target)),
     );
     p.controls.update();
   };

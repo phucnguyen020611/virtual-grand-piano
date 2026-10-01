@@ -785,11 +785,11 @@ export function createHall(scene, mats) {
     views: {
       frontRow: {
         position: new THREE.Vector3(8.8, stallsY(21, 8.8) + 5.6, 21),
-        target: new THREE.Vector3(0, 2.2, 0),
+        target: new THREE.Vector3(0, 3.6, 0),
       },
       balcony: {
         position: new THREE.Vector3(-HALL_HALF_WIDTH + 7, 30, 42),
-        target: new THREE.Vector3(0, 2, 0),
+        target: new THREE.Vector3(0, 3.4, 0),
       },
       overview: {
         position: new THREE.Vector3(0, 46, HALL_BACK_Z - 6),

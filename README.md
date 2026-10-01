@@ -37,6 +37,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 - Individually modeled major systems:
   - lacquered rim and case
   - lid and prop
+  - sliding fallboard (key cover)
   - soundboard and ribs
   - cast-iron plate / harp
   - bass and treble string fields
@@ -67,6 +68,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Separate systems        | **Exploded**                                     |
 | Restore assembled piano | **Normal**                                       |
 | Toggle lid              | **Open Lid / Close Lid**                         |
+| Cover the keys          | **Close fallboard / Open fallboard**             |
 | House curtain & lights  | **Close curtain / Open curtain**                 |
 | Adjust bench height     | Click a knob at either end of the bench          |
 | Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift` |

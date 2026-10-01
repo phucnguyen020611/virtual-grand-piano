@@ -9,6 +9,7 @@ import {
   buildLid,
   buildMusicDesk,
 } from "./anatomy.js";
+import { PIANO_LIFT } from "./geometry.js";
 import { buildKeyboard } from "./keyboard.js";
 import { createKeyboardLayout } from "./keyboardLayout.js";
 import { buildStringSystem, createStringLayout } from "./strings.js";
@@ -22,6 +23,7 @@ import { createStringResonance } from "./stringResonance.js";
  */
 export function createPiano(mats, stageTopY) {
   const group = new THREE.Group();
+  group.position.y = PIANO_LIFT;
   const stringLayout = createStringLayout();
   const keyboardLayout = createKeyboardLayout();
 
@@ -40,7 +42,7 @@ export function createPiano(mats, stageTopY) {
     stringLayout,
     actionMechanisms,
   });
-  const legs = buildLegs(mats, stageTopY);
+  const legs = buildLegs(mats, stageTopY - PIANO_LIFT);
   const { group: pedals, pedalPivots } = buildPedals(mats);
   const musicDesk = buildMusicDesk(mats);
   const {
@@ -100,6 +102,7 @@ export function createPiano(mats, stageTopY) {
     lidPivot,
     prop,
     setLidAngle,
+    setFallboard: caseRim.userData.setFallboard,
     explodedComponents,
     scoreBook: musicDesk.userData.book,
     // Static reference for raycasting the whole instrument.

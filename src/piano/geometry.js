@@ -20,22 +20,31 @@ import * as THREE from "three";
  * bench are modelled facing +Z and turned by this yaw as one stage set.
  */
 export const STAGE_YAW = -Math.PI / 2;
+/**
+ * The piano's frame stands this high above the stage, on long legs: it puts
+ * the keys at ~72 cm and the rim at ~1 m in the hall's 0.208 m/unit scale.
+ */
+export const PIANO_LIFT = 1.9;
 const STAGE_AXIS = new THREE.Vector3(0, 1, 0);
 /** A point given in the piano's own (unturned) frame, placed on the stage. */
 export const onStage = (x, y, z) =>
-  new THREE.Vector3(x, y, z).applyAxisAngle(STAGE_AXIS, STAGE_YAW);
+  new THREE.Vector3(x, y + PIANO_LIFT, z).applyAxisAngle(STAGE_AXIS, STAGE_YAW);
 
 export const DIM = {
   // Case / rim -------------------------------------------------------------
-  caseBottomY: 0.86, // underside of the rim (legs reach down from here)
-  caseTopY: 1.4, // top edge of the rim wall / keybed surface
+  caseBottomY: 0.7, // underside of the rim, a skirt below the cavity floor
+  caseTopY: 1.4, // keybed band / action reference height inside the case
+  // The outer wall stands well above the keys, as on a concert grand; the
+  // keyboard end drops below the rim into a deeper key bottom.
+  rimTopY: 1.9,
+  keyBottomY: 0.6,
   // Capstan centre at rest: low enough that its top (+0.045) stays below the
   // case even with the key down (+0.035), out of sight under the desk.
   capstanRestY: 1.3,
   wallThickness: 0.36, // visible rim wall thickness
 
   // Interior stack (all below the rim top so the rim frames the anatomy) ---
-  cavityFloorY: 0.92, // dark inner floor closing the belly underside
+  cavityFloorY: 0.97, // dark inner floor closing the belly underside
   ribY: 1.06, // ribs sit just under the soundboard
   soundboardTopY: 1.12, // top face of the thin spruce soundboard
   soundboardThickness: 0.05,
@@ -80,7 +89,7 @@ export const DIM = {
   blackKeyTopY: 1.57, // resting centre Y of a black key
   keyboardWidth: 5.9, // 52 white-key pitches; ~1.226 m at 0.208 m/unit
   keyDip: 0.048, // ~10 mm, with clearance above the keybed at full travel
-  lidHingeY: 1.45, // clears rim trim and the underside veneer when closed
+  lidHingeY: 1.95, // clears rim trim and the underside veneer when closed
   lidOpenAngle: 0.42,
 
   // Action / damper --------------------------------------------------------
@@ -101,7 +110,7 @@ export const DIM = {
   damperCutoffMidi: 95,
 
   // Pedal lyre -------------------------------------------------------------
-  pedalPivotY: 0.37,
+  pedalPivotY: 0.37 - PIANO_LIFT, // ~8 cm above the stage
   pedalPivotZ: 2.1,
   pedalTravelAngle: 0.16,
 
@@ -221,40 +230,28 @@ export function tag(obj, name, desc, category = "Piano anatomy") {
 // Authored in shape space (sx, sy). world.x = sx, world.z = -sy.
 
 /** Outer silhouette of the whole case: straight front, straight bass spine,
- *  curved treble bent side sweeping around the tail. */
+ *  a straight treble side that turns into the concave S of the bentside and
+ *  sweeps round the tail, as on a concert grand. */
 export function outerFootprint() {
   const s = new THREE.Shape();
   s.moveTo(-3.6, -2.4); // front-left (spine corner)
   s.lineTo(3.6, -2.4); // straight front edge
-  s.bezierCurveTo(4.05, -0.6, 3.9, 1.7, 2.85, 3.25); // treble bulge, curving in
-  s.bezierCurveTo(1.9, 4.55, 0.4, 5.0, -1.15, 4.9); // around the tail
+  s.lineTo(3.6, 0); // straight treble side along the keyboard end
+  s.bezierCurveTo(3.6, 1.1, 2.0, 1.6, 1.85, 3.1); // concave bentside
+  s.bezierCurveTo(1.7, 4.4, 0.3, 5.0, -1.15, 4.9); // round the tail
   s.bezierCurveTo(-2.5, 4.8, -3.25, 4.6, -3.6, 4.3); // into the spine corner
   s.lineTo(-3.6, -2.4); // straight bass spine
   return s;
 }
 
-/** Inner cavity contour (a THREE.Path suitable for use as a hole). The front
- *  stops short of the case front, leaving a solid keybed band. */
-export function cavityPath() {
-  const h = new THREE.Path();
-  h.moveTo(-3.24, -1.45);
-  h.lineTo(3.24, -1.45);
-  h.bezierCurveTo(3.64, -0.45, 3.5, 1.55, 2.5, 3.0);
-  h.bezierCurveTo(1.7, 4.2, 0.35, 4.6, -1.0, 4.5);
-  h.bezierCurveTo(-2.15, 4.42, -2.85, 4.25, -3.24, 3.95);
-  h.lineTo(-3.24, -1.45);
-  return h;
-}
-
-/** Closed Shape matching the cavity outline (for the soundboard / floor). */
-export function cavityShape(inset = 0) {
-  const s = new THREE.Shape();
-  const k = 1 - inset;
-  s.moveTo(-3.24 * k, -1.45);
-  s.lineTo(3.24 * k, -1.45);
-  s.bezierCurveTo(3.64 * k, -0.45, 3.5 * k, 1.55, 2.5 * k, 3.0 * k);
-  s.bezierCurveTo(1.7 * k, 4.2 * k, 0.35 * k, 4.6 * k, -1.0 * k, 4.5 * k);
-  s.bezierCurveTo(
+/** The cavity contour, ~0.36 inside the case; `k` shrinks the curved part. */
+function traceCavity(p, k = 1) {
+  p.moveTo(-3.24 * k, -1.45);
+  p.lineTo(3.24 * k, -1.45);
+  p.lineTo(3.24 * k, 0);
+  p.bezierCurveTo(3.24 * k, 1.05 * k, 1.65 * k, 1.55 * k, 1.49 * k, 3.05 * k);
+  p.bezierCurveTo(1.36 * k, 4.1 * k, 0.25 * k, 4.62 * k, -1.0 * k, 4.5 * k);
+  p.bezierCurveTo(
     -2.15 * k,
     4.42 * k,
     -2.85 * k,
@@ -262,9 +259,17 @@ export function cavityShape(inset = 0) {
     -3.24 * k,
     3.95 * k,
   );
-  s.lineTo(-3.24 * k, -1.45);
-  return s;
+  p.lineTo(-3.24 * k, -1.45);
+  return p;
 }
+
+/** Inner cavity contour (a THREE.Path suitable for use as a hole). The front
+ *  stops short of the case front, leaving a solid keybed band. */
+export const cavityPath = () => traceCavity(new THREE.Path());
+
+/** Closed Shape matching the cavity outline (for the soundboard / floor). */
+export const cavityShape = (inset = 0) =>
+  traceCavity(new THREE.Shape(), 1 - inset);
 
 /** Plate perimeter as a thin ring: cavity-sized outer contour with an inner
  *  hole, leaving open windows where the soundboard shows through. */
@@ -273,8 +278,9 @@ export function plateRingShape() {
   const hole = new THREE.Path();
   hole.moveTo(-2.86, -1.05);
   hole.lineTo(2.86, -1.05);
-  hole.bezierCurveTo(3.2, -0.3, 3.05, 1.4, 2.15, 2.65);
-  hole.bezierCurveTo(1.42, 3.72, 0.25, 4.05, -0.9, 3.96);
+  hole.lineTo(2.86, 0);
+  hole.bezierCurveTo(2.86, 0.95, 1.28, 1.4, 1.12, 2.95);
+  hole.bezierCurveTo(1.02, 3.7, 0.2, 4.08, -0.9, 3.96);
   hole.bezierCurveTo(-1.9, 3.9, -2.5, 3.74, -2.86, 3.48);
   hole.lineTo(-2.86, -1.05);
   s.holes.push(hole);

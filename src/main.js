@@ -293,6 +293,8 @@ const gatedInterface = document.querySelectorAll(
   "#app, .topbar, #pianoControls, #inspector",
 );
 let lidOpen = true;
+let fallboardOpen = true;
+let fallboardClosure = 0; // 0 open … 1 covering the keys
 let audioStatus = "Ready";
 let midiStatus = "";
 let recordingStartedAt = 0;
@@ -650,6 +652,12 @@ lidBtn.onclick = () => {
   lidBtn.textContent = lidOpen ? "Close lid" : "Open lid";
   lidBtn.setAttribute("aria-pressed", String(lidOpen));
 };
+const fallBtn = document.querySelector("#fallBtn");
+fallBtn.onclick = () => {
+  fallboardOpen = !fallboardOpen;
+  fallBtn.textContent = fallboardOpen ? "Close fallboard" : "Open fallboard";
+  fallBtn.setAttribute("aria-pressed", String(fallboardOpen));
+};
 const curtainBtn = document.querySelector("#curtainBtn");
 curtainBtn.onclick = () => {
   const open = !hall.curtainOpen;
@@ -738,6 +746,14 @@ function animate(timestamp) {
       reducedMotion.matches ? 100 : dt,
     ),
   );
+
+  fallboardClosure = THREE.MathUtils.damp(
+    fallboardClosure,
+    fallboardOpen ? 0 : 1,
+    3,
+    reducedMotion.matches ? 100 : dt,
+  );
+  piano.setFallboard(fallboardClosure);
 
   pianoPerformance.update(dt);
   piano.scoreBook.update(dt, reducedMotion.matches);
