@@ -377,6 +377,22 @@ async function run() {
         fall.min.y < keyBox.max.y,
       "closed fallboard leaves keys bare",
     );
+    // Nor can the keys be seen past the cheeks, looking down from either side
+    // through the slot under the fallboard.
+    const side = new p.THREE.Raycaster();
+    const keys = new Set(p.piano.keyMeshes);
+    for (const x of [-8, 8])
+      for (const y of [1.7, 1.75, 1.8])
+        for (const z of [2.5, 2.8, 3.0]) {
+          const from = p.piano.group.localToWorld(new p.THREE.Vector3(x, y, z));
+          const to = p.piano.group.localToWorld(new p.THREE.Vector3(0, 1.5, z));
+          side.set(from, to.sub(from).normalize());
+          const hit = side.intersectObject(p.piano.group, true)[0];
+          assert(
+            !keys.has(hit?.object),
+            `keys show past the cheek from ${x}, ${y}, ${z}`,
+          );
+        }
     click("fallBtn");
     await wait(3000);
     log("fallboard slides out and covers the keys", { pass: true });

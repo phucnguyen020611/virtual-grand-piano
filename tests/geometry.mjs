@@ -115,7 +115,27 @@ for (const angle of [0, 0.1, 0.2, DIM.lidOpenAngle]) {
 lid.setAngle(0);
 const closed = new THREE.Box3().setFromObject(lid.pivot);
 assert(closed.min.y > DIM.rimTopY + 0.02, "closed lid clips rim trim");
-assert(closed.max.z < 1.48, "closed lid extends into music desk");
+assert(closed.max.z < 1.78, "closed lid extends into music desk");
+assert(closed.max.z > 1.7, "closed lid leaves its flap folded");
+// Closed, lid and flap leave no hole: every ray down from above meets them.
+{
+  lid.group.updateMatrixWorld(true);
+  const down = new THREE.Raycaster();
+  for (let x = -3.4; x <= 3.4; x += 0.2)
+    for (let z = -0.5; z <= 1.7; z += 0.1) {
+      down.set(new THREE.Vector3(x, 5, z), new THREE.Vector3(0, -1, 0));
+      assert(
+        down.intersectObject(lid.pivot, true).length,
+        `closed lid open at ${x.toFixed(1)}, ${z.toFixed(1)}`,
+      );
+    }
+}
+lid.setAngle(DIM.lidOpenAngle);
+assert(
+  new THREE.Box3().setFromObject(lid.pivot).max.z < 1,
+  "raised lid leaves its flap open",
+);
+lid.setAngle(0);
 const outline = outerFootprint()
   .getPoints(48)
   .filter((p) => p.y >= -1.45);

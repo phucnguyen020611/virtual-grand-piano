@@ -26,15 +26,17 @@ const RIM_H = DIM.rimTopY - DIM.caseBottomY;
 function footprintBand(front, back = Infinity) {
   const outline = outerFootprint().getPoints(48);
   const points = [];
-  const cross = (a, b, y) =>
-    a.y < y !== b.y < y &&
-    points.push(a.clone().lerp(b, (y - a.y) / (b.y - a.y)));
   for (let i = 0; i < outline.length - 1; i++) {
     const a = outline[i],
       b = outline[i + 1];
     if (a.y >= front && a.y <= back) points.push(a.clone());
-    cross(a, b, front);
-    cross(a, b, back);
+    // An edge may cross both cuts; take them in the order the edge meets them,
+    // or the band's outline twists into a bow tie.
+    [front, back]
+      .filter((y) => a.y < y !== b.y < y)
+      .map((y) => (y - a.y) / (b.y - a.y))
+      .sort((t, u) => t - u)
+      .forEach((t) => points.push(a.clone().lerp(b, t)));
   }
   const s = new THREE.Shape(points);
   s.closePath();
@@ -56,14 +58,16 @@ function rimWallShape() {
 }
 
 /** Side profile (z, y) of a cheek: full rim height at the back, sweeping
- *  down in an S to a rounded nose just above the keys. */
+ *  down in an S to a rounded nose just above the fallboard. */
 function cheekProfile() {
   const s = new THREE.Shape();
   s.moveTo(2.16, DIM.keyBottomY);
   s.lineTo(3.11, DIM.keyBottomY);
-  s.lineTo(3.11, 1.47);
-  s.quadraticCurveTo(3.11, 1.56, 3.0, 1.56);
-  s.bezierCurveTo(2.84, 1.56, 2.76, DIM.rimTopY, 2.5, DIM.rimTopY);
+  // The nose stands just above the closed fallboard (1.675), so it shuts
+  // the keys in from the side as well.
+  s.lineTo(3.11, 1.6);
+  s.quadraticCurveTo(3.11, 1.7, 3.0, 1.7);
+  s.bezierCurveTo(2.84, 1.7, 2.76, DIM.rimTopY, 2.5, DIM.rimTopY);
   s.lineTo(2.16, DIM.rimTopY);
   return s;
 }
@@ -737,14 +741,23 @@ export function buildLid(mats) {
   pivot.rotation.z = DIM.lidOpenAngle; // Initial open state also defines accurate exploded bounds.
   g.add(pivot);
 
-  const lid = extrudeFlat(footprintBand(-1.45), 0.06, mats.blackLacquer, 0.02);
+  // The lid proper stops short of the belly rail; its front flap, hinged on
+  // the front edge, lies folded back on it while the lid is up and opens
+  // out flat to close the strip up to the music desk when the lid is down.
+  const lidFront = -0.9;
+  const lid = extrudeFlat(
+    footprintBand(lidFront),
+    0.06,
+    mats.blackLacquer,
+    0.02,
+  );
   lid.position.set(3.6, 0, 0); // spine edge aligns with the pivot axis
   pivot.add(lid);
 
   // Finished satin-black underside; it remains distinct from the exterior
   // clearcoat without turning the open lid into a bright metallic panel.
   const underTrim = extrudeFlat(
-    footprintBand(-1.45),
+    footprintBand(lidFront),
     0.012,
     mats.blackSatin,
     0,
@@ -752,45 +765,71 @@ export function buildLid(mats) {
   underTrim.position.set(3.6, -0.014, 0);
   pivot.add(underTrim);
 
-  // The front flap, folded back onto the lid on a continuous brass hinge.
-  const flapShape = footprintBand(-1.45, -0.8);
-  const flap = extrudeFlat(flapShape, 0.04, mats.blackLacquer, 0.012);
-  flap.position.set(3.6, 0.082, 0); // its bevel clears the lid top (0.072)
-  pivot.add(flap);
-  const edge = flapShape
-    .getPoints()
-    .filter((p) => p.y < -1.44)
-    .map((p) => p.x);
-  const [left, right] = [Math.min(...edge), Math.max(...edge)];
-  const hinge = cyl(
-    0.016,
-    0.016,
-    right - left,
-    mats.gold,
-    null,
-    3.6 + (left + right) / 2,
-    0.08,
-    1.43,
-    0,
-    Math.PI / 2,
-    "",
-    10,
+  const hingeY = 0.074; // just above the lid's top face (0.072)
+  const hingeZ = 0.92; // the lid's front edge, bevel included
+  const flapHinge = new THREE.Group();
+  flapHinge.position.set(3.6, hingeY, hingeZ);
+  pivot.add(flapHinge);
+  // Opened out it reaches to just short of the desk ledge (z 1.78).
+  const flap = extrudeFlat(
+    footprintBand(-1.74, -0.94),
+    0.06,
+    mats.blackLacquer,
+    0.02,
   );
-  pivot.add(hinge);
+  flap.position.set(0, -hingeY, -hingeZ); // flush with the lid when open
+  flapHinge.add(flap);
+  flapHinge.add(
+    cyl(0.014, 0.014, 7.2, mats.gold, null, 0, 0, 0, 0, Math.PI / 2, "", 10),
+  );
 
-  const prop = cyl(
-    0.045,
-    0.045,
-    1,
-    mats.blackSatin,
-    g,
-    2.92,
-    DIM.rimTopY + 1.0,
-    -0.2,
-    0,
-    -0.28,
-    "",
-    12,
+  // Prop stick, authored one unit long and stretched to reach the lid: a
+  // tapered shaft over a flat, slotted foot blade. The brass end cups undo
+  // the stretch so they keep their shape.
+  const prop = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.026, 0.04, 0.72, 16).translate(0, 0.14, 0),
+    mats.blackLacquer,
+  );
+  prop.castShadow = true;
+  g.add(prop);
+  const blade = new THREE.Shape();
+  blade.moveTo(-0.045, -0.5);
+  blade.lineTo(0.045, -0.5);
+  blade.lineTo(0.062, -0.45);
+  blade.lineTo(0.062, -0.29);
+  blade.quadraticCurveTo(0.062, -0.22, 0.038, -0.2);
+  blade.lineTo(-0.038, -0.2);
+  blade.quadraticCurveTo(-0.062, -0.22, -0.062, -0.29);
+  blade.lineTo(-0.062, -0.45);
+  blade.closePath();
+  const slot = new THREE.Path();
+  slot.moveTo(-0.015, -0.43);
+  slot.lineTo(0.015, -0.43);
+  slot.lineTo(0.015, -0.29);
+  slot.lineTo(-0.015, -0.29);
+  slot.closePath();
+  blade.holes.push(slot);
+  const bladeGeo = new THREE.ExtrudeGeometry(blade, {
+    depth: 0.04,
+    bevelThickness: 0.006,
+    bevelSize: 0.006,
+    bevelSegments: 2,
+  });
+  // Broad face toward the hall: width along z, thickness along x.
+  bladeGeo.translate(0, 0, -0.02).rotateY(Math.PI / 2);
+  const foot = new THREE.Mesh(bladeGeo, mats.blackLacquer);
+  foot.castShadow = true;
+  prop.add(foot);
+  const cupGeo = new THREE.CylinderGeometry(0.045, 0.035, 0.07, 14);
+  const cups = [1, -1].map((end) => {
+    const cup = new THREE.Mesh(cupGeo, mats.gold);
+    cup.userData.end = end;
+    prop.add(cup);
+    return cup;
+  });
+  // The brass socket, near flush under the lid, that the top cup seats in.
+  pivot.add(
+    cyl(0.07, 0.07, 0.006, mats.gold, null, 7.05, -0.017, -0.2, 0, 0, "", 16),
   );
 
   tag(
@@ -806,11 +845,19 @@ export function buildLid(mats) {
   const up = new THREE.Vector3(0, 1, 0);
   function setAngle(angle) {
     pivot.rotation.z = angle;
+    // Folded back (−π) while the lid is raised; flat as it comes down.
+    flapHinge.rotation.x =
+      -Math.PI * THREE.MathUtils.smoothstep(angle, 0.04, 0.3);
     top.set(7.05 * Math.cos(angle), 7.05 * Math.sin(angle), -0.2);
     top.add(pivot.position);
     direction.subVectors(top, base);
     prop.position.copy(base).addScaledVector(direction, 0.5);
-    prop.scale.y = direction.length();
+    const length = direction.length();
+    prop.scale.y = length;
+    for (const cup of cups) {
+      cup.scale.y = 1 / length;
+      cup.position.y = cup.userData.end * (0.5 - 0.035 / length);
+    }
     prop.quaternion.setFromUnitVectors(up, direction.normalize());
     prop.visible = angle > 0.03;
   }
