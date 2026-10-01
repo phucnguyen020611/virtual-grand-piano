@@ -47,7 +47,7 @@ function haloTexture() {
 }
 
 /** Great composers along the side walls, stage end first: left, then right. */
-const COMPOSERS = [
+export const COMPOSERS = [
   ["bach", "Johann Sebastian Bach", "1685 – 1750"],
   ["haydn", "Joseph Haydn", "1732 – 1809"],
   ["mozart", "Wolfgang Amadeus Mozart", "1756 – 1791"],
@@ -625,6 +625,7 @@ export function buildRoyalInterior(hall, scene, room) {
     /** Animate the stained glass. */
     update: glass.update,
     setGlow: glass.setGlow,
+    setBeams: glass.setBeams,
     /** Dim every lamp in the room: 0 = dark, 1 = full house. */
     setHouseLights(level) {
       lights.forEach((light, i) => (light.intensity = lightPower[i] * level));

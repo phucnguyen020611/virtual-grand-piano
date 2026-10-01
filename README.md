@@ -14,7 +14,7 @@
 
 ## Overview
 
-Virtual Grand Piano is a browser-based 3D instrument experience focused on two ideas: the expressive feel of a concert grand and the engineering hidden inside it. The first release provides a playable procedural grand piano, a free inspection camera, an exploded anatomy view, a modeled music desk and score, and a European court-style concert hall (gilded columns, coffered ceiling, crystal chandeliers, glowing Sainte-Chapelle-style stained glass between portraits of eight great composers, an organ beneath Mengs's _Parnassus_ in a gilt frame, a herringbone parquet stage, carpeted stairs with a gilt balustrade, and stepped velvet stalls with a royal aisle runner) with the piano side-on to the audience as at a recital.
+Virtual Grand Piano is a browser-based 3D instrument experience focused on two ideas: the expressive feel of a concert grand and the engineering hidden inside it. The first release provides a playable procedural grand piano, a free inspection camera, an exploded anatomy view, a modeled music desk and score, and a European court-style concert hall (gilded columns, coffered ceiling, crystal chandeliers, glowing Sainte-Chapelle-style stained glass casting coloured sunbeams, between portraits of eight great composers, an organ beneath Mengs's _Parnassus_ in a gilt frame, a herringbone parquet stage, carpeted stairs with a gilt balustrade, and stepped velvet stalls with a royal aisle runner) with the piano side-on to the audience as at a recital.
 
 The current model is procedural and intentionally lightweight. Future releases can replace or extend individual systems with higher-fidelity meshes, physically based textures, sampled audio, mechanical animation, and more accurate piano-action behavior without changing the overall product concept.
 
@@ -27,7 +27,8 @@ The current model is procedural and intentionally lightweight. Future releases c
 - Recorded acoustic piano samples with a bounded generated fallback
 - Autoplay playlist of five simplified pieces (Beethoven, Pachelbel, Bach and
   a traditional hymn) with hand-coloured key glow, falling
-  crystal light columns and star-dust sparkles
+  crystal light columns, star-dust sparkles and the composer's portrait
+  projected, lantern-show style, on the rear wall
 - An engraved, page-turning score book on the music desk (click a page to turn)
 - Free orbit, zoom-to-cursor and pan camera with view presets (pianist,
   keyboard, front row, balcony, whole hall) and double-click to orbit a spot
@@ -113,7 +114,8 @@ virtual-grand-piano/
 │   ├── scene/
 │   │   ├── hall.js             # concert hall, stage and lighting rig
 │   │   ├── royalDecor.js       # gilt, chandeliers, sconces, balustrades, drapes, portraits
-│   │   ├── stainedGlass.js     # glowing stained-glass lancets and their wall light
+│   │   ├── stainedGlass.js     # stained-glass lancets, their wall light and sunbeams
+│   │   ├── composerProjection.js # autoplay's composer, projected on the rear wall
 │   │   ├── surfaces.js         # procedural PBR sets (parquet, damask, velvet, runner…)
 │   │   └── noteEffects.js      # autoplay key glow, light columns, star dust
 │   ├── audio/

@@ -560,19 +560,54 @@ async function run() {
     };
     let glow;
     p.scene.traverse((o) => (glow ??= o.material?.userData?.glassGlow));
+    const beams = [];
+    p.scene.traverse(
+      (o) => o.material?.fragmentShader?.includes("Motes") && beams.push(o),
+    );
     pick("low");
     assert(
       p.renderer.getPixelRatio() === Math.min(w.devicePixelRatio, 0.75) &&
         !p.hall.key.castShadow &&
-        glow.value === 0,
+        glow.value === 0 &&
+        beams.length === 10 &&
+        beams.every((o) => !o.visible),
       "Low quality kept its costly extras",
+    );
+    pick("medium");
+    assert(
+      glow.value === 1 && beams.every((o) => !o.visible),
+      "Medium quality should light the walls but skip the sunbeams",
     );
     pick("high");
     assert(
-      p.hall.key.castShadow && glow.value === 1,
+      p.hall.key.castShadow &&
+        glow.value === 1 &&
+        beams.every((o) => o.visible),
       "High quality lost the shadow or the glass light",
     );
     log("graphics quality presets", { pass: true });
+  }
+
+  // Autoplay projects the composer on the rear wall, and takes it away.
+  {
+    const disc = p.scene.getObjectByName("composer-projection");
+    const settle = () => {
+      for (let i = 0; i < 3; i++) p.hall.update(100);
+    };
+    click("autoBtn");
+    // The slide waits for its portrait before it is shown.
+    for (let i = 0; i < 50 && !disc.visible; i++) {
+      await wait(100);
+      settle();
+    }
+    assert(
+      disc.visible && disc.material.uniforms.fade.value === 1,
+      "autoplay did not project its composer",
+    );
+    click("autoBtn");
+    settle();
+    assert(!disc.visible, "stopping autoplay left the projection on");
+    log("composer projection follows autoplay", { pass: true });
   }
 
   // Styled dropdowns drive their native select by mouse and keyboard.

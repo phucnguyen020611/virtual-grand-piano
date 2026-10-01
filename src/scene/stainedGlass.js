@@ -5,7 +5,7 @@ import * as THREE from "three";
  * tiered rose in the arch and a column of medallions, each a kaleidoscope of
  * concentric rings. A shader lets the panes twinkle, sweeps a sheen across
  * the glass and shifts it through an iridescent sheen with the viewing angle;
- * the wall round it takes on their light.
+ * the wall round it takes on their light and sunbeams slant through.
  *
  * Everything is authored in the opening's own units: x −2.5…2.5, y 0…16.
  */
@@ -341,6 +341,82 @@ function glowOnto(material, bays, tints, time, level, strength) {
   material.needsUpdate = true;
 }
 
+// --- Sunbeams -----------------------------------------------------------------
+// Shafts of light slant down from each window into the hall. Each is a sheaf
+// of thin planes laid along the light; every point carries the window
+// coordinate its ray came through, so the shaft takes the glass's colours as
+// streaks and keeps the lancet's outline.
+const BEAM_LENGTH = 38;
+const BEAM_X = [-1.9, -0.95, 0, 0.95, 1.9];
+const BEAM_Y = [2.5, 6.5, 10.5, 14.5];
+
+function beamGeometry(direction) {
+  const position = [];
+  const win = [];
+  const along = [];
+  const end = direction.clone().multiplyScalar(BEAM_LENGTH);
+  // A quad from window segment a→b, carried along the light.
+  const quad = (a, b) => {
+    const corners = [
+      [a, 0],
+      [b, 0],
+      [b, 1],
+      [a, 0],
+      [b, 1],
+      [a, 1],
+    ];
+    for (const [[x, y], t] of corners) {
+      position.push(x + end.x * t, y + end.y * t, end.z * t);
+      win.push(x, y);
+      along.push(t);
+    }
+  };
+  for (const x of BEAM_X) quad([x, 0], [x, H]);
+  for (const y of BEAM_Y) quad([-W / 2, y], [W / 2, y]);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(position, 3),
+  );
+  geometry.setAttribute("aWin", new THREE.Float32BufferAttribute(win, 2));
+  geometry.setAttribute("aAlong", new THREE.Float32BufferAttribute(along, 1));
+  return geometry;
+}
+
+const beamVertex = /* glsl */ `
+  attribute vec2 aWin;
+  attribute float aAlong;
+  varying vec2 vWin;
+  varying float vAlong;
+  void main() {
+    vWin = aWin;
+    vAlong = aAlong;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const beamFragment = /* glsl */ `
+  uniform sampler2D map;
+  uniform float time;
+  uniform float level;
+  varying vec2 vWin;
+  varying float vAlong;
+  void main() {
+    vec2 p = vWin;
+    // Only light that came through the lancet: no corners above its arch.
+    float cap = length(p - vec2(0.0, ${SPRING.toFixed(2)})) - ${(W / 2).toFixed(2)};
+    if (p.y > ${SPRING.toFixed(2)} && cap > 0.0) discard;
+    vec3 tint = texture2D(map, vec2(p.x / ${W.toFixed(1)} + 0.5, p.y / ${H.toFixed(1)}), 2.0).rgb;
+    // Brightest at the glass, gone by the far end; soft at the shaft's sides.
+    float fade = pow(1.0 - vAlong, 2.4) * smoothstep(0.0, 0.04, vAlong);
+    float sides = smoothstep(${(W / 2).toFixed(2)}, 1.2, abs(p.x)) * smoothstep(0.0, 1.5, p.y);
+    // Motes drifting in the light.
+    float motes = 0.8 + 0.2 * sin(vAlong * 46.0 + p.x * 2.7 + p.y * 0.8 - time * 0.5);
+    gl_FragColor = vec4(tint * fade * sides * motes * 0.036 * level, 1.0);
+    #include <colorspace_fragment>
+  }
+`;
+
 /**
  * Glaze each bay ([x, y, z, yaw]) with a lancet, and light the `wall`
  * material round it.
@@ -353,6 +429,7 @@ export function buildStainedGlass(parent, bays, shape, wall) {
   const time = { value: 0 };
   const level = { value: 1 };
   const strength = { value: 1 };
+  const beams = [];
   bays.forEach(([x, y, z, yaw], i) => {
     const glass = new THREE.Mesh(
       glassGeometry,
@@ -369,6 +446,29 @@ export function buildStainedGlass(parent, bays, shape, wall) {
     glass.position.set(x, y, z);
     glass.rotation.y = yaw;
     parent.add(glass);
+    // The light slants down and, on both walls alike, toward the back.
+    const toBack = x < 0 ? -0.25 : 0.25; // local x runs ∓z on the two walls
+    const beam = new THREE.Mesh(
+      beamGeometry(new THREE.Vector3(toBack, -0.45, 1).normalize()),
+      new THREE.ShaderMaterial({
+        uniforms: {
+          map: { value: variants[i % variants.length].map },
+          time,
+          level,
+        },
+        vertexShader: beamVertex,
+        fragmentShader: beamFragment,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    beam.position.copy(glass.position);
+    beam.rotation.y = yaw;
+    beam.renderOrder = 3;
+    beams.push(beam);
+    parent.add(beam);
   });
   glowOnto(
     wall,
@@ -382,9 +482,13 @@ export function buildStainedGlass(parent, bays, shape, wall) {
     setLevel(value) {
       level.value = 0.1 + 0.9 * value;
     },
-    /** The wall light is the glass's one optional cost: off at Low quality. */
+    /** The light on the wall round the windows (off at Low). */
     setGlow(on) {
       strength.value = on ? 1 : 0;
+    },
+    /** Sunbeams: layered additive light, the glass's dearest effect. */
+    setBeams(on) {
+      for (const beam of beams) beam.visible = on;
     },
     update(dt) {
       time.value += dt;

@@ -13,7 +13,8 @@ import {
   stageBoardSet,
   velvetSet,
 } from "./surfaces.js";
-import { buildRoyalInterior } from "./royalDecor.js";
+import { buildRoyalInterior, COMPOSERS } from "./royalDecor.js";
+import { createComposerProjection } from "./composerProjection.js";
 
 // One scene unit is ~0.21 m (the keyboard is 5.9 units, 1.22 m wide).
 const STAGE_TOP = -0.045; // legs and casters sit on this plane
@@ -312,6 +313,16 @@ export function createHall(scene, mats) {
     hall,
   );
   rear.rotation.y = Math.PI;
+  // Autoplay casts the composer's portrait, lantern-show style, on the bare
+  // wall behind the stalls, clear of the back rows and the balconies.
+  const projection = createComposerProjection(
+    hall,
+    // Off the wall by a hand's breadth: that far from the camera, depth
+    // precision is too coarse to tell a decal from the wall behind it.
+    new THREE.Vector3(0, 40, HALL_BACK_Z - 0.6),
+    30,
+    Object.fromEntries(COMPOSERS.map(([file, name]) => [name, file])),
+  );
 
   const royal = buildRoyalInterior(hall, scene, {
     halfWidth: HALL_HALF_WIDTH,
@@ -808,8 +819,9 @@ export function createHall(scene, mats) {
       curtainTarget = open ? 1 : 0;
     },
     /** Graphics quality: key-light shadow size (0 = none), the two broad
-     *  area lights and the stained glass's wall light, the costliest parts. */
-    setQuality({ shadow, areaLights, glassGlow }) {
+     *  area lights, the stained glass's wall light and sunbeams: the costliest
+     *  parts. */
+    setQuality({ shadow, areaLights, glassGlow, sunbeams }) {
       key.castShadow = shadow > 0;
       if (shadow && key.shadow.mapSize.x !== shadow) {
         key.shadow.mapSize.set(shadow, shadow);
@@ -818,8 +830,12 @@ export function createHall(scene, mats) {
       }
       wash.visible = wallGlaze.visible = areaLights;
       royal.setGlow(glassGlow);
+      royal.setBeams(sunbeams);
     },
+    /** Project the playing song's composer on the rear wall (null: none). */
+    showComposer: projection.show,
     update(dt) {
+      projection.update(dt);
       // Reduced motion arrives as one huge step: hold the glass still then.
       royal.update(dt < 1 ? dt : 0);
       // The traveller takes a few seconds to cross; lights follow it.

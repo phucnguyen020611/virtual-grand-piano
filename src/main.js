@@ -68,24 +68,28 @@ const QUALITY = {
     shadow: 0,
     areaLights: false,
     glassGlow: false,
+    sunbeams: false,
   },
   medium: {
     pixelRatio: () => 1,
     shadow: 1024,
     areaLights: true,
     glassGlow: true,
+    sunbeams: false,
   },
   high: {
     pixelRatio: () => (handheld() ? 1.5 : 2),
     shadow: 2048,
     areaLights: true,
     glassGlow: true,
+    sunbeams: true,
   },
   ultra: {
     pixelRatio: () => 3,
     shadow: 4096,
     areaLights: true,
     glassGlow: true,
+    sunbeams: true,
   },
 };
 let quality = "high";
@@ -258,6 +262,7 @@ function stopAutoplay() {
   autoBtn.setAttribute("aria-pressed", "false");
   pianoPerformance.stopSource("autoplay");
   noteEffects.stop();
+  hall.showComposer(null);
   progressEl.style.width = "0%";
 }
 function startAutoplay() {
@@ -272,6 +277,7 @@ function startAutoplay() {
   piano.scoreBook.turnTo(1); // open at the music
   songStart = performance.now() + LEAD_IN * 1000;
   noteEffects.start(songEvents);
+  hall.showComposer(song);
   for (const event of songEvents) {
     autoTimers.push(
       setTimeout(
