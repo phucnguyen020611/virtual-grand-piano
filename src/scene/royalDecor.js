@@ -195,9 +195,16 @@ export function buildRoyalInterior(hall, scene, room) {
   instanced(
     base,
     gilt,
-    columns.map(([x, z]) => [x, balconyY + 1.6, z]),
+    columns.map(([x, z]) => [x, balconyY + 1.1, z]),
     hall,
   );
+  // A ledge along the dado's top for the bases to stand on; under the
+  // balconies it disappears into the deck.
+  for (const side of [-1, 1]) {
+    const ledge = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, length), gilt);
+    ledge.position.set(side * (halfWidth - 0.9), balconyY + 0.25, midZ);
+    hall.add(ledge);
+  }
 
   // --- Cornices: balcony string course and the entablature under the ceiling ---
   const band = (y, h, d, material) => {
@@ -376,35 +383,42 @@ export function buildRoyalInterior(hall, scene, room) {
   const balconyZ0 = 16;
   const balusters = [];
   const railX = halfWidth - 6;
-  for (const side of [-1, 1])
-    for (let z = balconyZ0 + 0.5; z < backZ - 0.5; z += 0.85)
-      balusters.push([side * railX, balconyY + 0.5, z]);
-  instanced(baluster, gilt, balusters, hall);
+  const railVelvet = new THREE.MeshPhysicalMaterial({
+    ...repeatSet(velvet, 1, 60),
+    roughness: 1,
+    sheen: 1,
+    sheenColor: 0xe0707e,
+  });
+  // A gilt rail with its velvet cushion, from (x0, z0) to (x1, z1).
+  const railRun = (x0, z0, x1, z1) => {
+    const w = Math.abs(x1 - x0);
+    const d = Math.abs(z1 - z0);
+    for (const [size, h, y, material] of [
+      [0.7, 0.3, 3, gilt],
+      [0.62, 0.22, 3.25, railVelvet],
+    ]) {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(w || size, h, d || size),
+        material,
+      );
+      m.position.set((x0 + x1) / 2, balconyY + y, (z0 + z1) / 2);
+      hall.add(m);
+    }
+  };
+  const endZ = balconyZ0 + 0.5;
   for (const side of [-1, 1]) {
-    const rail = new THREE.Mesh(
-      new THREE.BoxGeometry(0.7, 0.3, backZ - balconyZ0),
-      gilt,
-    );
-    rail.position.set(side * railX, balconyY + 3, (backZ + balconyZ0) / 2);
-    const cushion = new THREE.Mesh(
-      new THREE.BoxGeometry(0.62, 0.22, backZ - balconyZ0),
-      new THREE.MeshPhysicalMaterial({
-        ...repeatSet(velvet, 1, 60),
-        roughness: 1,
-        sheen: 1,
-        sheenColor: 0xe0707e,
-      }),
-    );
-    cushion.position.set(
-      side * railX,
-      balconyY + 3.25,
-      (backZ + balconyZ0) / 2,
-    );
-    hall.add(rail, cushion);
+    for (let z = endZ; z < backZ - 0.5; z += 0.85)
+      balusters.push([side * railX, balconyY + 0.5, z]);
+    // Close the balcony's open end back to the wall.
+    for (let x = railX + 0.85; x < halfWidth - 0.3; x += 0.85)
+      balusters.push([side * x, balconyY + 0.5, endZ]);
+    railRun(side * railX, balconyZ0, side * railX, backZ);
+    railRun(side * (railX - 0.35), endZ, side * halfWidth, endZ);
     // Glass globes on gilt stems along the rail.
     for (let z = balconyZ0 + 4; z < backZ - 2; z += 8)
       bulbs.push([side * railX, balconyY + 4.4, z, 0.42]);
   }
+  instanced(baluster, gilt, balusters, hall);
   instanced(
     new THREE.CylinderGeometry(0.07, 0.12, 0.9, 8),
     gilt,
