@@ -39,6 +39,15 @@ Each was taken from Commons' 960 px rendition, scaled and centre-cropped to
 512 × 640 px (4:5) to fit the frames. The white ground around Scheffer's oval
 Chopin portrait was filled with a dark tone so it sits in a rectangular frame.
 
+## Exit sign
+
+`public/art/exit-sign.svg` is the ISO 7010 safe-condition sign "Exit, straight
+ahead" with English text, lit above the doors at the back of the stalls.
+
+- Source file: [ISO 7010 - Exit Up - EN.svg](https://commons.wikimedia.org/wiki/File:ISO_7010_-_Exit_Up_-_EN.svg), Wikimedia Commons, by The Navigators
+- Licence: public domain
+- Used as published, 1170 × 380 px.
+
 ## The developer's picture
 
 `public/art/developer.jpg` is the GitHub profile picture of the project's

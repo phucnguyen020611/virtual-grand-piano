@@ -604,9 +604,14 @@ async function run() {
       disc.visible && disc.material.uniforms.fade.value === 1,
       "autoplay did not project its composer",
     );
+    const beam = p.scene.getObjectByName("lantern-beam");
+    assert(beam.visible, "the lantern on the rig cast no beam");
     click("autoBtn");
     settle();
-    assert(!disc.visible, "stopping autoplay left the projection on");
+    assert(
+      !disc.visible && !beam.visible,
+      "stopping autoplay left the projection on",
+    );
     log("composer projection follows autoplay", { pass: true });
 
     // Credits roll up the same disc, end on the developer's card, and give

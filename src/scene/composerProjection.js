@@ -136,12 +136,49 @@ const fragmentShader = /* glsl */ `
   }
 `;
 
+// The lantern's light on its way to the wall, caught in the hall's haze:
+// densest along the axis and near the lens, specked with drifting dust.
+const beamFragment = /* glsl */ `
+  uniform float fade;
+  uniform float time;
+  uniform float wear;
+  varying vec3 vNormal;
+  varying vec3 vView;
+  varying vec3 vLocal;
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+  }
+  void main() {
+    float along = vLocal.y; // 0 at the lens, 1 at the wall
+    float core = pow(abs(dot(normalize(vNormal), normalize(vView))), 2.0);
+    float ends = smoothstep(0.0, 0.03, along) * smoothstep(1.0, 0.9, along);
+    vec2 cell = vec2(atan(vLocal.x, vLocal.z) * 9.0, along * 140.0 - time * 0.6);
+    vec2 at = fract(cell) - 0.5;
+    float seed = hash(floor(cell));
+    float dust = step(0.9, seed) * smoothstep(0.22, 0.0, length(at))
+      * (0.5 + 0.5 * sin(time * (2.0 + 5.0 * seed) + seed * 40.0));
+    float frame = floor(time * 18.0) * wear;
+    float flicker = 0.94 + (hash(vec2(frame, 9.0)) - 0.5) * 0.08 * wear;
+    vec3 warm = vec3(1.0, 0.83, 0.58);
+    float glow = core * (1.0 - 0.7 * along) * 0.09 + dust * 0.1;
+    gl_FragColor = vec4(warm * glow * ends * flicker * fade, 1.0);
+    #include <colorspace_fragment>
+  }
+`;
+
 /**
  * @param parent the hall group
  * @param at centre of the disc on the wall; the disc faces −z (the stage)
  * @param portraits composer name → their portrait texture on the wall
+ * @param lantern the instrument that casts it: { lens: position, material }
  */
-export function createComposerProjection(parent, at, diameter, portraits) {
+export function createComposerProjection(
+  parent,
+  at,
+  diameter,
+  portraits,
+  lantern,
+) {
   const uniforms = {
     map: { value: null },
     fade: { value: 0 },
@@ -173,6 +210,51 @@ export function createComposerProjection(parent, at, diameter, portraits) {
   disc.rotation.y = Math.PI;
   disc.visible = false;
   parent.add(disc);
+
+  // The beam, an open cone from the lens to the disc's rim.
+  const reach = at.distanceTo(lantern.lens);
+  const cone = new THREE.CylinderGeometry(
+    diameter * 0.46,
+    0.45,
+    reach,
+    40,
+    1,
+    true,
+  );
+  cone.translate(0, reach / 2, 0);
+  const beam = new THREE.Mesh(
+    cone,
+    new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader: /* glsl */ `
+        varying vec3 vNormal;
+        varying vec3 vView;
+        varying vec3 vLocal;
+        void main() {
+          vLocal = vec3(position.x, position.y / ${reach.toFixed(2)}, position.z);
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vNormal = normalMatrix * normal;
+          vView = -mv.xyz;
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: beamFragment,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    }),
+  );
+  beam.name = "lantern-beam";
+  beam.position.copy(lantern.lens);
+  beam.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    at.clone().sub(lantern.lens).normalize(),
+  );
+  beam.visible = false;
+  parent.add(beam);
+  const lensDark = lantern.material.color.clone();
+  const lensLit = new THREE.Color(0xffe2b0).multiplyScalar(3);
 
   const slides = new Map();
   let wanted = null; // the slide's key, or null for none
@@ -206,7 +288,8 @@ export function createComposerProjection(parent, at, diameter, portraits) {
       );
       if (uniforms.fade.value === 0) uniforms.map.value = next ?? null;
       uniforms.map.value?.userData.tick?.(dt);
-      disc.visible = uniforms.fade.value > 0;
+      disc.visible = beam.visible = uniforms.fade.value > 0;
+      lantern.material.color.lerpColors(lensDark, lensLit, uniforms.fade.value);
     },
   };
 }

@@ -138,6 +138,7 @@ export function buildRoyalInterior(hall, scene, room) {
     balconyY,
     aniso,
     velvet,
+    landing, // the stairs' head at the back of each balcony
   } = room;
   const keepEnv = (m, intensity) => {
     m.envMapIntensity = intensity;
@@ -156,11 +157,37 @@ export function buildRoyalInterior(hall, scene, room) {
     color: 0xe6d9bd,
     roughness: 0.75,
   });
-  const bulbGlow = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0xffe2b0).multiplyScalar(3),
+  // Frosted opal glass round a lit filament: a hot core where the lamp shows
+  // through, warming to amber at the rim, so each globe reads round.
+  const bulbGlow = new THREE.ShaderMaterial({
+    uniforms: { level: { value: 1 } },
+    vertexShader: /* glsl */ `
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        vec4 mv = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        vNormal = normalMatrix * mat3(instanceMatrix) * normal;
+        vView = -mv.xyz;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform float level;
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        float facing = abs(dot(normalize(vNormal), normalize(vView)));
+        vec3 lit = mix(vec3(0.62, 0.3, 0.1), vec3(1.0, 0.86, 0.62) * 1.15, pow(facing, 1.3))
+          + vec3(1.0, 0.92, 0.75) * pow(facing, 16.0) * 0.9;
+        vec3 cold = vec3(0.17, 0.15, 0.13) * (0.45 + 0.55 * facing);
+        gl_FragColor = vec4(mix(cold, lit, level), 1.0);
+        #include <colorspace_fragment>
+      }
+    `,
     toneMapped: false,
   });
-  const bulbs = []; // every lamp's position, for bulbs and halos
+  // Every lamp's [x, y, z, radius, round]: candle flames unless round.
+  const bulbs = [];
   const length = backZ - stageBackZ;
   const midZ = (backZ + stageBackZ) / 2;
 
@@ -408,23 +435,39 @@ export function buildRoyalInterior(hall, scene, room) {
     }
   };
   const endZ = balconyZ0 + 0.5;
+  const headZ = backZ - landing; // the rail stops for the stairs
   for (const side of [-1, 1]) {
-    for (let z = endZ; z < backZ - 0.5; z += 0.85)
+    for (let z = endZ; z < headZ; z += 0.85)
       balusters.push([side * railX, balconyY + 0.5, z]);
     // Close the balcony's open end back to the wall.
     for (let x = railX + 0.85; x < halfWidth - 0.3; x += 0.85)
       balusters.push([side * x, balconyY + 0.5, endZ]);
-    railRun(side * railX, balconyZ0, side * railX, backZ);
+    railRun(side * railX, balconyZ0, side * railX, headZ);
     railRun(side * (railX - 0.35), endZ, side * halfWidth, endZ);
-    // Glass globes on gilt stems along the rail.
-    for (let z = balconyZ0 + 4; z < backZ - 2; z += 8)
-      bulbs.push([side * railX, balconyY + 4.4, z, 0.42]);
+    // Opal globes on turned brass lamp posts along the rail.
+    for (let z = balconyZ0 + 4; z < headZ - 1; z += 8)
+      bulbs.push([side * railX, balconyY + 4.75, z, 0.4, true]);
   }
   instanced(baluster, gilt, balusters, hall);
   instanced(
-    new THREE.CylinderGeometry(0.07, 0.12, 0.9, 8),
+    new THREE.LatheGeometry(
+      [
+        [0.24, 0],
+        [0.24, 0.08],
+        [0.1, 0.16],
+        [0.07, 0.4],
+        [0.13, 0.55],
+        [0.06, 0.7],
+        [0.06, 0.85],
+        // The gallery cup the globe sits in.
+        [0.2, 0.92],
+        [0.24, 1.05],
+        [0.2, 1.06],
+      ].map(([r, y]) => new THREE.Vector2(r, y)),
+      16,
+    ),
     gilt,
-    bulbs.map(([x, y, z]) => [x, y - 0.7, z]),
+    bulbs.map(([x, , z]) => [x, balconyY + 3.36, z]),
     hall,
   );
 
@@ -500,6 +543,7 @@ export function buildRoyalInterior(hall, scene, room) {
     1.6,
   );
   const chandelierZ = [22, 38, 54, 70, 86];
+  const sleeves = []; // ivory candle sleeves under every flame
   const hangY = ceilingY - 14;
   const frame = [];
   const drops = [];
@@ -538,7 +582,8 @@ export function buildRoyalInterior(hall, scene, room) {
         const a = (i / count) * Math.PI * 2;
         const x = Math.cos(a) * radius;
         const bz = z + Math.sin(a) * radius;
-        bulbs.push([x, y + 0.55, bz, 0.22]);
+        bulbs.push([x, y + 1.25, bz, 0.2]);
+        sleeves.push([x, y + 0.7, bz]);
         frame.push(
           new THREE.CylinderGeometry(0.12, 0.09, 0.4, 8).translate(
             x,
@@ -570,37 +615,68 @@ export function buildRoyalInterior(hall, scene, room) {
   instanced(new THREE.OctahedronGeometry(0.16, 0), crystal, drops, hall);
   scene.add(...lights);
 
-  // --- Two-branch wall sconces below the balconies -----------------------------------
+  // --- Two-branch candle sconces below the balconies ---------------------------------
+  // A cast shield on the wall; two scrolled arms curl out and up to drip pans,
+  // each holding a candle sleeve and its flame.
   const sconce = [];
   for (let i = 0; i < columnZ.length - 1; i++)
     for (const side of [-1, 1]) {
-      const x = side * (halfWidth - 0.35);
       const z = (columnZ[i] + columnZ[i + 1]) / 2;
+      if (room.doorBays?.includes(z)) continue; // a doorway stands there
+      const x = side * halfWidth;
       const y = floorY(z) + 12;
       sconce.push([x, y, z]);
-      for (const dz of [-0.9, 0.9])
-        bulbs.push([x - side * 0.9, y + 1.3, z + dz, 0.24]);
+      for (const dz of [-0.95, 0.95]) {
+        bulbs.push([x - side * 1.1, y + 1.55, z + dz, 0.22]);
+        sleeves.push([x - side * 1.1, y + 1.05, z + dz]);
+      }
     }
-  const sconceGeometry = mergeGeometries([
-    new THREE.BoxGeometry(0.5, 1.6, 0.8),
-    new THREE.BoxGeometry(1.6, 0.14, 0.14).translate(0, 0.6, -0.9),
-    new THREE.BoxGeometry(1.6, 0.14, 0.14).translate(0, 0.6, 0.9),
-    new THREE.CylinderGeometry(0.16, 0.12, 0.6, 8).translate(0.9, 0.95, -0.9),
-    new THREE.CylinderGeometry(0.16, 0.12, 0.6, 8).translate(0.9, 0.95, 0.9),
-  ]);
+  const sconceParts = [
+    new THREE.SphereGeometry(1, 16, 12).scale(0.12, 0.85, 0.42),
+    new THREE.SphereGeometry(0.16, 12, 8).translate(0.12, -0.95, 0),
+  ];
+  for (const dz of [-0.95, 0.95])
+    sconceParts.push(
+      new THREE.TubeGeometry(
+        new THREE.CubicBezierCurve3(
+          new THREE.Vector3(0.1, 0.1, 0),
+          new THREE.Vector3(0.9, -0.5, dz * 0.2),
+          new THREE.Vector3(1.2, 0.1, dz),
+          new THREE.Vector3(1.1, 0.68, dz),
+        ),
+        16,
+        0.06,
+        6,
+      ),
+      new THREE.LatheGeometry(
+        [
+          [0.05, 0],
+          [0.2, 0.08],
+          [0.24, 0.14],
+          [0.1, 0.12],
+        ].map(([r, y]) => new THREE.Vector2(r, y)),
+        14,
+      ).translate(1.1, 0.66, dz),
+    );
   // Arms point into the room from each wall.
   instanced(
-    sconceGeometry,
+    mergeGeometries(sconceParts.map((g) => (g.index ? g.toNonIndexed() : g))),
     gilt,
     sconce.map(([x, y, z]) => [x, y, z, x > 0 ? Math.PI : 0]),
+    hall,
+  );
+  instanced(
+    new THREE.CylinderGeometry(0.075, 0.08, 0.6, 10),
+    ivory,
+    sleeves,
     hall,
   );
 
   // --- Every bulb lit: an emissive flame plus a halo, two draw calls in all -------
   instanced(
-    new THREE.SphereGeometry(1, 10, 8).scale(1, 1.5, 1),
+    new THREE.SphereGeometry(1, 16, 12).scale(1, 1.5, 1),
     bulbGlow,
-    bulbs.map(([x, y, z, r]) => [x, y, z, 0, r, r, r]),
+    bulbs.map(([x, y, z, r, round]) => [x, y, z, 0, r, round ? r / 1.5 : r, r]),
     hall,
   );
   const haloGeometry = new THREE.BufferGeometry();
@@ -627,8 +703,6 @@ export function buildRoyalInterior(hall, scene, room) {
   halos.renderOrder = 4;
   hall.add(halos);
 
-  const litBulb = bulbGlow.color.clone();
-  const coldBulb = new THREE.Color(0x2a2520); // unlit glass
   const lightPower = lights.map((light) => light.intensity);
   return {
     gilt,
@@ -646,7 +720,7 @@ export function buildRoyalInterior(hall, scene, room) {
     /** Dim every lamp in the room: 0 = dark, 1 = full house. */
     setHouseLights(level) {
       lights.forEach((light, i) => (light.intensity = lightPower[i] * level));
-      bulbGlow.color.lerpColors(coldBulb, litBulb, level);
+      bulbGlow.uniforms.level.value = level;
       halos.material.opacity = level;
       crystal.emissiveIntensity = 0.35 * level;
       glass.setLevel(level);

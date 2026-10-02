@@ -15,6 +15,8 @@ import {
 } from "./surfaces.js";
 import { buildRoyalInterior } from "./royalDecor.js";
 import { createComposerProjection } from "./composerProjection.js";
+import { buildLightingRig } from "./stageLighting.js";
+import { buildPassages } from "./passages.js";
 
 // One scene unit is ~0.21 m (the keyboard is 5.9 units, 1.22 m wide).
 const STAGE_TOP = -0.045; // legs and casters sit on this plane
@@ -47,6 +49,8 @@ const stallsY = (z, x = 0) =>
   );
 const floorY = (z, x = 0) => (z < STAGE_FRONT_Z ? STAGE_TOP : stallsY(z, x));
 const BALCONY_Y = 24;
+const LANDING = 4; // each balcony's stair arrives through a gap this wide
+const WING_Z = -14; // the stage doors, one bay in from the organ wall
 const ORGAN_Y = 9; // base of the display pipes
 
 function mesh(geometry, material, x, y, z, parent) {
@@ -325,16 +329,47 @@ export function createHall(scene, mats) {
     aniso,
     velvet,
     glowWall: upperPlaster, // the stained glass lights it
+    landing: LANDING,
+    doorBays: [WING_Z],
   });
+  // --- Lighting rig: a front-of-house pipe between two chandeliers, and an
+  // electric over the stage hung clear above Parnassus ------------------------
+  // Piano and bench together: the pool of light covers the whole stage set.
+  const normalFocus = onStage(0, 1.2, 0.3);
+  const SLIDE_AT = new THREE.Vector3(0, 40, HALL_BACK_Z - 0.6);
+  const mark = (x, z) => new THREE.Vector3(x, STAGE_TOP, z);
+  const [keyRig, fillRig, lanternRig, backRig] = buildLightingRig(hall, {
+    ceilingY: CEILING_Y,
+    pipes: [
+      { y: 47.2, z: 30, x0: -26, x1: 26, hangers: [-22, 22] },
+      { y: 60.5, z: -18, x0: -26, x1: 26, hangers: [-22, 22] },
+    ],
+    instruments: [
+      { x: 12, pipe: 0, aim: normalFocus },
+      { x: -18, pipe: 0, aim: normalFocus },
+      { x: 0, pipe: 0, aim: SLIDE_AT, kind: "profile" },
+      { x: -4, pipe: 1, aim: normalFocus },
+      // Spare instruments, focused on other marks and dark tonight.
+      { x: -9, pipe: 0, aim: mark(-8, -4), kind: "profile" },
+      { x: 6, pipe: 0, aim: mark(6, -8) },
+      { x: 20, pipe: 0, aim: mark(14, 0), kind: "profile" },
+      { x: -16, pipe: 1, aim: mark(-10, -6) },
+      { x: 9, pipe: 1, aim: mark(8, -2) },
+      { x: 18, pipe: 1, aim: mark(16, -10) },
+    ],
+  });
+
   // Autoplay casts the composer's portrait, lantern-show style, on the bare
-  // wall behind the stalls, clear of the back rows and the balconies.
+  // wall behind the stalls, clear of the back rows and the balconies; the
+  // profile on the front-of-house pipe is the lantern.
   const projection = createComposerProjection(
     hall,
     // Off the wall by a hand's breadth: that far from the camera, depth
     // precision is too coarse to tell a decal from the wall behind it.
-    new THREE.Vector3(0, 40, HALL_BACK_Z - 0.6),
+    SLIDE_AT,
     30,
     royal.portraitMaps,
+    lanternRig,
   );
   const gold = royal.gilt;
   // Gilded nosing along the stage front.
@@ -606,6 +641,22 @@ export function createHall(scene, mats) {
   // Every small gilt piece of the stage wall and the stairs: one draw call.
   hall.add(new THREE.Mesh(mergeGeometries(gilded), gold));
 
+  // Exit doors, stage doors in the wings and the stairs to the balconies.
+  buildPassages(hall, {
+    halfWidth: HALL_HALF_WIDTH,
+    backZ: HALL_BACK_Z,
+    stageTopY: STAGE_TOP,
+    rearFloorY: tierY(ROWS - 1), // the cross-aisle behind the last row
+    deckY: BALCONY_Y + 0.5,
+    railX: HALL_HALF_WIDTH - 6,
+    landing: LANDING,
+    wingZ: WING_Z,
+    gilt: gold,
+    wood: darkWood,
+    velvet,
+    runner: { geometry: runnerAlong, material: runnerMaterial },
+  });
+
   const { velvet: seatShape, frame } = seatGeometries();
   const seats = [];
   for (let row = 0; row < 17; row++) {
@@ -614,6 +665,8 @@ export function createHall(scene, mats) {
     // curve never touch; each faces square to its row, as in a real hall.
     for (let x = 3.9; x < 27; x += 3.2)
       for (const side of [-1, 1]) {
+        // The back row's outer seats would stand on the balcony stairs.
+        if (row === ROWS - 1 && x > 22) continue;
         const sx = side * x;
         const z = rowZ + rowCurve(sx);
         seats.push([sx, tierY(row), z, Math.atan(sx / 80)]); // rowCurve' = x/80
@@ -649,9 +702,7 @@ export function createHall(scene, mats) {
   });
   hall.add(velvetSeats, frameSeats);
 
-  // --- Lighting rig ------------------------------------------------------------------
-  // Piano and bench together: the pool of light covers the whole stage set.
-  const normalFocus = onStage(0, 1.2, 0.3);
+  // --- Stage lights, from the rig's lenses ------------------------------------------
   const explodedFocus = onStage(0, 4.35, -0.65);
   const focus = normalFocus.clone();
 
@@ -661,8 +712,8 @@ export function createHall(scene, mats) {
     scene.add(light, light.target);
     return light;
   };
-  // Front-of-house key from the lighting bridge: the only shadow caster.
-  const key = spot(0xfff1dc, 3.2, new THREE.Vector3(12, 46, 40), 0.105, 0.7);
+  // Front-of-house key: the only shadow caster.
+  const key = spot(0xfff1dc, 3.2, keyRig.lens, 0.105, 0.7);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
   key.shadow.bias = -0.00008;
@@ -670,8 +721,12 @@ export function createHall(scene, mats) {
   key.shadow.radius = 3;
   key.shadow.camera.near = 30;
   key.shadow.camera.far = 90;
-  const fill = spot(0xffe2c0, 1.4, new THREE.Vector3(-18, 42, 36), 0.12, 0.8);
-  const back = spot(0xd8e4ff, 1.8, new THREE.Vector3(-4, 48, -20), 0.24, 0.6);
+  const fill = spot(0xffe2c0, 1.4, fillRig.lens, 0.12, 0.8);
+  const back = spot(0xd8e4ff, 1.8, backRig.lens, 0.2, 0.6);
+  // Their lenses glow while they burn.
+  const lit = [keyRig, fillRig, backRig].map(({ material }) => material);
+  const lensOff = lit[0].color.clone();
+  const lensOn = new THREE.Color(0xfff0d8).multiplyScalar(2.2);
 
   // Soft overhead wash for the whole stage, and a warm glaze on the organ wall.
   const wash = new THREE.RectAreaLight(0xffe8cc, 0.2, 56, 30);
@@ -755,6 +810,7 @@ export function createHall(scene, mats) {
     // Studio reflections fade with the room, all but a trace. (Materials
     // lit by scene.environment take this, not their own envMapIntensity.)
     scene.environmentIntensity = 0.1 + 0.9 * level;
+    for (const lens of lit) lens.color.lerpColors(lensOff, lensOn, level);
     ghostLamp.intensity = 28 * (1 - level);
     ghostGlass.color.copy(ghostGlow).multiplyScalar(1 - level);
     ghost.visible = level < 0.999;

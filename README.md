@@ -29,7 +29,8 @@ The current model is procedural and intentionally lightweight. Future releases c
   a traditional hymn) with hand-coloured key glow, falling
   crystal light columns, star-dust sparkles and the composer's portrait
   projected, lantern-show style, on the rear wall
-- Closing credits that roll up the same lantern projection, worn like old film
+- Closing credits that roll up the same lantern projection (its beam visible in
+  the haze from the lens on the lighting pipe), worn like old film
   (gate weave, grain, scratches, dust and flicker), ending on the developer's
   card
 - An engraved, page-turning score book on the music desk (click a page to turn)
@@ -51,7 +52,15 @@ The current model is procedural and intentionally lightweight. Future releases c
   - legs and brass casters
   - pedal lyre and three pedals
   - music desk and 3D score
-- Wooden concert stage with a focused overhead lamp
+- Herringbone stage lit from a real rig: Fresnels and a profile lantern hung
+  in yokes on a front-of-house pipe and an electric over the stage, each light
+  coming from its own glowing lens
+- Ways in and out: double exit doors under a lit ISO 7010 exit sign, stage doors with
+  velvet portières in the wings, and a grand stair up the rear wall to each
+  balcony
+- Period lamps: opal globes on turned brass posts along the balconies, scrolled
+  two-candle sconces, candle sleeves on the chandeliers
+- Sunbeams with glinting dust and passing-cloud shimmer
 - Soft shadows, glossy reflections, fog, and ACES tone mapping
 - Responsive desktop and mobile interface
 
@@ -107,6 +116,7 @@ virtual-grand-piano/
 │   ├── art/parnassus.jpg   # Mengs, Parnassus (public domain)
 │   ├── art/composers/      # eight composer portraits (public domain)
 │   ├── art/developer.jpg   # the developer's GitHub picture, for the credits
+│   ├── art/exit-sign.svg   # ISO 7010 exit sign (public domain)
 │   └── logo.svg
 ├── src/
 │   ├── main.js                # scene/renderer/camera bootstrap + wiring + render loop
@@ -122,6 +132,8 @@ virtual-grand-piano/
 │   │   ├── stainedGlass.js     # stained-glass lancets, their wall light and sunbeams
 │   │   ├── composerProjection.js # old-film lantern on the rear wall: composer or credits
 │   │   ├── credits.js          # the closing credits roll and the developer's card
+│   │   ├── stageLighting.js    # lighting pipes, instruments in yokes, the lantern
+│   │   ├── passages.js         # exit doors, stage doors in the wings, balcony stairs
 │   │   ├── surfaces.js         # procedural PBR sets (parquet, damask, velvet, runner…)
 │   │   └── noteEffects.js      # autoplay key glow, light columns, star dust
 │   ├── audio/

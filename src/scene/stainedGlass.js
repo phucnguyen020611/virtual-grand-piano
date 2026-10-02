@@ -410,9 +410,19 @@ const beamFragment = /* glsl */ `
     // Brightest at the glass, gone by the far end; soft at the shaft's sides.
     float fade = pow(1.0 - vAlong, 2.4) * smoothstep(0.0, 0.04, vAlong);
     float sides = smoothstep(${(W / 2).toFixed(2)}, 1.2, abs(p.x)) * smoothstep(0.0, 1.5, p.y);
-    // Motes drifting in the light.
+    // Motes drifting through the light, and clouds passing the sun.
     float motes = 0.8 + 0.2 * sin(vAlong * 46.0 + p.x * 2.7 + p.y * 0.8 - time * 0.5);
-    gl_FragColor = vec4(tint * fade * sides * motes * 0.036 * level, 1.0);
+    float clouds = 0.78 + 0.22 * sin(time * 0.35 + vAlong * 5.0 + p.x * 0.4)
+      * sin(time * 0.21 + 1.7);
+    // Dust that catches the sun: specks drifting slowly down and across the
+    // shaft, each glinting on and off on its own beat.
+    vec2 cell = vec2((p.x + p.y) * 3.0 + time * 0.12, vAlong * 110.0 + time * 0.5);
+    vec2 at = fract(cell) - 0.5;
+    float seed = fract(sin(dot(floor(cell), vec2(12.9898, 78.233))) * 43758.5453);
+    float glint = pow(max(0.0, sin(time * (1.3 + 3.0 * seed) + seed * 50.0)), 6.0);
+    float speck = step(0.93, seed) * smoothstep(0.16, 0.0, length(at)) * glint;
+    vec3 light = tint * motes * clouds * 0.036 + mix(tint, vec3(1.0, 0.92, 0.75), 0.6) * speck * 0.5;
+    gl_FragColor = vec4(light * fade * sides * level, 1.0);
     #include <colorspace_fragment>
   }
 `;
