@@ -74,8 +74,10 @@ The current model is procedural and intentionally lightweight. Future releases c
   follows your clock (or your choice): white day light, long low amber shafts
   at sunset, faint blue moonlight at night
 - A concert ritual: a two-note chime as the house lamps go down and the stage
-  stays lit, then applause from an audience of some 190 figures, who sway with
-  the music and clap at the end of each piece (off at Low graphics)
+  stays lit, then applause from an audience of some 190 in court dress
+  (gilt-trimmed frock coats, powdered hair; ball gowns, gloves and tiaras), who
+  sway with the music and clap at the end of each piece (**Audience** shows or
+  hides them; Low graphics starts without)
 - Royal scrollbars: slim gilt thumbs on dark lacquer, on cream in the programme
 - A printed concert programme (click any seat, or **Programme**): every piece
   with its composer and a line about it, each ready to play
@@ -107,6 +109,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Graphics quality        | **Graphics: Low / Medium / High / Ultra**         |
 | Daylight outside        | **Sky:** your clock / day / sunset / night        |
 | Concert programme       | Click any seat, or **Programme**                  |
+| Show / hide audience    | **Audience**                                      |
 | House curtain & lights  | **Close curtain / Open curtain**                  |
 | Adjust bench height     | Click a knob at either end of the bench           |
 | Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift`  |

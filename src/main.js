@@ -941,12 +941,19 @@ creditsBtn.onclick = () => {
   hall.rollCredits();
   flyTo(hall.views.projection.position, hall.views.projection.target, 2);
 };
+// The audience: present by default (not at Low), and yours to dismiss.
+const crowdBtn = document.querySelector("#crowdBtn");
+crowdBtn.onclick = () => {
+  hall.audience.visible = !hall.audience.visible;
+  crowdBtn.setAttribute("aria-pressed", String(hall.audience.visible));
+};
 const qualitySelect = document.querySelector("#qualitySelect");
 function applyQuality(level) {
   quality = level;
   qualitySelect.value = level;
   renderer.setPixelRatio(renderPixelRatio());
   hall.setQuality(QUALITY[level]);
+  crowdBtn.setAttribute("aria-pressed", String(hall.audience.visible));
   try {
     localStorage.setItem("vgp.quality", level);
   } catch {

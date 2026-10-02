@@ -766,7 +766,7 @@ async function run() {
   {
     const crowd = p.hall.audience;
     assert(crowd.count > 100, `only ${crowd.count} in the audience`);
-    const hands = crowd.meshes[4];
+    const hands = crowd.hands[0];
     const before = hands.instanceMatrix.array.slice(0, 16);
     crowd.applaud(3);
     for (let i = 0; i < 20; i++) crowd.update(0.05, false);
@@ -785,6 +785,14 @@ async function run() {
     );
     p.hall.setConcert(false);
     p.hall.update(100);
+    const crowdBtn = d.querySelector("#crowdBtn");
+    click("crowdBtn");
+    assert(
+      !crowd.visible && crowdBtn.getAttribute("aria-pressed") === "false",
+      "the audience button did not dismiss the audience",
+    );
+    click("crowdBtn");
+    assert(crowd.visible, "the audience button did not bring them back");
     log("an audience that applauds, a house that dims", { pass: true });
   }
 
