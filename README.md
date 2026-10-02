@@ -255,7 +255,7 @@ PCM reserved for a cold load or a failed recorded asset.
 | Root samples       | 30, every Salamander root from A0 through C8            |
 | Velocity layers    | 3 real captures (original layers 4 / 9 / 14) = 90 files |
 | Shipped asset size | 6.89 MiB Ogg/Opus, mono 48 kHz                          |
-| Decoded cache      | 112 MiB desktop / 56 MiB touch (about 37 MiB pinned)    |
+| Decoded cache      | 160 MiB desktop / 56 MiB touch (about 37 MiB pinned)    |
 | Polyphony          | 64 voices                                               |
 
 **Attribution.** “Salamander Grand Piano V3 by Alexander Holm, licensed under
@@ -282,9 +282,11 @@ and an interactive latency hint. Medium/forte captures in that range are
 pinned (about 37 MiB); soft captures are evictable. This leaves space for
 bass and high-register playing without permanently pinning the entire warmup.
 On desktop (fine pointer) the C/F# roots from C3 to F#5 then decode in the
-background, evictable. Bass and high-register captures load only when
-played. Recorded and fallback buffers share an LRU-like decoded cache (112 MiB
-desktop, 56 MiB touch devices):
+background, evictable, followed by the medium capture of every bass and
+treble root (treble first; about 42 MiB in all), so neither end of the keyboard
+opens on generated fallback. On touch devices, bass and high-register captures
+load only when played. Recorded and fallback buffers share an LRU-like decoded
+cache (160 MiB desktop, 56 MiB touch devices):
 unpinned recordings and generated fallbacks are evicted by last use, while an
 active `AudioBufferSourceNode` continues safely after its cache entry is gone.
 Concurrent requests for one root/layer share one fetch/decode promise. Failed

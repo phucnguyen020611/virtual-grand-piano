@@ -65,12 +65,18 @@ function releaseSeconds(midi, velocity, age, reason) {
 // ponytail: pointer type stands in for device memory; phones keep 56 MB.
 const COARSE_POINTER =
   globalThis.matchMedia?.("(pointer: coarse)").matches ?? false;
-const MAX_DECODED_BYTES = (COARSE_POINTER ? 56 : 112) * 1024 * 1024;
+const MAX_DECODED_BYTES = (COARSE_POINTER ? 56 : 160) * 1024 * 1024;
 const CORE_ROOTS = new Set([45, 51, 57, 63, 69, 75, 81]);
 // Denser C/F# roots across the default keyboard range. Desktop decodes them
 // after the pinned core; they stay evictable, and a warm neighbour root covers
 // any that is cold, so they only ever improve on the core's ±3 coverage.
 const DETAIL_ROOTS = COARSE_POINTER ? [] : [60, 66, 54, 72, 48, 78];
+// Then the medium capture of every root outside the core, treble first (it is
+// short, ~8.5 MiB for all nine) and the long bass after (~34 MiB): one real
+// recording per root, so neither end of the keyboard opens on generated PCM.
+const OUTER_ROOTS = COARSE_POINTER
+  ? []
+  : [84, 87, 90, 93, 96, 99, 102, 105, 108, 42, 39, 36, 33, 30, 27, 24, 21];
 
 function bufferBytes(buffer) {
   return buffer.length * buffer.numberOfChannels * 4;
@@ -206,13 +212,17 @@ export function createAudioEngine() {
    * are requested only after they are played, leaving mobile memory for the
    * common keyboard range.
    */
-  function loadRoots(rootMidis) {
+  function loadRoots(rootMidis, layer = null) {
     return (async () => {
       for (const rootMidi of rootMidis) {
         if (disposed) return;
         await Promise.all(
           manifest
-            .filter((entry) => entry.rootMidi === rootMidi)
+            .filter(
+              (entry) =>
+                entry.rootMidi === rootMidi &&
+                (layer === null || entry.layer === layer),
+            )
             .map((entry) => queueRecordedLoad(entry)),
         );
         ready = recordedBuffers.size > 0;
@@ -231,7 +241,7 @@ export function createAudioEngine() {
           "No recorded piano samples loaded; the engine stays on generated fallback PCM.",
         );
       // Background pass: readiness never waits on the detail roots.
-      if (ready) loadRoots(DETAIL_ROOTS);
+      if (ready) loadRoots(DETAIL_ROOTS).then(() => loadRoots(OUTER_ROOTS, 1));
     });
     return loading;
   }
