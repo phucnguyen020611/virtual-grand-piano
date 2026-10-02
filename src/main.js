@@ -620,8 +620,8 @@ const freeCam = {
   turn: 0,
 };
 const FREE_CAM_KEYS = /^(Arrow|Page(Up|Down))/;
-const WALK_SPEED = 9; // units per second
-const TURN_SPEED = 1.5; // radians per second
+const WALK_SPEED = 24; // units per second: the stalls' length in ~3 s
+const TURN_SPEED = 2.2; // radians per second
 freeCamBtn.onclick = () => {
   freeCam.on = !freeCam.on;
   freeCamBtn.setAttribute("aria-pressed", String(freeCam.on));
