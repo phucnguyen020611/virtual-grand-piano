@@ -78,6 +78,8 @@ const OUTER_ROOTS = COARSE_POINTER
   ? []
   : [84, 87, 90, 93, 96, 99, 102, 105, 108, 42, 39, 36, 33, 30, 27, 24, 21];
 
+const clampUnit = (v, lo = 0) => Math.min(1, Math.max(lo, v));
+
 function bufferBytes(buffer) {
   return buffer.length * buffer.numberOfChannels * 4;
 }
@@ -94,6 +96,18 @@ export function createAudioEngine() {
   let pedalGain = null;
   let pedalBuffers = null;
   let analyser = null; // DEV-only output tap for headroom checks
+  // Where the listener sits: tone, level and image of the direct sound.
+  let seatTone = null;
+  let seatGain = null;
+  let seatPan = null;
+  const seat = {
+    distance: 0,
+    pan: 0,
+    width: 0.5,
+    gain: 1,
+    cutoff: 20000,
+    room: 0.1,
+  };
   let disposed = false;
 
   // Entries retain only decoded working-set buffers. Active AudioBufferSource
@@ -176,14 +190,25 @@ export function createAudioEngine() {
     pedalGain = ctx.createGain();
     pedalGain.gain.value = 0.055;
 
-    dry.connect(master);
+    // The direct sound (and the strings' own resonance) reaches the seat
+    // through the air: duller, quieter and narrower with distance, while the
+    // room's reverberation stays and so takes over toward the back.
+    seatTone = ctx.createBiquadFilter();
+    seatTone.type = "lowpass";
+    seatTone.Q.value = 0.5;
+    seatGain = ctx.createGain();
+    seatPan = ctx.createStereoPanner();
+    dry.connect(seatTone);
+    seatTone.connect(seatGain);
+    seatGain.connect(seatPan);
+    seatPan.connect(master);
     dry.connect(room);
     resonanceInput.connect(resonanceExcitationGain);
     resonanceExcitationGain.connect(resonance);
     room.connect(roomGain);
     roomGain.connect(master);
     resonance.connect(resonanceGain);
-    resonanceGain.connect(master);
+    resonanceGain.connect(seatTone);
     pedalGain.connect(dry);
     const ceiling = ctx.createWaveShaper();
     ceiling.curve = createCeilingCurve();
@@ -203,8 +228,44 @@ export function createAudioEngine() {
       up: createPedalNoise(ctx, "up"),
     };
 
+    applySeat(true);
     loadSamples();
     return ctx;
+  }
+
+  function applySeat(instant = false) {
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    for (const [param, value] of [
+      [seatGain.gain, seat.gain],
+      [seatTone.frequency, seat.cutoff],
+      [seatPan.pan, seat.pan],
+      [roomGain.gain, seat.room],
+    ])
+      if (instant) param.setValueAtTime(value, now);
+      else param.setTargetAtTime(value, now, 0.12);
+  }
+
+  /**
+   * The listener's place: `distance` from the piano in scene units (~0.21 m)
+   * and `pan`, -1 (piano to the left) to 1 (to the right). At the keyboard
+   * the sound is close and dry; at the back of the stalls ~45% as loud,
+   * rolled off above ~5 kHz, narrower, with three to four times the room.
+   */
+  function setListener(distance, pan) {
+    if (
+      Math.abs(distance - seat.distance) < 0.5 &&
+      Math.abs(pan - seat.pan / seat.width) < 0.02
+    )
+      return;
+    const t = clampUnit((distance - 10) / 90);
+    seat.distance = distance;
+    seat.width = 0.5 * (1 - 0.6 * t);
+    seat.pan = clampUnit(pan, -1) * seat.width;
+    seat.gain = 1 - 0.55 * t ** 0.8;
+    seat.cutoff = 20000 * 0.25 ** t;
+    seat.room = 0.1 + 0.26 * t;
+    applySeat();
   }
 
   /**
@@ -720,6 +781,11 @@ export function createAudioEngine() {
   return {
     ensureAudio,
     warmFallbacks,
+    setListener,
+    /** DEV: the seat's current mix. */
+    get seat() {
+      return { ...seat };
+    },
     resume: () => ctx?.resume(),
     noteOn,
     noteOff,

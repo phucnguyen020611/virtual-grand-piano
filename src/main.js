@@ -805,6 +805,11 @@ if (import.meta.env.DEV)
 
 // --- Animation loop ---------------------------------------------------------
 const timer = new THREE.Timer();
+// The ear goes where the camera goes: near and dry at the keyboard, distant
+// and reverberant at the back of the hall, panned to the piano's side.
+const SOUNDBOARD = onStage(0, 1.2, 0);
+const toPiano = new THREE.Vector3();
+const earRight = new THREE.Vector3();
 timer.connect(document);
 
 function animate(timestamp) {
@@ -849,6 +854,9 @@ function animate(timestamp) {
       THREE.MathUtils.clamp(songTime / songLength, 0, 1) * 100 + "%";
   noteEffects.update(dt, songTime, reducedMotion.matches);
   piano.scoreBook.follow(songTime);
+  toPiano.subVectors(SOUNDBOARD, camera.position);
+  earRight.setFromMatrixColumn(camera.matrixWorld, 0);
+  audio.setListener(toPiano.length(), toPiano.normalize().dot(earRight));
   if (explodedView.exploded || explodedView.isTransitioning)
     inspection.updateLabels();
 
