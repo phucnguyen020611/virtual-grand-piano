@@ -70,7 +70,9 @@ The current model is procedural and intentionally lightweight. Future releases c
   balcony
 - Period lamps: opal globes on turned brass posts along the balconies, scrolled
   two-candle sconces, candle sleeves on the chandeliers
-- Sunbeams with glinting dust and passing-cloud shimmer
+- Sunbeams with glinting dust and passing-cloud shimmer, under a sky that
+  follows your clock (or your choice): white day light, long low amber shafts
+  at sunset, faint blue moonlight at night
 - Soft shadows, glossy reflections, fog, and ACES tone mapping
 - Responsive desktop and mobile interface
 
@@ -97,6 +99,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Clean view              | **Hide HUD / Show HUD** (top right)               |
 | Closing credits         | **Credits** (top right); press again to close     |
 | Graphics quality        | **Graphics: Low / Medium / High / Ultra**         |
+| Daylight outside        | **Sky:** your clock / day / sunset / night        |
 | House curtain & lights  | **Close curtain / Open curtain**                  |
 | Adjust bench height     | Click a knob at either end of the bench           |
 | Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift`  |

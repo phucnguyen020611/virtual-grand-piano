@@ -256,6 +256,7 @@ const common = /* glsl */ `
   uniform sampler2D map;
   uniform float time;
   uniform float level;
+  uniform vec3 sky; // the daylight outside: colour times strength
   varying vec2 vShape;
   varying vec3 vWorld;
   varying vec3 vNormal;
@@ -281,7 +282,7 @@ const glassFragment = /* glsl */ `
     vec3 iris = hue(facing * 1.8 + vShape.y * 0.06 - time * 0.04);
     // Multiplying the sheen in keeps every jewel colour saturated.
     vec3 color = glass * (twinkle + 0.9 * sweep) * (0.75 + 0.9 * iris) + lum * sweep * 0.25;
-    gl_FragColor = vec4(color * level, 1.0);
+    gl_FragColor = vec4(color * level * sky, 1.0);
     #include <colorspace_fragment>
   }
 `;
@@ -291,7 +292,7 @@ const glassFragment = /* glsl */ `
  * shader from its distance to the lancet: it lies on the surface, so frames
  * and columns in front occlude it as they would real light.
  */
-function glowOnto(material, bays, tints, time, level, strength) {
+function glowOnto(material, bays, tints, time, level, strength, sky) {
   const n = bays.length;
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, {
@@ -300,6 +301,7 @@ function glowOnto(material, bays, tints, time, level, strength) {
       glowTime: time,
       glowLevel: level,
       glowStrength: strength,
+      glowSky: sky,
     });
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -317,7 +319,8 @@ function glowOnto(material, bays, tints, time, level, strength) {
         varying vec3 vGlowWorld;
         uniform vec3 glowBays[${n}];
         uniform vec3 glowTints[${n}];
-        uniform float glowTime, glowLevel, glowStrength;`,
+        uniform float glowTime, glowLevel, glowStrength;
+        uniform vec3 glowSky;`,
       )
       .replace(
         "#include <emissivemap_fragment>",
@@ -332,7 +335,7 @@ function glowOnto(material, bays, tints, time, level, strength) {
           float rect = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
           float cap = length(p - vec2(0.0, ${SPRING.toFixed(2)})) - ${(W / 2).toFixed(2)};
           float d = max(min(rect, cap), 0.0);
-          totalEmissiveRadiance += glowTints[i] * 1.5 * exp(-d * 1.1) * pulse * glowLevel * glowStrength;
+          totalEmissiveRadiance += glowTints[i] * glowSky * 1.5 * exp(-d * 1.1) * pulse * glowLevel * glowStrength;
         }`,
       );
   };
@@ -350,11 +353,12 @@ const BEAM_LENGTH = 38;
 const BEAM_X = [-1.9, -0.95, 0, 0.95, 1.9];
 const BEAM_Y = [2.5, 6.5, 10.5, 14.5];
 
-function beamGeometry(direction) {
+/** The sheaf's planes as window points carried `aAlong` (0–1) down the
+ *  light; the vertex shader aims them, so the sun can move. */
+function beamGeometry() {
   const position = [];
   const win = [];
   const along = [];
-  const end = direction.clone().multiplyScalar(BEAM_LENGTH);
   // A quad from window segment a→b, carried along the light.
   const quad = (a, b) => {
     const corners = [
@@ -366,7 +370,7 @@ function beamGeometry(direction) {
       [a, 1],
     ];
     for (const [[x, y], t] of corners) {
-      position.push(x + end.x * t, y + end.y * t, end.z * t);
+      position.push(x, y, t);
       win.push(x, y);
       along.push(t);
     }
@@ -386,12 +390,16 @@ function beamGeometry(direction) {
 const beamVertex = /* glsl */ `
   attribute vec2 aWin;
   attribute float aAlong;
+  uniform float toBack; // the slant toward the back of the hall
+  uniform float drop; // the sun's height: how steeply the light falls
   varying vec2 vWin;
   varying float vAlong;
   void main() {
     vWin = aWin;
     vAlong = aAlong;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec3 ray = normalize(vec3(toBack, -drop, 1.0)) * ${BEAM_LENGTH.toFixed(1)};
+    vec3 at = vec3(aWin, 0.0) + ray * aAlong;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(at, 1.0);
   }
 `;
 
@@ -399,6 +407,7 @@ const beamFragment = /* glsl */ `
   uniform sampler2D map;
   uniform float time;
   uniform float level;
+  uniform vec3 sky;
   varying vec2 vWin;
   varying float vAlong;
   void main() {
@@ -422,7 +431,7 @@ const beamFragment = /* glsl */ `
     float glint = pow(max(0.0, sin(time * (1.3 + 3.0 * seed) + seed * 50.0)), 6.0);
     float speck = step(0.93, seed) * smoothstep(0.16, 0.0, length(at)) * glint;
     vec3 light = tint * motes * clouds * 0.036 + mix(tint, vec3(1.0, 0.92, 0.75), 0.6) * speck * 0.5;
-    gl_FragColor = vec4(light * fade * sides * level, 1.0);
+    gl_FragColor = vec4(light * fade * sides * level * sky, 1.0);
     #include <colorspace_fragment>
   }
 `;
@@ -439,6 +448,8 @@ export function buildStainedGlass(parent, bays, shape, wall) {
   const time = { value: 0 };
   const level = { value: 1 };
   const strength = { value: 1 };
+  const sky = { value: new THREE.Color(1, 1, 1) };
+  const drop = { value: 0.45 };
   const beams = [];
   bays.forEach(([x, y, z, yaw], i) => {
     const glass = new THREE.Mesh(
@@ -448,6 +459,7 @@ export function buildStainedGlass(parent, bays, shape, wall) {
           map: { value: variants[i % variants.length].map },
           time,
           level,
+          sky,
         },
         vertexShader,
         fragmentShader: glassFragment,
@@ -459,12 +471,15 @@ export function buildStainedGlass(parent, bays, shape, wall) {
     // The light slants down and, on both walls alike, toward the back.
     const toBack = x < 0 ? -0.25 : 0.25; // local x runs ∓z on the two walls
     const beam = new THREE.Mesh(
-      beamGeometry(new THREE.Vector3(toBack, -0.45, 1).normalize()),
+      beamGeometry(),
       new THREE.ShaderMaterial({
         uniforms: {
           map: { value: variants[i % variants.length].map },
           time,
           level,
+          sky,
+          drop,
+          toBack: { value: toBack },
         },
         vertexShader: beamVertex,
         fragmentShader: beamFragment,
@@ -477,6 +492,7 @@ export function buildStainedGlass(parent, bays, shape, wall) {
     beam.position.copy(glass.position);
     beam.rotation.y = yaw;
     beam.renderOrder = 3;
+    beam.frustumCulled = false; // its true extent moves with the sun
     beams.push(beam);
     parent.add(beam);
   });
@@ -487,8 +503,23 @@ export function buildStainedGlass(parent, bays, shape, wall) {
     time,
     level,
     strength,
+    sky,
   );
+  const skyFrom = new THREE.Color();
+  const skyTo = new THREE.Color(1, 1, 1);
+  let dropFrom = 0.45;
+  let dropTo = 0.45;
+  let change = 1;
   return {
+    /** Daylight outside: its colour and strength, and how high the sun is
+     *  (the beams' fall per unit run); eased in over a few seconds. */
+    setDaylight(color, height) {
+      skyFrom.copy(sky.value);
+      skyTo.copy(color);
+      dropFrom = drop.value;
+      dropTo = height;
+      change = 0;
+    },
     setLevel(value) {
       level.value = 0.1 + 0.9 * value;
     },
@@ -502,6 +533,11 @@ export function buildStainedGlass(parent, bays, shape, wall) {
     },
     update(dt) {
       time.value += dt;
+      if (change >= 1) return;
+      change = dt > 0 ? Math.min(1, change + dt / 3) : 1; // 0: reduced motion
+      const e = change * change * (3 - 2 * change);
+      sky.value.lerpColors(skyFrom, skyTo, e);
+      drop.value = THREE.MathUtils.lerp(dropFrom, dropTo, e);
     },
   };
 }

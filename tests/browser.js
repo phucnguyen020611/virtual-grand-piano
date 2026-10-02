@@ -720,6 +720,34 @@ async function run() {
     log("MIDI files drop in and practice waits", { pass: true });
   }
 
+  // The sky outside follows the choice.
+  {
+    const glass = [];
+    p.scene.traverse(
+      (o) =>
+        o.material?.uniforms?.sky && o.material.uniforms.drop && glass.push(o),
+    );
+    const sky = glass[0].material.uniforms;
+    const skySelect = d.querySelector("#skySelect");
+    skySelect.value = "sunset";
+    skySelect.dispatchEvent(new Event("change"));
+    p.hall.update(100); // reduced-motion step: settle at once
+    p.hall.update(0);
+    assert(
+      sky.drop.value < 0.3 && sky.sky.value.r > sky.sky.value.b,
+      "sunset did not lower and warm the sun",
+    );
+    skySelect.value = "night";
+    skySelect.dispatchEvent(new Event("change"));
+    p.hall.update(0);
+    assert(sky.sky.value.b > sky.sky.value.r, "night was not moonlit");
+    skySelect.value = "auto";
+    skySelect.dispatchEvent(new Event("change"));
+    p.hall.update(0);
+
+    log("the sky follows the choice", { pass: true });
+  }
+
   // Styled dropdowns drive their native select by mouse and keyboard.
   {
     const select = d.querySelector("#qualitySelect");

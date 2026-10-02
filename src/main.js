@@ -875,6 +875,36 @@ qualitySelect.addEventListener("change", () =>
   applyQuality(qualitySelect.value),
 );
 applyQuality(quality);
+
+// The sky outside the stained glass, by choice or by the visitor's clock:
+// day from 7 to 17, sunset either side of it, night otherwise.
+const skySelect = document.querySelector("#skySelect");
+const clockSky = (hour = new Date().getHours()) =>
+  hour >= 7 && hour < 17
+    ? "day"
+    : (hour >= 5 && hour < 7) || (hour >= 17 && hour < 19)
+      ? "sunset"
+      : "night";
+function applySky(choice) {
+  skySelect.value = choice;
+  hall.setSky(choice === "auto" ? clockSky() : choice);
+  try {
+    localStorage.setItem("vgp.sky", choice);
+  } catch {
+    // Storage blocked: the choice lasts for this visit.
+  }
+}
+skySelect.addEventListener("change", () => applySky(skySelect.value));
+setInterval(() => skySelect.value === "auto" && applySky("auto"), 60000);
+let savedSky = "auto";
+try {
+  savedSky = localStorage.getItem("vgp.sky") ?? "auto";
+} catch {
+  // Storage blocked: follow the clock.
+}
+applySky(
+  [...skySelect.options].some((o) => o.value === savedSky) ? savedSky : "auto",
+);
 const curtainBtn = document.querySelector("#curtainBtn");
 curtainBtn.onclick = () => {
   const open = !hall.curtainOpen;

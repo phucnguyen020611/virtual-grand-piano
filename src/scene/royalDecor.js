@@ -717,6 +717,7 @@ export function buildRoyalInterior(hall, scene, room) {
     update: glass.update,
     setGlow: glass.setGlow,
     setBeams: glass.setBeams,
+    setDaylight: glass.setDaylight,
     /** Dim every lamp in the room: 0 = dark, 1 = full house. */
     setHouseLights(level) {
       lights.forEach((light, i) => (light.intensity = lightPower[i] * level));

@@ -51,6 +51,14 @@ const floorY = (z, x = 0) => (z < STAGE_FRONT_Z ? STAGE_TOP : stallsY(z, x));
 const BALCONY_Y = 24;
 const LANDING = 4; // each balcony's stair arrives through a gap this wide
 const WING_Z = -14; // the stage doors, one bay in from the organ wall
+// Daylight through the glass: colour, strength and how steeply the light
+// falls. A low sunset sun throws long amber shafts; the moon, high and cold,
+// barely lights the panes.
+const SKIES = {
+  day: [0xffffff, 1, 0.45],
+  sunset: [0xffa060, 1.25, 0.2],
+  night: [0x6a80d0, 0.35, 0.62],
+};
 const ORGAN_Y = 9; // base of the display pipes
 
 function mesh(geometry, material, x, y, z, parent) {
@@ -892,6 +900,14 @@ export function createHall(scene, mats) {
       wash.visible = wallGlaze.visible = areaLights;
       royal.setGlow(glassGlow);
       royal.setBeams(sunbeams);
+    },
+    /** The sky outside the stained glass: "day", "sunset" or "night". */
+    setSky(name) {
+      const [color, strength, height] = SKIES[name] ?? SKIES.day;
+      royal.setDaylight(
+        new THREE.Color(color).multiplyScalar(strength),
+        height,
+      );
     },
     /** Project the playing song's composer on the rear wall (null: none). */
     showComposer: projection.show,
