@@ -97,6 +97,8 @@ export function createMidiInput({ controller, onStatus = () => {} }) {
         value >= 64,
         group,
       );
+    } else if (note === 66 || note === 67) {
+      controller.setPedal?.(note === 67 ? "soft" : "sostenuto", value >= 64);
     } else if (note === 123) {
       releaseChannel(id, channel);
     } else if (note === 120) {

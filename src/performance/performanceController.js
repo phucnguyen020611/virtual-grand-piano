@@ -14,6 +14,8 @@ export function createPerformanceController(audio, mechanics, resonance) {
   const observers = new Set();
   let sustain = false;
   let timedSequence = 0;
+  // Sostenuto holds up the dampers of the notes down when it was pressed.
+  const sostenutoHeld = new Set();
 
   function emit(event) {
     for (const observer of observers) observer(event);
@@ -40,7 +42,11 @@ export function createPerformanceController(audio, mechanics, resonance) {
     activeSourceTokensByMidi.delete(midi);
     physicallyHeldNotes.delete(midi);
     mechanics.setNoteHeld(midi, false);
-    if (sustain && midi <= mechanics.damperCutoffMidi && !force) {
+    if (
+      (sustain || sostenutoHeld.has(midi)) &&
+      midi <= mechanics.damperCutoffMidi &&
+      !force
+    ) {
       sustainedReleasedNotes.add(midi);
       mechanics.setDamperLifted(midi, true);
       resonance.setDamperOpen(midi, true);
@@ -91,7 +97,33 @@ export function createPerformanceController(audio, mechanics, resonance) {
     audio.setSustain(down);
     if (down) return;
     for (const midi of [...sustainedReleasedNotes]) {
-      if (physicallyHeldNotes.has(midi)) continue;
+      if (physicallyHeldNotes.has(midi) || sostenutoHeld.has(midi)) continue;
+      sustainedReleasedNotes.delete(midi);
+      mechanics.setDamperLifted(midi, false);
+      resonance.setDamperOpen(midi, false);
+      audio.noteOff(midi, 0.65, "sustain-release");
+    }
+  }
+
+  /**
+   * The other two pedals. Soft (una corda) shifts the action so new notes
+   * strike fewer strings: quieter and mellower. Sostenuto catches the notes
+   * held at the moment it goes down and keeps only their dampers up.
+   */
+  function setPedal(type, down) {
+    mechanics.setPedal(type, down);
+    if (type === "soft") audio.setSoft?.(down);
+    if (type !== "sostenuto") return;
+    if (down) {
+      for (const midi of physicallyHeldNotes) sostenutoHeld.add(midi);
+      return;
+    }
+    const caught = [...sostenutoHeld];
+    sostenutoHeld.clear();
+    if (sustain) return; // the sustain pedal still holds them
+    for (const midi of caught) {
+      if (physicallyHeldNotes.has(midi) || !sustainedReleasedNotes.has(midi))
+        continue;
       sustainedReleasedNotes.delete(midi);
       mechanics.setDamperLifted(midi, false);
       resonance.setDamperOpen(midi, false);
@@ -191,6 +223,7 @@ export function createPerformanceController(audio, mechanics, resonance) {
       audio.noteOff(midi, 0.25, "stop");
     }
     physicallyHeldNotes.clear();
+    sostenutoHeld.clear();
     activeSourceTokensByMidi.clear();
     sourceGroups.clear();
     sustainOwners.clear();
@@ -204,6 +237,7 @@ export function createPerformanceController(audio, mechanics, resonance) {
     playMidi,
     setSustain,
     setSustainForSource,
+    setPedal,
     releaseSource,
     stopSource,
     stopAll,

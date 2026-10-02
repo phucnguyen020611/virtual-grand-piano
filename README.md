@@ -87,6 +87,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Sustain                 | `Space` (when a UI control is not focused)        |
 | MIDI input              | **Connect MIDI**, then choose an input if needed  |
 | Record performance      | **Record**, then **Play recording**               |
+| Soft / sostenuto pedal  | Click the left / middle pedal, or MIDI CC67 / 66  |
 | Inspect component       | Click a piano component                           |
 | Separate systems        | **Exploded**                                      |
 | Restore assembled piano | **Normal**                                        |
@@ -425,8 +426,9 @@ scrollable at short heights. Reduced motion snaps camera/assembly transitions
 and lid movement while retaining musical key/action feedback.
 
 The model is an educational representation: one string course per key, evenly
-spaced at the strike line; soft and sostenuto pedals animate but do not affect
-audio. The score book is engraved from the same data autoplay plays
+spaced at the strike line. The soft pedal makes new notes quieter and mellower
+(una corda) and the sostenuto holds the dampers of the notes down when it is
+pressed (click the pedals, or MIDI CC67 and CC66). The score book is engraved from the same data autoplay plays
 (`src/performance/songs.js`). No guided tour or presentation mode is included
 in this pass.
 

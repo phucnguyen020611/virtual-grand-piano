@@ -217,7 +217,7 @@ const inspection = createInspection(
   (type, down) => {
     if (type === "sustain")
       pianoPerformance.setSustainForSource("pointer:pedal", down, "pointer");
-    else mechanics.setPedal(type, down);
+    else pianoPerformance.setPedal(type, down);
   },
   controls,
 );

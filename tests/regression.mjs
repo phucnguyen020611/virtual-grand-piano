@@ -30,6 +30,7 @@ const visuals = {
   strike() {},
   setDamperOpen() {},
   setSustain() {},
+  setPedal() {},
   update() {},
 };
 const controller = createPerformanceController(audio, visuals, visuals);
@@ -225,6 +226,17 @@ check("repertoire: bars fill their metre, pages hold every bar once", () => {
       assert(!i || change.time >= pedal[i - 1].time, `${song.id} pedal order`),
     );
   }
+});
+check("sostenuto holds only the notes down when it was pressed", () => {
+  const offs = () => calls.filter(([kind]) => kind === "off").map(([, m]) => m);
+  controller.noteOn(60, 0.7, "computer:a", "computer");
+  controller.setPedal("sostenuto", true);
+  controller.noteOff(60, "computer:a");
+  controller.noteOn(64, 0.7, "computer:b", "computer");
+  controller.noteOff(64, "computer:b");
+  assert.deepEqual(offs(), [64], "the caught C rings, the later E is damped");
+  controller.setPedal("sostenuto", false);
+  assert.deepEqual(offs(), [64, 60], "lifting the pedal damps the C");
 });
 check("MIDI files read into timed events", () => {
   // Format 1, 96 ticks a quarter: a tempo track (120, then 60 bpm at beat 2)

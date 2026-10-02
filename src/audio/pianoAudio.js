@@ -142,6 +142,7 @@ export function createAudioEngine() {
   let voiceCount = 0;
   let physicalSourceCount = 0;
   let sustain = false;
+  let soft = false; // una corda: new notes strike two strings of three
   let ready = false;
   let loading = null;
   let lastPedalAt = -1;
@@ -582,7 +583,7 @@ export function createAudioEngine() {
       return null;
     }
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
-    const level = Math.max(0, Math.min(1, velocity));
+    const level = Math.max(0, Math.min(1, velocity)) * (soft ? 0.8 : 1);
     const now = ctx.currentTime;
 
     // A restruck string keeps ringing; only trim the stack if one note is
@@ -605,10 +606,11 @@ export function createAudioEngine() {
     filter.type = "lowpass";
     // Continuous brightness across the whole velocity range, so the boundary
     // between two sample layers is never heard as a step.
-    filter.frequency.value = Math.min(
-      18000,
-      900 + midiToFrequency(midi) * (3 + 9 * Math.pow(level, 1.3)),
-    );
+    filter.frequency.value =
+      Math.min(
+        18000,
+        900 + midiToFrequency(midi) * (3 + 9 * Math.pow(level, 1.3)),
+      ) * (soft ? 0.62 : 1);
     filter.Q.value = 0.4;
 
     const peak = velocityGain(level) * 0.5;
@@ -782,6 +784,12 @@ export function createAudioEngine() {
     ensureAudio,
     warmFallbacks,
     setListener,
+    setSoft(down) {
+      soft = down;
+    },
+    get soft() {
+      return soft;
+    },
     /** DEV: the seat's current mix. */
     get seat() {
       return { ...seat };
