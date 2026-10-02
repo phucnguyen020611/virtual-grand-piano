@@ -583,6 +583,54 @@ function updateRecordingUi() {
 }
 recorder.subscribe(updateRecordingUi);
 
+// Every take is also captured as sound, as it is heard, so it can be saved:
+// a few seconds' ring-out after the last note, then the file is ready.
+const saveAudioBtn = document.querySelector("#saveAudioBtn");
+const AUDIO_TYPES = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"];
+let takeRecorder = null;
+let lastTake = null;
+let wasRecording = false;
+saveAudioBtn.hidden = !globalThis.MediaRecorder;
+recorder.subscribe(() => {
+  const { recording } = recorder.state();
+  if (recording === wasRecording || saveAudioBtn.hidden) return;
+  wasRecording = recording;
+  if (recording) {
+    const mimeType = AUDIO_TYPES.find((type) =>
+      MediaRecorder.isTypeSupported(type),
+    );
+    const take = new MediaRecorder(
+      audio.captureStream(),
+      mimeType ? { mimeType } : {},
+    );
+    const chunks = [];
+    take.ondataavailable = (event) =>
+      event.data.size && chunks.push(event.data);
+    take.onstop = () => {
+      lastTake = new Blob(chunks, { type: take.mimeType });
+      saveAudioBtn.disabled = false;
+    };
+    take.start();
+    takeRecorder = take;
+    saveAudioBtn.disabled = true;
+  } else {
+    const take = takeRecorder;
+    takeRecorder = null;
+    setTimeout(() => take?.state === "recording" && take.stop(), 2000);
+  }
+});
+saveAudioBtn.onclick = () => {
+  if (!lastTake) return;
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(lastTake);
+  const local = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+  const stamp = local.toISOString().slice(0, 19).replace(/[T:]/g, "-");
+  const ext = lastTake.type.includes("mp4") ? "m4a" : "webm";
+  link.download = `virtual-grand-piano-${stamp}.${ext}`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+};
+
 function setExplodedMode(exploded) {
   inspection.setMode(exploded, { normalBtn, explodeBtn });
   explodedView.setExploded(exploded);

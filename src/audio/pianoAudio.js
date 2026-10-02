@@ -96,6 +96,8 @@ export function createAudioEngine() {
   let pedalGain = null;
   let pedalBuffers = null;
   let analyser = null; // DEV-only output tap for headroom checks
+  let finalStage = null; // what reaches the speakers
+  let capture = null; // a tap of it for saving takes
   // Where the listener sits: tone, level and image of the direct sound.
   let seatTone = null;
   let seatGain = null;
@@ -218,6 +220,7 @@ export function createAudioEngine() {
     master.connect(limiter);
     limiter.connect(ceiling);
     ceiling.connect(ctx.destination);
+    finalStage = ceiling;
     if (import.meta.env.DEV) {
       analyser = ctx.createAnalyser();
       analyser.fftSize = 2048;
@@ -784,6 +787,15 @@ export function createAudioEngine() {
     ensureAudio,
     warmFallbacks,
     setListener,
+    /** Everything heard, as a MediaStream to record. */
+    captureStream() {
+      ensureAudio();
+      if (!capture) {
+        capture = ctx.createMediaStreamDestination();
+        finalStage.connect(capture);
+      }
+      return capture.stream;
+    },
     setSoft(down) {
       soft = down;
     },

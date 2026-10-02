@@ -87,6 +87,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Sustain                 | `Space` (when a UI control is not focused)        |
 | MIDI input              | **Connect MIDI**, then choose an input if needed  |
 | Record performance      | **Record**, then **Play recording**               |
+| Save the take as sound  | **Save audio** after recording                    |
 | Soft / sostenuto pedal  | Click the left / middle pedal, or MIDI CC67 / 66  |
 | Inspect component       | Click a piano component                           |
 | Separate systems        | **Exploded**                                      |
@@ -266,6 +267,11 @@ own playback. Playback uses the regular `recording` source, so it coexists with
 live performance and can be stopped without affecting other sources. Recordings
 are intentionally not persisted across page reloads. Playback is disabled while
 recording so the event list stays immutable during playback.
+
+Each take is also captured as sound, exactly as heard (room, pedal and all),
+with a two-second ring-out: **Save audio** downloads it as WebM/Opus (or M4A
+where the browser records only MP4). The file never leaves the browser until
+you save it.
 
 The geometry is intentionally procedural; higher-fidelity glTF meshes and PBR textures can replace individual modules without changing the overall product concept.
 
