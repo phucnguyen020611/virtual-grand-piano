@@ -646,6 +646,16 @@ async function run() {
     log("credits roll on the projection", { pass: true });
   }
 
+  // The open score follows the music.
+  {
+    const book = p.piano.scoreBook;
+    book.turnTo(1);
+    book.update(1, true);
+    assert(book.follow(0.05) !== null, "the score did not mark the first bar");
+    assert(book.follow(-1) === null, "the score marked a bar before the music");
+    log("the score follows the music", { pass: true });
+  }
+
   // Styled dropdowns drive their native select by mouse and keyboard.
   {
     const select = d.querySelector("#qualitySelect");

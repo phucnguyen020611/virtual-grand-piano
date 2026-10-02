@@ -848,6 +848,7 @@ function animate(timestamp) {
     progressEl.style.width =
       THREE.MathUtils.clamp(songTime / songLength, 0, 1) * 100 + "%";
   noteEffects.update(dt, songTime, reducedMotion.matches);
+  piano.scoreBook.follow(songTime);
   if (explodedView.exploded || explodedView.isTransitioning)
     inspection.updateLabels();
 

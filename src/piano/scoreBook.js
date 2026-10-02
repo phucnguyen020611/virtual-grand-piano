@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { makeCanvasTexture } from "./materials.js";
-import { parsePitch } from "../performance/songs.js";
+import { parsePitch, timeline } from "../performance/songs.js";
 
 // --- Engraving -------------------------------------------------------------
 // A small engraver for the repertoire: grand staff, key and time signatures,
@@ -376,7 +376,11 @@ function drawStaffNotes(g, chords, staff, slotX, beamEvery) {
   }
 }
 
-function drawSystem(g, song, measures, top, first) {
+// Where each printed bar landed, per song: { page, x0, x1, top, bottom,
+// from, to } in page pixels (`from`/`to`: the first and last beat's x).
+const layouts = new WeakMap();
+
+function drawSystem(g, song, measures, top, first, record) {
   const treble = { clef: "treble", top };
   const bass = { clef: "bass", top: top + 4 * SP + STAFF_GAP };
   const bottom = bass.top + 4 * SP;
@@ -452,6 +456,14 @@ function drawSystem(g, song, measures, top, first) {
     const padR = SP * 1.2;
     const slot = (mx1 - mx0 - padL - padR) / measure.length;
     const slotX = (pos) => mx0 + padL + (pos + 0.5) * slot;
+    record?.(index, {
+      x0: mx0,
+      x1: mx1,
+      top: treble.top - SP * 2.2,
+      bottom: bottom + SP * 2.2,
+      from: slotX(0),
+      to: slotX(measure.length),
+    });
     for (const [staff, hand] of [
       [treble, "rh"],
       [bass, "lh"],
@@ -516,9 +528,12 @@ function drawMusicPage(g, w, h, song, pageIndex) {
     text(g, song.tempo, MARGIN_X, 250, 21, { weight: 700, align: "left" });
     top = 300;
   }
+  const layout = layouts.get(song);
   song.pages[pageIndex].forEach((system, s) => {
     const first = pageIndex === 0 && s === 0;
-    const { x0 } = drawSystem(g, song, system, top, first);
+    const { x0 } = drawSystem(g, song, system, top, first, (index, rect) =>
+      layout?.set(index, { ...rect, page: pageIndex }),
+    );
     if (first && song.dynamic)
       text(g, song.dynamic, x0 + 110, top + 4 * SP + STAFF_GAP / 2 + 6, 22, {
         weight: 700,
@@ -699,9 +714,16 @@ export function createScoreBook(maxAniso, song) {
   });
 
   let current = song;
+  let bars = [];
   function setSong(next) {
     current = next;
+    layouts.set(next, new Map());
     pageDrawers(next).forEach((draw, i) => textures[i].userData.paint(draw));
+    bars = timeline(next).map(({ index, start, unit, measure }) => ({
+      index,
+      start,
+      end: start + measure.length * unit,
+    }));
   }
   setSong(song);
 
@@ -778,6 +800,75 @@ export function createScoreBook(maxAniso, song) {
     }
   }
 
+  // Following the music: a soft gilt wash over the bar being played and a
+  // fine line sweeping through it, on whichever open page holds it.
+  const overlay = (material) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+    m.visible = false;
+    group.add(m);
+    return m;
+  };
+  const glowCanvas = document.createElement("canvas");
+  glowCanvas.width = glowCanvas.height = 128;
+  const glow = glowCanvas.getContext("2d");
+  glow.shadowColor = glow.fillStyle = "#fff";
+  glow.shadowBlur = 18;
+  glow.fillRect(22, 22, 84, 84);
+  const wash = overlay(
+    new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(glowCanvas),
+      color: 0xe0a83c,
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  const line = overlay(
+    new THREE.MeshBasicMaterial({
+      color: 0xa4441f,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  const LIFT = 0.03; // the open pages' rest angle off the cover (restAngle)
+  /** Place `mesh` over page pixels [x0, x1] × [top, bottom] of an open page. */
+  function lay(mesh, page, x0, x1, top, bottom) {
+    const side = page === 0 ? -1 : 1; // music starts on the left-hand page
+    const u = (x0 + x1) / 2 / PAGE_W;
+    const d = (side > 0 ? u : 1 - u) * PAGE_WIDTH; // distance from the spine
+    mesh.position.set(
+      side * d * Math.cos(LIFT),
+      PAGE_HEIGHT / 2 - ((top + bottom) / 2 / PAGE_H) * PAGE_HEIGHT,
+      d * Math.sin(LIFT) + 0.004,
+    );
+    mesh.rotation.y = -side * LIFT;
+    mesh.scale.set(
+      ((x1 - x0) / PAGE_W) * PAGE_WIDTH,
+      ((bottom - top) / PAGE_H) * PAGE_HEIGHT,
+      1,
+    );
+  }
+  /** Mark the bar sounding at `t` seconds into the piece (null: none);
+   *  returns the marked bar's index, or null. */
+  function follow(t) {
+    const settled = turned === 1 && leaves.every((leaf) => leaf.t >= 1);
+    const bar = t !== null && t >= 0 && settled && bars.find((b) => t < b.end);
+    const rect = bar && layouts.get(current)?.get(bar.index);
+    wash.visible = line.visible = Boolean(rect) && rect.page < 2;
+    if (!wash.visible) return null;
+    const x = THREE.MathUtils.lerp(
+      rect.from,
+      rect.to,
+      (t - bar.start) / (bar.end - bar.start),
+    );
+    lay(wash, rect.page, rect.x0, rect.x1, rect.top, rect.bottom);
+    lay(line, rect.page, x - 2, x + 2, rect.top + 6, rect.bottom - 6);
+    return bar.index;
+  }
+
   // Click the right-hand page to turn forward, the left-hand page to go back.
   const local = new THREE.Vector3();
   group.userData.onPick = (hit) => {
@@ -805,6 +896,7 @@ export function createScoreBook(maxAniso, song) {
     turnTo,
     update,
     setSong,
+    follow,
     get spread() {
       return turned;
     },

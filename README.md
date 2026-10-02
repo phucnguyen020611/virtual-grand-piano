@@ -34,6 +34,8 @@ The current model is procedural and intentionally lightweight. Future releases c
   (gate weave, grain, scratches, dust and flicker), ending on the developer's
   card
 - An engraved, page-turning score book on the music desk (click a page to turn)
+  that follows autoplay: a gilt wash on the bar being played, a line sweeping
+  through it
 - Free orbit, zoom-to-cursor and pan camera with view presets (pianist,
   keyboard, front row, balcony, whole hall) and double-click to orbit a spot
 - Exploded view: pick a part’s name to fly the camera to it

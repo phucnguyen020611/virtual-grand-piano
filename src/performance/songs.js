@@ -482,7 +482,7 @@ const DYNAMIC = { pp: 0.42, p: 0.5, mp: 0.56, mf: 0.64 };
  * The performed timeline: bar starts in seconds, easing into a closing
  * ritardando over the last two bars.
  */
-function timeline(song) {
+export function timeline(song) {
   const order = song.playOrder ?? song.measures.map((_, i) => i);
   let seconds = 0;
   return order.map((index, k) => {
