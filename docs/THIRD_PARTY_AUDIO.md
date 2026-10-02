@@ -21,3 +21,17 @@ conversion of the cited recordings.
 
 The original project includes the full CC BY 3.0 legal code in its `LICENSE`
 file; the canonical licence text is available at the licence URL above.
+
+## Hall sounds
+
+The chime that calls the audience in and the applause at the end of a piece
+are short excerpts of recordings from Wikimedia Commons, trimmed, faded,
+downmixed to mono and encoded as Ogg/Opus at 48 kHz.
+
+| File                             | Excerpt                              | Source file on Wikimedia Commons                                                                                                                                         | Licence |
+| -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| `public/audio/hall/chime.ogg`    | The tubular-bell stroke (4.0–6.7 s)  | [415061 gsb1039 clock-chime-tubebells-handbells-vibes.wav](https://commons.wikimedia.org/wiki/File:415061_gsb1039_clock-chime-tubebells-handbells-vibes.wav), by gsb1039 | CC0     |
+| `public/audio/hall/applause.ogg` | The first 12 s, faded out from 8.5 s | [Sound Effects - Applause after a concert.ogg](https://commons.wikimedia.org/wiki/File:Sound_Effects_-_Applause_after_a_concert.ogg), by Amada44                         | CC0     |
+
+The app plays the chime twice, the second a minor third lower, for the
+familiar two-note call.

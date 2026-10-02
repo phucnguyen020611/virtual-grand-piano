@@ -761,6 +761,33 @@ async function run() {
     log("sky by choice and a programme that plays", { pass: true });
   }
 
+  // An audience in the stalls that applauds, and the house going down for
+  // a performance.
+  {
+    const crowd = p.hall.audience;
+    assert(crowd.count > 100, `only ${crowd.count} in the audience`);
+    const hands = crowd.meshes[4];
+    const before = hands.instanceMatrix.array.slice(0, 16);
+    crowd.applaud(3);
+    for (let i = 0; i < 20; i++) crowd.update(0.05, false);
+    const after = hands.instanceMatrix.array.slice(0, 16);
+    assert(
+      after.some((v, i) => Math.abs(v - before[i]) > 1e-3),
+      "nobody raised their hands to applaud",
+    );
+    const lamps = p.scene.children.filter((o) => o.isPointLight);
+    const lit = Math.max(...lamps.map((l) => l.intensity));
+    p.hall.setConcert(true);
+    p.hall.update(100);
+    assert(
+      Math.max(...lamps.map((l) => l.intensity)) < lit * 0.5,
+      "the house lights did not go down for the performance",
+    );
+    p.hall.setConcert(false);
+    p.hall.update(100);
+    log("an audience that applauds, a house that dims", { pass: true });
+  }
+
   // Styled dropdowns drive their native select by mouse and keyboard.
   {
     const select = d.querySelector("#qualitySelect");

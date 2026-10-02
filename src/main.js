@@ -70,6 +70,7 @@ const QUALITY = {
     areaLights: false,
     glassGlow: false,
     sunbeams: false,
+    crowd: false,
   },
   medium: {
     pixelRatio: () => 1,
@@ -77,6 +78,7 @@ const QUALITY = {
     areaLights: true,
     glassGlow: true,
     sunbeams: false,
+    crowd: true,
   },
   high: {
     pixelRatio: () => (handheld() ? 1.5 : 2),
@@ -84,6 +86,7 @@ const QUALITY = {
     areaLights: true,
     glassGlow: true,
     sunbeams: true,
+    crowd: true,
   },
   ultra: {
     pixelRatio: () => 3,
@@ -91,6 +94,7 @@ const QUALITY = {
     areaLights: true,
     glassGlow: true,
     sunbeams: true,
+    crowd: true,
   },
 };
 let quality = "high";
@@ -229,7 +233,7 @@ if (import.meta.env.DEV) window.__vgp.explodedView = explodedView;
 // A playhead runs with the render loop, so the tempo can change and practice
 // can stop it: it holds at each chord of the hands being practised until the
 // player strikes every note of it, the light columns resting on those keys.
-const LEAD_IN = 2.2; // seconds for the first light columns to fall
+const LEAD_IN = 3; // the chime rings and the first light columns fall
 const noteEffects = createNoteEffects(scene, piano, renderer, camera);
 let song = SONGS[0];
 let songEvents = scoreEvents(song);
@@ -334,7 +338,14 @@ function stopAutoplay() {
   pianoPerformance.stopSource("autoplay");
   noteEffects.stop();
   hall.showComposer(null);
+  hall.setConcert(false);
   progressEl.style.width = "0%";
+}
+/** The piece played through: the house applauds as the lights come up. */
+function finishPiece() {
+  stopAutoplay();
+  audio.playEffect("audio/hall/applause.ogg", { gain: 0.55 });
+  if (!reducedMotion.matches) hall.audience.applaud(10);
 }
 function startAutoplay() {
   if (autoplay) {
@@ -352,6 +363,14 @@ function startAutoplay() {
   noteEffects.start(songEvents);
   setCredits(false);
   hall.showComposer(song);
+  // The hall's chime, two strokes a third apart, as the house lights go down.
+  audio.playEffect("audio/hall/chime.ogg", { gain: 0.45 });
+  audio.playEffect("audio/hall/chime.ogg", {
+    delay: 0.7,
+    rate: 0.84,
+    gain: 0.4,
+  });
+  hall.setConcert(true);
 }
 // The evening's programme: every piece, a line about it, and a button that
 // plays it. Opened from the HUD or by clicking any seat in the hall.
@@ -459,7 +478,7 @@ function advanceAutoplay(dt) {
       songPedal[pedalCursor++].down,
       "autoplay",
     );
-  if (playhead > songLength + 2) stopAutoplay();
+  if (playhead > songLength + 1.2) finishPiece();
 }
 
 // --- UI wiring --------------------------------------------------------------
@@ -1074,6 +1093,7 @@ function animate(timestamp) {
   piano.scoreBook.update(dt, reducedMotion.matches);
 
   advanceAutoplay(dt);
+  hall.audience.update(dt, autoplay && !reducedMotion.matches);
   const songTime = autoplay ? playhead : null;
   if (autoplay)
     progressEl.style.width =

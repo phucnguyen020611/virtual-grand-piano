@@ -73,6 +73,9 @@ The current model is procedural and intentionally lightweight. Future releases c
 - Sunbeams with glinting dust and passing-cloud shimmer, under a sky that
   follows your clock (or your choice): white day light, long low amber shafts
   at sunset, faint blue moonlight at night
+- A concert ritual: a two-note chime as the house lamps go down and the stage
+  stays lit, then applause from an audience of some 190 figures, who sway with
+  the music and clap at the end of each piece (off at Low graphics)
 - A printed concert programme (click any seat, or **Programme**): every piece
   with its composer and a line about it, each ready to play
 - Soft shadows, glossy reflections, fog, and ACES tone mapping
@@ -137,6 +140,7 @@ virtual-grand-piano/
 │   ├── art/composers/      # eight composer portraits (public domain)
 │   ├── art/developer.jpg   # the developer's GitHub picture, for the credits
 │   ├── art/exit-sign.svg   # ISO 7010 exit sign (public domain)
+│   ├── audio/hall/         # the chime and the applause (CC0 excerpts)
 │   └── logo.svg
 ├── src/
 │   ├── main.js                # scene/renderer/camera bootstrap + wiring + render loop
@@ -154,6 +158,7 @@ virtual-grand-piano/
 │   │   ├── credits.js          # the closing credits roll and the developer's card
 │   │   ├── stageLighting.js    # lighting pipes, instruments in yokes, the lantern
 │   │   ├── passages.js         # exit doors, stage doors in the wings, balcony stairs
+│   │   ├── audience.js         # the seated audience: sway and applause
 │   │   ├── surfaces.js         # procedural PBR sets (parquet, damask, velvet, runner…)
 │   │   └── noteEffects.js      # autoplay key glow, light columns, star dust
 │   ├── audio/

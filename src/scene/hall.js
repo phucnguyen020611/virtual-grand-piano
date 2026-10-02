@@ -17,6 +17,7 @@ import { buildRoyalInterior } from "./royalDecor.js";
 import { createComposerProjection } from "./composerProjection.js";
 import { buildLightingRig } from "./stageLighting.js";
 import { buildPassages } from "./passages.js";
+import { buildAudience } from "./audience.js";
 
 // One scene unit is ~0.21 m (the keyboard is 5.9 units, 1.22 m wide).
 const STAGE_TOP = -0.045; // legs and casters sit on this plane
@@ -709,6 +710,7 @@ export function createHall(scene, mats) {
     frameSeats.setMatrixAt(i, matrix);
   });
   hall.add(velvetSeats, frameSeats);
+  const audience = buildAudience(hall, seats);
 
   // --- Stage lights, from the rig's lenses ------------------------------------------
   const explodedFocus = onStage(0, 4.35, -0.65);
@@ -810,11 +812,16 @@ export function createHall(scene, mats) {
   let curtainTarget = 1;
   let curtain = 1;
   let houseLevel = -1;
-  function setHouse(level) {
-    if (level === houseLevel) return;
+  let houseDim = -1;
+  // During a performance the house lamps go down; the stage stays lit.
+  let concertTarget = 0;
+  let concert = 0;
+  function setHouse(level, dim = 1) {
+    if (level === houseLevel && dim === houseDim) return;
     houseLevel = level;
+    houseDim = dim;
     for (const [light, power] of dimmable) light.intensity = power * level;
-    royal.setHouseLights(level);
+    royal.setHouseLights(level * dim);
     // Studio reflections fade with the room, all but a trace. (Materials
     // lit by scene.environment take this, not their own envMapIntensity.)
     scene.environmentIntensity = 0.1 + 0.9 * level;
@@ -891,7 +898,8 @@ export function createHall(scene, mats) {
     /** Graphics quality: key-light shadow size (0 = none), the two broad
      *  area lights, the stained glass's wall light and sunbeams: the costliest
      *  parts. */
-    setQuality({ shadow, areaLights, glassGlow, sunbeams }) {
+    setQuality({ shadow, areaLights, glassGlow, sunbeams, crowd }) {
+      audience.visible = crowd;
       key.castShadow = shadow > 0;
       if (shadow && key.shadow.mapSize.x !== shadow) {
         key.shadow.mapSize.set(shadow, shadow);
@@ -910,6 +918,11 @@ export function createHall(scene, mats) {
         height,
       );
     },
+    audience,
+    /** A performance is on: dim the house lamps (or bring them back up). */
+    setConcert(on) {
+      concertTarget = on ? 1 : 0;
+    },
     /** Project the playing song's composer on the rear wall (null: none). */
     showComposer: projection.show,
     rollCredits: projection.rollCredits,
@@ -925,7 +938,12 @@ export function createHall(scene, mats) {
       );
       const eased = curtain * curtain * (3 - 2 * curtain);
       royal.setCurtain(eased);
-      setHouse(eased);
+      concert = THREE.MathUtils.clamp(
+        concert + Math.sign(concertTarget - concert) * (dt / 2.5),
+        0,
+        1,
+      );
+      setHouse(eased, 1 - 0.65 * concert * concert * (3 - 2 * concert));
       blend = THREE.MathUtils.damp(blend, target, 2.8, dt);
       focus.lerpVectors(normalFocus, explodedFocus, blend);
       aim();

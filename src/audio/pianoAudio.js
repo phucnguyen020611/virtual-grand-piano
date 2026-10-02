@@ -98,6 +98,7 @@ export function createAudioEngine() {
   let analyser = null; // DEV-only output tap for headroom checks
   let finalStage = null; // what reaches the speakers
   let capture = null; // a tap of it for saving takes
+  const effects = new Map(); // url -> decoded hall sound
   // Where the listener sits: tone, level and image of the direct sound.
   let seatTone = null;
   let seatGain = null;
@@ -787,6 +788,29 @@ export function createAudioEngine() {
     ensureAudio,
     warmFallbacks,
     setListener,
+    /**
+     * A sound of the hall itself (the chime, the applause), played into the
+     * mix after `delay` seconds at `rate` (pitch) and `gain`. Decoded once.
+     */
+    playEffect(url, { delay = 0, rate = 1, gain = 1 } = {}) {
+      ensureAudio();
+      if (!effects.has(url))
+        effects.set(
+          url,
+          fetchSample(url).catch(() => null), // a missing sound stays silent
+        );
+      effects.get(url).then((buffer) => {
+        if (!buffer || disposed) return;
+        const source = ctx.createBufferSource();
+        const level = ctx.createGain();
+        source.buffer = buffer;
+        source.playbackRate.value = rate;
+        level.gain.value = gain;
+        source.connect(level);
+        level.connect(master);
+        source.start(ctx.currentTime + delay);
+      });
+    },
     /** Everything heard, as a MediaStream to record. */
     captureStream() {
       ensureAudio();
