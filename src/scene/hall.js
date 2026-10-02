@@ -878,6 +878,7 @@ export function createHall(scene, mats) {
       },
     },
     key,
+    seats: velvetSeats, // a click on one opens the programme
     setExploded(value) {
       target = value ? 1 : 0;
     },

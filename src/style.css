@@ -1055,3 +1055,129 @@ kbd {
     display: none;
   }
 }
+
+/* The concert programme: a printed card on cream paper, gilt-ruled. */
+.programme {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(86vh, 860px);
+  border: 0;
+  border-radius: 6px;
+  padding: 0;
+  overflow: auto;
+  color: #2a241c;
+  background: #f4efe2;
+  box-shadow:
+    0 0 0 1px #c9a052,
+    0 0 0 6px #f4efe2,
+    0 0 0 7px rgba(201, 160, 82, 0.6),
+    0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.programme::backdrop {
+  background: rgba(8, 6, 4, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.programmeSheet {
+  position: relative;
+  padding: 40px 36px 30px;
+  text-align: center;
+}
+
+.programmeClose {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border-color: rgba(42, 36, 28, 0.25);
+  color: #2a241c;
+  background: transparent;
+}
+
+.programmeHouse {
+  margin: 0;
+  color: #8a6a2c;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.programme h2 {
+  margin: 6px 0 0;
+  font-family: var(--font-script);
+  font-size: 58px;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.programmeDate {
+  margin: 4px 0 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #c9a052;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-style: italic;
+}
+
+.programmeList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.programmeList li {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(201, 160, 82, 0.45);
+}
+
+.programmeList h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.programmeList .composer {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.programmeList .about {
+  margin: 6px auto 10px;
+  max-width: 40ch;
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.programmeList button {
+  border-color: #c9a052;
+  color: #2a241c;
+  background: rgba(201, 160, 82, 0.14);
+}
+
+.programmeList button:hover {
+  background: rgba(201, 160, 82, 0.3);
+}
+
+.programmeFoot {
+  margin: 18px 0 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-style: italic;
+  color: #5a4d3c;
+}
+
+@media (max-width: 560px) {
+  .programmeSheet {
+    padding: 52px 18px 22px;
+  }
+}
+
+.programme :focus-visible {
+  outline-color: #7a5a1c;
+}

@@ -353,6 +353,69 @@ function startAutoplay() {
   setCredits(false);
   hall.showComposer(song);
 }
+// The evening's programme: every piece, a line about it, and a button that
+// plays it. Opened from the HUD or by clicking any seat in the hall.
+const programme = document.querySelector("#programme");
+document.querySelector("#programmeDate").textContent =
+  new Date().toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+document.querySelector("#programmeList").replaceChildren(
+  ...SONGS.map((piece) => {
+    const item = document.createElement("li");
+    const about = piece.notes.join(" ").split(/(?<=\.)\s/)[0];
+    item.innerHTML = `<h3></h3><p class="composer"></p><p class="about"></p>`;
+    item.querySelector("h3").textContent = piece.title;
+    item.querySelector(".composer").textContent = piece.dates.startsWith("(")
+      ? `${piece.composer} ${piece.dates}`
+      : `${piece.composer} · ${piece.dates}`;
+    item.querySelector(".about").textContent = about;
+    const play = document.createElement("button");
+    play.value = piece.id;
+    play.textContent = "Play";
+    play.setAttribute("aria-label", `Play ${piece.title}`);
+    item.append(play);
+    return item;
+  }),
+);
+const openProgramme = () => programme.open || programme.showModal();
+document.querySelector("#programmeBtn").onclick = openProgramme;
+programme.addEventListener("close", () => {
+  const piece = SONGS.find((p) => p.id === programme.returnValue);
+  programme.returnValue = "";
+  if (!piece) return;
+  songSelect.value = piece.id;
+  setPiece(piece);
+  startAutoplay();
+});
+// A click (not a drag) on a seat.
+const seatRay = new THREE.Raycaster();
+let seatDown = null;
+renderer.domElement.addEventListener("pointerdown", (event) => {
+  seatDown = [event.clientX, event.clientY];
+});
+renderer.domElement.addEventListener("click", (event) => {
+  if (!seatDown) return;
+  const moved = Math.hypot(
+    event.clientX - seatDown[0],
+    event.clientY - seatDown[1],
+  );
+  if (moved > 8) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  seatRay.setFromCamera(
+    new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    ),
+    camera,
+  );
+  const hit = seatRay.intersectObjects([hall.group], true)[0];
+  if (hit?.object === hall.seats) openProgramme();
+});
+
 // The player's own notes, from any input, answer the chord practice waits on.
 pianoPerformance.addObserver((event) => {
   if (waiting && event.type === "noteOn" && event.sourceGroup !== "autoplay")

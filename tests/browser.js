@@ -720,7 +720,7 @@ async function run() {
     log("MIDI files drop in and practice waits", { pass: true });
   }
 
-  // The sky outside follows the choice.
+  // The sky outside follows the choice; the programme plays what you pick.
   {
     const glass = [];
     p.scene.traverse(
@@ -745,7 +745,20 @@ async function run() {
     skySelect.dispatchEvent(new Event("change"));
     p.hall.update(0);
 
-    log("the sky follows the choice", { pass: true });
+    const programme = d.querySelector("#programme");
+    click("programmeBtn");
+    assert(programme.open, "the programme did not open");
+    const play = programme.querySelectorAll(".programmeList button")[1];
+    play.click();
+    await wait(50);
+    assert(
+      !programme.open &&
+        d.querySelector("#songSelect").value === play.value &&
+        d.querySelector("#autoBtn").getAttribute("aria-pressed") === "true",
+      "the programme did not play its piece",
+    );
+    click("autoBtn");
+    log("sky by choice and a programme that plays", { pass: true });
   }
 
   // Styled dropdowns drive their native select by mouse and keyboard.

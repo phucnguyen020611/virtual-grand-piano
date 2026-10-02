@@ -99,6 +99,9 @@
                 >
                   Play
                 </button>
+                <button id="programmeBtn" title="Or click any seat in the hall">
+                  Programme
+                </button>
                 <button id="midiFileBtn" title="Or drop a .mid file anywhere">
                   Open MIDI…
                 </button>
@@ -181,6 +184,22 @@
         </button>
       </div>
     </main>
+
+    <dialog id="programme" class="programme" aria-labelledby="programmeTitle">
+      <form method="dialog" class="programmeSheet">
+        <button class="programmeClose" aria-label="Close the programme">
+          Close
+        </button>
+        <p class="programmeHouse">Virtual Grand Piano · The Gilded Hall</p>
+        <h2 id="programmeTitle">Programme</h2>
+        <p class="programmeDate" id="programmeDate"></p>
+        <ol class="programmeList" id="programmeList"></ol>
+        <p class="programmeFoot">
+          Kindly silence your telephones. Pick a piece to hear it from the
+          stage.
+        </p>
+      </form>
+    </dialog>
 
     <aside id="helpPanel" class="helpPanel" aria-label="Controls guide" hidden>
       <div class="panelHeading">
