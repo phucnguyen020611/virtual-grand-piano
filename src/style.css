@@ -1181,3 +1181,46 @@ kbd {
 .programme :focus-visible {
   outline-color: #7a5a1c;
 }
+
+/* Royal scrollbars: a slim gilt thumb on a dark lacquer track (on cream in
+   the programme). WebKit/Blink take the gradient; Firefox the plain colours.
+   Setting scrollbar-color would make Chromium ignore the gradient, hence the
+   @supports split. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(22, 17, 11, 0.72);
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: linear-gradient(#f3dda2, #c9a052 55%, #8e6a2c) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(#f8e7b8, #d8b064 55%, #9c7634) padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.programme::-webkit-scrollbar-track {
+  background: #e6dcc4;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #c9a052 rgba(22, 17, 11, 0.72);
+  }
+
+  .programme {
+    scrollbar-color: #a8823a #e6dcc4;
+  }
+}

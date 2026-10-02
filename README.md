@@ -76,6 +76,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 - A concert ritual: a two-note chime as the house lamps go down and the stage
   stays lit, then applause from an audience of some 190 figures, who sway with
   the music and clap at the end of each piece (off at Low graphics)
+- Royal scrollbars: slim gilt thumbs on dark lacquer, on cream in the programme
 - A printed concert programme (click any seat, or **Programme**): every piece
   with its composer and a line about it, each ready to play
 - Soft shadows, glossy reflections, fog, and ACES tone mapping
