@@ -14,6 +14,7 @@ import { createComputerKeyboard } from "./performance/computerKeyboard.js";
 import { createMidiInput } from "./performance/midiInput.js";
 import { createPerformanceRecorder } from "./performance/performanceRecorder.js";
 import { SONGS, scoreEvents, scorePedal } from "./performance/songs.js";
+import { parseMidiFile } from "./performance/midiFile.js";
 import { createNoteEffects } from "./scene/noteEffects.js";
 import { enhanceSelect } from "./interaction/dropdown.js";
 import { createInspection } from "./interaction/inspection.js";
@@ -224,18 +225,32 @@ inspection.addPickable(bench);
 const explodedView = createExplodedView({ piano, camera, controls });
 if (import.meta.env.DEV) window.__vgp.explodedView = explodedView;
 
-// --- Autoplay, read from the engraved score ---------------------------------
+// --- Autoplay and practice, from an engraved score or a MIDI file -----------
+// A playhead runs with the render loop, so the tempo can change and practice
+// can stop it: it holds at each chord of the hands being practised until the
+// player strikes every note of it, the light columns resting on those keys.
 const LEAD_IN = 2.2; // seconds for the first light columns to fall
 const noteEffects = createNoteEffects(scene, piano, renderer, camera);
 let song = SONGS[0];
 let songEvents = scoreEvents(song);
-let songLength = Math.max(...songEvents.map((e) => e.time + e.duration));
-let autoplay = false,
-  autoTimers = [],
-  songStart = 0;
+let songPedal = scorePedal(song);
+const lengthOf = (events) =>
+  events.reduce((end, e) => Math.max(end, e.time + e.duration), 0);
+let songLength = lengthOf(songEvents);
+let midiPiece = null; // the last file opened, offered with the pieces
+let autoplay = false;
+let playhead = 0; // seconds into the piece; negative during the lead-in
+let cursor = 0;
+let pedalCursor = 0;
+let waiting = null; // practice: the notes still to be struck
+let tempo = 1;
+let practice = "listen";
 const autoBtn = document.querySelector("#autoBtn"),
   songSelect = document.querySelector("#songSelect"),
-  progressEl = document.querySelector("#songProgress");
+  progressEl = document.querySelector("#songProgress"),
+  practiceSelect = document.querySelector("#practiceSelect"),
+  tempoSelect = document.querySelector("#tempoSelect"),
+  midiFileInput = document.querySelector("#midiFileInput");
 // Every HUD dropdown gets the styled listbox; the native select stays behind it.
 document.querySelectorAll("#pianoControls select").forEach(enhanceSelect);
 for (const piece of SONGS)
@@ -245,19 +260,75 @@ for (const piece of SONGS)
       piece.id,
     ),
   );
-songSelect.addEventListener("change", () => {
+
+function setPiece(piece) {
   if (autoplay) stopAutoplay();
-  song = SONGS.find((piece) => piece.id === songSelect.value);
-  songEvents = scoreEvents(song);
-  songLength = Math.max(...songEvents.map((e) => e.time + e.duration));
-  piano.scoreBook.setSong(song);
-  piano.scoreBook.turnTo(1);
+  song = piece;
+  songEvents = piece.midi?.events ?? scoreEvents(piece);
+  songPedal = piece.midi?.pedal ?? scorePedal(piece);
+  songLength = lengthOf(songEvents);
+  // Only the engraved pieces are printed; a file opens the book at its
+  // blank manuscript.
+  if (piece.midi) piano.scoreBook.turnTo(2);
+  else {
+    piano.scoreBook.setSong(piece);
+    piano.scoreBook.turnTo(1);
+  }
+}
+songSelect.addEventListener("change", () =>
+  setPiece(
+    songSelect.value === "midi"
+      ? midiPiece
+      : SONGS.find((piece) => piece.id === songSelect.value),
+  ),
+);
+practiceSelect.addEventListener("change", () => {
+  practice = practiceSelect.value;
+  waiting = null;
+});
+tempoSelect.addEventListener("change", () => (tempo = +tempoSelect.value));
+
+async function openMidi(file) {
+  try {
+    const { name, events, pedal } = parseMidiFile(await file.arrayBuffer());
+    const title = name || file.name.replace(/\.midi?$/i, "");
+    midiPiece = {
+      id: `midi:${title}`,
+      title,
+      composer: "Your MIDI file",
+      midi: { events, pedal },
+    };
+    let option = songSelect.querySelector('option[value="midi"]');
+    if (!option) songSelect.add((option = new Option("", "midi")));
+    option.textContent = `${title} — MIDI`;
+    songSelect.value = "midi";
+    setPiece(midiPiece);
+    setStatus(`Opened ${title}: ${events.length} notes`);
+  } catch (error) {
+    setStatus(`Can't read ${file.name}: ${error.message}`);
+  }
+}
+document.querySelector("#midiFileBtn").onclick = () => midiFileInput.click();
+midiFileInput.onchange = () => {
+  if (midiFileInput.files[0]) openMidi(midiFileInput.files[0]);
+  midiFileInput.value = "";
+};
+// …or drop one anywhere on the page.
+addEventListener("dragover", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  event.preventDefault();
+  setStatus("Drop a MIDI file to play it");
+});
+addEventListener("drop", (event) => {
+  const file = event.dataTransfer?.files[0];
+  if (!file) return;
+  event.preventDefault();
+  openMidi(file);
 });
 
 function stopAutoplay() {
   autoplay = false;
-  autoTimers.forEach(clearTimeout);
-  autoTimers = [];
+  waiting = null;
   autoBtn.textContent = "Play";
   autoBtn.setAttribute("aria-pressed", "false");
   pianoPerformance.stopSource("autoplay");
@@ -272,47 +343,60 @@ function startAutoplay() {
   }
   prepareAudio();
   autoplay = true;
+  playhead = -LEAD_IN;
+  cursor = pedalCursor = 0;
+  waiting = null;
   autoBtn.textContent = "Stop";
   autoBtn.setAttribute("aria-pressed", "true");
-  piano.scoreBook.turnTo(1); // open at the music
-  songStart = performance.now() + LEAD_IN * 1000;
+  if (!song.midi) piano.scoreBook.turnTo(1); // open at the music
   noteEffects.start(songEvents);
   setCredits(false);
   hall.showComposer(song);
-  for (const event of songEvents) {
-    autoTimers.push(
-      setTimeout(
-        () => {
-          if (!autoplay) return;
-          pianoPerformance.playMidi(
-            event.midi,
-            event.duration * 0.95,
-            event.velocity,
-            "autoplay",
-          );
-        },
-        (LEAD_IN + event.time) * 1000,
-      ),
-    );
+}
+// The player's own notes, from any input, answer the chord practice waits on.
+pianoPerformance.addObserver((event) => {
+  if (waiting && event.type === "noteOn" && event.sourceGroup !== "autoplay")
+    waiting.delete(event.midi);
+});
+const practised = (event) => practice === "both" || practice === event.hand;
+function advanceAutoplay(dt) {
+  if (!autoplay || waiting?.size) return;
+  waiting = null;
+  playhead += dt * tempo;
+  while (cursor < songEvents.length && songEvents[cursor].time <= playhead) {
+    // Notes struck together are one chord.
+    const at = songEvents[cursor].time;
+    let end = cursor;
+    while (end < songEvents.length && songEvents[end].time - at < 0.03) end++;
+    const chord = songEvents.slice(cursor, end);
+    const mine = practice === "listen" ? [] : chord.filter(practised);
+    for (const event of chord)
+      if (!mine.includes(event))
+        pianoPerformance.playMidi(
+          event.midi,
+          (event.duration * 0.95) / tempo,
+          event.velocity,
+          "autoplay",
+        );
+    cursor = end;
+    if (mine.length) {
+      waiting = new Set(mine.map((event) => event.midi));
+      playhead = at;
+      break;
+    }
   }
-  // Legato pedalling from the score: the dampers, the sympathetic ring and
-  // the pedal's own thump all follow.
-  for (const { time, down } of scorePedal(song))
-    autoTimers.push(
-      setTimeout(
-        () =>
-          autoplay &&
-          pianoPerformance.setSustainForSource(
-            "autoplay:pedal",
-            down,
-            "autoplay",
-          ),
-        (LEAD_IN + time) * 1000,
-      ),
+  // Legato pedalling from the score (or the file): the dampers, the
+  // sympathetic ring and the pedal's own thump all follow.
+  while (
+    pedalCursor < songPedal.length &&
+    songPedal[pedalCursor].time <= playhead
+  )
+    pianoPerformance.setSustainForSource(
+      "autoplay:pedal",
+      songPedal[pedalCursor++].down,
+      "autoplay",
     );
-  autoTimers.push(
-    setTimeout(() => stopAutoplay(), (LEAD_IN + songLength + 2) * 1000),
-  );
+  if (playhead > songLength + 2) stopAutoplay();
 }
 
 // --- UI wiring --------------------------------------------------------------
@@ -848,12 +932,13 @@ function animate(timestamp) {
   pianoPerformance.update(dt);
   piano.scoreBook.update(dt, reducedMotion.matches);
 
-  const songTime = autoplay ? (performance.now() - songStart) / 1000 : null;
+  advanceAutoplay(dt);
+  const songTime = autoplay ? playhead : null;
   if (autoplay)
     progressEl.style.width =
       THREE.MathUtils.clamp(songTime / songLength, 0, 1) * 100 + "%";
   noteEffects.update(dt, songTime, reducedMotion.matches);
-  piano.scoreBook.follow(songTime);
+  piano.scoreBook.follow(song.midi ? null : songTime);
   toPiano.subVectors(SOUNDBOARD, camera.position);
   earRight.setFromMatrixColumn(camera.matrixWorld, 0);
   audio.setListener(toPiano.length(), toPiano.normalize().dot(earRight));

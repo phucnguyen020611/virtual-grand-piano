@@ -665,6 +665,61 @@ async function run() {
     log("seat-aware sound and a score that follows", { pass: true });
   }
 
+  // A dropped MIDI file joins the pieces; practice waits for the player.
+  {
+    const body = [0, 0x90, 48, 90]; // a held C3 for the left hand
+    for (const midi of [60, 62, 64])
+      body.push(0, 0x90, midi, 90, 48, 0x80, midi, 0);
+    body.push(0, 0x80, 48, 0, 0, 0xff, 0x2f, 0);
+    const bytes = new Uint8Array([
+      ...[0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0, 96],
+      ...[0x4d, 0x54, 0x72, 0x6b, 0, 0, 0, body.length, ...body],
+    ]);
+    const files = new w.DataTransfer();
+    files.items.add(new w.File([bytes], "scale.mid", { type: "audio/midi" }));
+    w.dispatchEvent(
+      new w.DragEvent("drop", { dataTransfer: files, cancelable: true }),
+    );
+    const songSelect = d.querySelector("#songSelect");
+    for (let i = 0; i < 20 && songSelect.value !== "midi"; i++) await wait(50);
+    assert(
+      songSelect.value === "midi",
+      "the dropped MIDI file was not offered",
+    );
+    const practiceSelect = d.querySelector("#practiceSelect");
+    practiceSelect.value = "right";
+    practiceSelect.dispatchEvent(new Event("change"));
+    const auto = [];
+    const unwatch = p.performance.addObserver(
+      (e) =>
+        e.type === "noteOn" &&
+        e.sourceGroup === "autoplay" &&
+        auto.push(e.midi),
+    );
+    const progress = d.querySelector("#songProgress");
+    click("autoBtn");
+    await wait(3000);
+    const held = progress.style.width;
+    await wait(400);
+    assert(
+      progress.style.width === held,
+      "practice did not wait for the player",
+    );
+    assert(
+      auto.includes(48) && !auto.includes(60),
+      "practice played the right hand",
+    );
+    p.performance.noteOn(60, 0.7, "computer:practice", "computer");
+    p.performance.noteOff(60, "computer:practice");
+    await wait(400);
+    assert(progress.style.width !== held, "practice did not move on");
+    unwatch();
+    click("autoBtn");
+    practiceSelect.value = "listen";
+    practiceSelect.dispatchEvent(new Event("change"));
+    log("MIDI files drop in and practice waits", { pass: true });
+  }
+
   // Styled dropdowns drive their native select by mouse and keyboard.
   {
     const select = d.querySelector("#qualitySelect");

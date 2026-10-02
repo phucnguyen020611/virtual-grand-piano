@@ -25,6 +25,11 @@ The current model is procedural and intentionally lightweight. Future releases c
 - Mouse/touch key interaction
 - Computer-keyboard performance controls
 - Recorded acoustic piano samples with a bounded generated fallback
+- Any MIDI file: **Open MIDI…** or drop a `.mid` on the page and it joins the
+  playlist, pedalling and all
+- Practice mode: the light columns stop on the keys of each chord until you
+  play it, for both hands or one (the other hand plays along), at 100%, 75% or
+  50% tempo
 - Autoplay playlist of five simplified pieces (Beethoven, Pachelbel, Bach and
   a traditional hymn) with hand-coloured key glow, falling
   crystal light columns, star-dust sparkles and the composer's portrait
@@ -71,30 +76,32 @@ The current model is procedural and intentionally lightweight. Future releases c
 
 ## Controls
 
-| Action                  | Control                                          |
-| ----------------------- | ------------------------------------------------ |
-| Orbit camera            | Left-drag / one-finger drag                      |
-| Zoom                    | Mouse wheel / pinch                              |
-| Pan                     | Right-drag / two-finger drag                     |
-| Play visible key        | Press, tap, or drag across piano keys            |
-| Play mapped notes       | `Z–/`, `Q–[`, and nearby number-row black keys   |
-| Shift keyboard range    | `←` / `→` or **Oct −** / **Oct +**               |
-| Sustain                 | `Space` (when a UI control is not focused)       |
-| MIDI input              | **Connect MIDI**, then choose an input if needed |
-| Record performance      | **Record**, then **Play recording**              |
-| Inspect component       | Click a piano component                          |
-| Separate systems        | **Exploded**                                     |
-| Restore assembled piano | **Normal**                                       |
-| Toggle lid              | **Open Lid / Close Lid**                         |
-| Cover the keys          | **Close fallboard / Open fallboard**             |
-| Clean view              | **Hide HUD / Show HUD** (top right)              |
-| Closing credits         | **Credits** (top right); press again to close    |
-| Graphics quality        | **Graphics: Low / Medium / High / Ultra**        |
-| House curtain & lights  | **Close curtain / Open curtain**                 |
-| Adjust bench height     | Click a knob at either end of the bench          |
-| Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift` |
-| Autoplay                | **5-piece playlist**, pedalled, with a soundwave |
-| Restore camera          | **Reset View**                                   |
+| Action                  | Control                                           |
+| ----------------------- | ------------------------------------------------- |
+| Orbit camera            | Left-drag / one-finger drag                       |
+| Zoom                    | Mouse wheel / pinch                               |
+| Pan                     | Right-drag / two-finger drag                      |
+| Play visible key        | Press, tap, or drag across piano keys             |
+| Play mapped notes       | `Z–/`, `Q–[`, and nearby number-row black keys    |
+| Shift keyboard range    | `←` / `→` or **Oct −** / **Oct +**                |
+| Sustain                 | `Space` (when a UI control is not focused)        |
+| MIDI input              | **Connect MIDI**, then choose an input if needed  |
+| Record performance      | **Record**, then **Play recording**               |
+| Inspect component       | Click a piano component                           |
+| Separate systems        | **Exploded**                                      |
+| Restore assembled piano | **Normal**                                        |
+| Toggle lid              | **Open Lid / Close Lid**                          |
+| Cover the keys          | **Close fallboard / Open fallboard**              |
+| Clean view              | **Hide HUD / Show HUD** (top right)               |
+| Closing credits         | **Credits** (top right); press again to close     |
+| Graphics quality        | **Graphics: Low / Medium / High / Ultra**         |
+| House curtain & lights  | **Close curtain / Open curtain**                  |
+| Adjust bench height     | Click a knob at either end of the bench           |
+| Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift`  |
+| Autoplay                | **5-piece playlist**, pedalled, with a soundwave  |
+| Play your own MIDI      | **Open MIDI…**, or drop a `.mid` file anywhere    |
+| Practise a piece        | **Practice:** both / right / left hand, **Tempo** |
+| Restore camera          | **Reset View**                                    |
 
 ## Tech stack
 
@@ -147,7 +154,8 @@ virtual-grand-piano/
 │   ├── performance/
 │   │   ├── computerKeyboard.js # physical-key layout, octave shift, focus safety
 │   │   ├── midiInput.js        # selected Web MIDI input + CC64 handling
-│   │   └── performanceRecorder.js # in-memory musical event recording/playback
+│   │   ├── performanceRecorder.js # in-memory musical event recording/playback
+│   │   └── midiFile.js         # Standard MIDI File reader for the playlist
 │   ├── interaction/
 │   │   ├── dropdown.js         # styled, accessible dropdowns over native selects
 │   │   └── inspection.js       # raycasting selection, labels, mode switching

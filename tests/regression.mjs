@@ -14,6 +14,7 @@ import {
   scoreEvents,
   scorePedal,
 } from "../src/performance/songs.js";
+import { parseMidiFile } from "../src/performance/midiFile.js";
 
 const calls = [];
 const audio = {
@@ -224,6 +225,45 @@ check("repertoire: bars fill their metre, pages hold every bar once", () => {
       assert(!i || change.time >= pedal[i - 1].time, `${song.id} pedal order`),
     );
   }
+});
+check("MIDI files read into timed events", () => {
+  // Format 1, 96 ticks a quarter: a tempo track (120, then 60 bpm at beat 2)
+  // and a piano track with running status, a pedal and a drum hit.
+  const track = (body) => [
+    ...[0x4d, 0x54, 0x72, 0x6b],
+    ...[0, 0, (body.length >> 8) & 0xff, body.length & 0xff],
+    ...body,
+  ];
+  const file = new Uint8Array([
+    ...[0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 2, 0, 96],
+    ...track([
+      ...[0, 0xff, 0x51, 3, 0x07, 0xa1, 0x20], // 120 bpm
+      ...[0x81, 0x40, 0xff, 0x51, 3, 0x0f, 0x42, 0x40], // 60 bpm at tick 192
+      ...[0, 0xff, 0x2f, 0],
+    ]),
+    ...track([
+      ...[0, 0xff, 0x03, 4, 0x54, 0x65, 0x73, 0x74], // "Test"
+      ...[0, 0xb0, 64, 127], // pedal down
+      ...[0, 0x90, 60, 100], // C4 on…
+      ...[0, 48, 80], // …and E3, running status
+      ...[0, 0x99, 36, 100], // a kick drum: dropped
+      ...[0x81, 0x40, 0x80, 60, 0], // C4 off at tick 192
+      ...[0x60, 0x90, 48, 0], // E3 off (velocity 0) at tick 288
+      ...[0, 0xff, 0x2f, 0],
+    ]),
+  ]);
+  const { name, events, pedal } = parseMidiFile(file.buffer);
+  assert.equal(name, "Test");
+  assert.equal(events.length, 2);
+  const [low, high] = [...events].sort((a, b) => a.midi - b.midi);
+  assert.equal(high.midi, 60);
+  assert.equal(high.hand, "right");
+  assert.equal(low.hand, "left");
+  assert(Math.abs(high.duration - 1) < 1e-9, "two beats at 120 bpm");
+  assert(Math.abs(low.duration - 2) < 1e-9, "then a beat at 60 bpm");
+  assert(Math.abs(high.velocity - 100 / 127) < 1e-9);
+  assert.deepEqual(pedal, [{ time: 0, down: true }]);
+  assert.throws(() => parseMidiFile(new Uint8Array(20).buffer));
 });
 controller.stopAll();
 console.log(`${passed} regression checks passed`);

@@ -92,6 +92,31 @@
                 >
                   Play
                 </button>
+                <button id="midiFileBtn" title="Or drop a .mid file anywhere">
+                  Open MIDI…
+                </button>
+                <input
+                  id="midiFileInput"
+                  type="file"
+                  accept=".mid,.midi,audio/midi,audio/x-midi"
+                  hidden
+                />
+              </div>
+            </section>
+            <section class="controlGroup" aria-label="Practice">
+              <span class="groupLabel">Practice</span>
+              <div class="controlRow">
+                <select id="practiceSelect" aria-label="Practice mode">
+                  <option value="listen">Listen</option>
+                  <option value="both">Practice: both hands</option>
+                  <option value="right">Practice: right hand</option>
+                  <option value="left">Practice: left hand</option>
+                </select>
+                <select id="tempoSelect" aria-label="Tempo">
+                  <option value="1">Tempo 100%</option>
+                  <option value="0.75">Tempo 75%</option>
+                  <option value="0.5">Tempo 50%</option>
+                </select>
               </div>
             </section>
             <section
