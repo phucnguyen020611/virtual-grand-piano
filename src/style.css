@@ -784,6 +784,9 @@ kbd {
     height: 100%;
     max-width: none;
     align-items: flex-end;
+    /* When the tools wrap, keep every line on the floor, not spread up the
+       screen. */
+    align-content: flex-end;
     justify-content: flex-end;
   }
 
@@ -806,9 +809,15 @@ kbd {
     display: none;
   }
 
+  /* Clear of the part inspector on the left; groups wrap to a second
+     line at the right instead of running under it. */
   .secondaryControls:not([open]) .secondaryContent,
   .secondaryContent {
     display: flex;
+    max-width: calc(100vw - 440px);
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: flex-end;
     gap: var(--ui-gap);
     padding: 0;
   }
