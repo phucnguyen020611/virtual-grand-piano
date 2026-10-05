@@ -78,7 +78,7 @@ const QUALITY = {
     areaLights: true,
     glassGlow: true,
     sunbeams: false,
-    crowd: true,
+    crowd: false, // ~0.8 M triangles: High and up, or by the Audience button
   },
   high: {
     pixelRatio: () => (handheld() ? 1.5 : 2),

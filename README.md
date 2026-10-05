@@ -74,10 +74,14 @@ The current model is procedural and intentionally lightweight. Future releases c
   follows your clock (or your choice): white day light, long low amber shafts
   at sunset, faint blue moonlight at night
 - A concert ritual: a two-note chime as the house lamps go down and the stage
-  stays lit, then applause from an audience of some 190 in court dress
-  (gilt-trimmed frock coats, powdered hair; ball gowns, gloves and tiaras), who
-  sway with the music and clap at the end of each piece (**Audience** shows or
-  hides them; Low graphics starts without)
+  stays lit, then applause from an audience of some 190 in 1770s court dress:
+  velvet frock coats with turned-back cuffs, brocade waistcoats, lace jabots,
+  powdered wigs and queues, officers' epaulettes and the sash of an order;
+  satin gowns over brocade stomachers and petticoats, lace, long gloves,
+  tiaras or flowers in curled, dressed-up hair, a fan here and there. Every
+  face has eyes, brows, nose, lips and ears; heads glance about, turn to the
+  stage, and to a neighbour as they clap (**Audience** shows or hides them;
+  High graphics and up start with them)
 - Royal scrollbars: slim gilt thumbs on dark lacquer, on cream in the programme
 - A printed concert programme (click any seat, or **Programme**): every piece
   with its composer and a line about it, each ready to play

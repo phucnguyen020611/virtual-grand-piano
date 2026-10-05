@@ -765,6 +765,7 @@ async function run() {
   // a performance.
   {
     const crowd = p.hall.audience;
+    if (!crowd.visible) click("crowdBtn"); // Medium and Low start without them
     assert(crowd.count > 100, `only ${crowd.count} in the audience`);
     const hands = crowd.hands[0];
     const before = hands.instanceMatrix.array.slice(0, 16);
