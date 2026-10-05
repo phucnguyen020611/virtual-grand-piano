@@ -18,6 +18,7 @@ import { parseMidiFile } from "./performance/midiFile.js";
 import { createNoteEffects } from "./scene/noteEffects.js";
 import { enhanceSelect } from "./interaction/dropdown.js";
 import { createInspection } from "./interaction/inspection.js";
+import { createCinematic } from "./interaction/cinematic.js";
 import {
   createExplodedView,
   NORMAL_DEFAULT_CAMERA_POSITION,
@@ -330,7 +331,8 @@ addEventListener("drop", (event) => {
   openMidi(file);
 });
 
-function stopAutoplay() {
+function stopAutoplay(finished = false) {
+  if (!finished) cinematic.stop();
   autoplay = false;
   waiting = null;
   autoBtn.textContent = "Play";
@@ -343,7 +345,8 @@ function stopAutoplay() {
 }
 /** The piece played through: the house applauds as the lights come up. */
 function finishPiece() {
-  stopAutoplay();
+  stopAutoplay(true);
+  cinematic.finale(cinemaShots().applause);
   audio.playEffect("audio/hall/applause.ogg", { gain: 0.55 });
   if (!reducedMotion.matches) hall.audience.applaud(10);
 }
@@ -924,6 +927,95 @@ hudBtn.onclick = () => {
   hudBtn.setAttribute("aria-pressed", String(hidden));
 };
 // Credits roll up the lantern's disc on the rear wall; the camera turns to it.
+// Cinema mode: the piece plays as a film of the hall. The director cuts
+// between moves over the stalls, the keyboard, the glass, the balconies and
+// the lantern's beam, and closes on the audience's applause.
+const cinemaBtn = document.querySelector("#cinemaBtn");
+const cinemaReturn = {
+  position: new THREE.Vector3(),
+  target: new THREE.Vector3(),
+};
+const cinematic = createCinematic({
+  camera,
+  controls,
+  onEnd() {
+    cinemaBtn.setAttribute("aria-pressed", "false");
+    flyTo(cinemaReturn.position, cinemaReturn.target, 1.6);
+  },
+});
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+function cinemaShots() {
+  const book = new THREE.Vector3().setFromMatrixPosition(
+    piano.scoreBook.group.matrixWorld,
+  );
+  const facing = new THREE.Vector3(0, 0, 1).transformDirection(
+    piano.scoreBook.group.matrixWorld,
+  );
+  const shot = (from, to, seconds, via) => ({ from, to, seconds, via });
+  return {
+    film: [
+      // From the back of the hall, high, settling toward the stage.
+      shot([V(0, 44, 96), V(0, 6, 0)], [V(0, 30, 56), V(0, 5, 0)], 9),
+      // Past the chandeliers and down to the piano.
+      shot([V(-16, 46, 82), V(0, 54, 58)], [V(-11, 38, 30), V(0, 7, 0)], 8),
+      // Along the keys.
+      shot(
+        [onStage(-2.8, 3.6, 4.6), onStage(-1.6, 1.4, 1.4)],
+        [onStage(2.8, 3.6, 4.6), onStage(1.6, 1.4, 1.4)],
+        8,
+      ),
+      // Round the piano.
+      shot(
+        [onStage(-13, 7, 9), onStage(0, 2, 0)],
+        [onStage(13, 7, 9), onStage(0, 2, 0)],
+        10,
+        onStage(0, 8, 17),
+      ),
+      // The score on the desk, the bar being played.
+      shot(
+        [
+          book
+            .clone()
+            .addScaledVector(facing, 3.4)
+            .add(V(0, 0.6, 0)),
+          book,
+        ],
+        [
+          book
+            .clone()
+            .addScaledVector(facing, 2.2)
+            .add(V(0, 0.2, 0)),
+          book,
+        ],
+        7,
+      ),
+      // The house, from the stage.
+      shot([V(10, 9, 6), V(0, 7, 44)], [V(-10, 9, 6), V(0, 7, 44)], 8),
+      // The stained glass and its light, from across the stalls.
+      shot([V(2, 24, 18), V(34, 40, 28)], [V(4, 26, 58), V(34, 40, 68)], 9),
+      // From the balcony.
+      shot([V(-28, 31, 74), V(0, 4, 0)], [V(-27, 31, 44), V(0, 4, 0)], 8),
+      // Along the lantern's beam to the portrait on the rear wall.
+      shot([V(6, 36, 24), V(0, 40, 100)], [V(0, 31, 54), V(0, 40, 100)], 8),
+    ],
+    applause: shot([V(7, 9, 7), V(0, 7, 42)], [V(-7, 10, 9), V(0, 7, 42)], 7),
+  };
+}
+function startCinema() {
+  cinemaReturn.position.copy(camera.position);
+  cinemaReturn.target.copy(controls.target);
+  flight.t = 1;
+  cinemaBtn.setAttribute("aria-pressed", "true");
+  if (!autoplay) startAutoplay();
+  cinematic.start(cinemaShots().film, `${song.title} — ${song.composer}`);
+}
+if (import.meta.env.DEV) window.__vgp.cinematic = cinematic;
+cinemaBtn.onclick = () => (cinematic.active ? cinematic.stop() : startCinema());
+document.querySelector("#cinemaExitBtn").onclick = () => cinematic.stop();
+addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && cinematic.active) cinematic.stop();
+});
+
 const creditsBtn = document.querySelector("#creditsBtn");
 let credits = false;
 function setCredits(on) {
@@ -1073,6 +1165,7 @@ function animate(timestamp) {
   // Never pass through a wall, the ceiling or a floor.
   hall.keepInside(camera.position, 0.8);
   hall.keepInside(controls.target, 0.2);
+  cinematic.update(dt, reducedMotion.matches);
 
   explodedView.update(dt, reducedMotion.matches);
   hall.update(reducedMotion.matches ? 100 : dt);

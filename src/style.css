@@ -1233,3 +1233,72 @@ kbd {
     scrollbar-color: #a8823a #e6dcc4;
   }
 }
+
+/* Cinema mode: 2.39:1 letterbox bars slide in, the HUD steps aside, and a
+   veil dips to black at each cut. */
+.letterbox {
+  position: fixed;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  display: flex;
+  height: 0;
+  overflow: hidden;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 max(24px, env(safe-area-inset-left));
+  background: #000;
+  transition: height 900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.letterbox.top {
+  top: 0;
+}
+
+.letterbox.bottom {
+  bottom: 0;
+}
+
+.cinema .letterbox {
+  height: max(56px, calc((100vh - 100vw / 2.39) / 2));
+}
+
+.cinemaCaption {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ui-accent-strong);
+  font-family: var(--font-display);
+  font-size: clamp(16px, 2.2vw, 26px);
+  font-style: italic;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cinemaExit {
+  flex: 0 0 auto;
+  border-color: rgba(215, 185, 120, 0.4);
+  background: transparent;
+  color: var(--ui-muted);
+}
+
+.cinemaFade {
+  position: fixed;
+  z-index: 39;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cinema :is(.topbar, .hud, .inspector, .helpPanel, .label3d) {
+  opacity: 0;
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .letterbox {
+    transition: none;
+  }
+}

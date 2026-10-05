@@ -795,6 +795,23 @@ async function run() {
     click("crowdBtn");
     assert(crowd.visible, "the audience button did not bring them back");
     log("an audience that applauds, a house that dims", { pass: true });
+
+    // Cinema mode letterboxes the screen, plays the piece, and lets go.
+    click("cinemaBtn");
+    assert(
+      d.body.classList.contains("cinema") &&
+        d.querySelector("#autoBtn").getAttribute("aria-pressed") === "true" &&
+        !p.controls.enabled,
+      "cinema mode did not take the camera",
+    );
+    p.cinematic.update(30); // past the first shot's cut
+    click("cinemaExitBtn");
+    assert(
+      !d.body.classList.contains("cinema") && p.controls.enabled,
+      "leaving cinema mode kept the camera",
+    );
+    click("autoBtn");
+    log("cinema mode", { pass: true });
   }
 
   // Styled dropdowns drive their native select by mouse and keyboard.

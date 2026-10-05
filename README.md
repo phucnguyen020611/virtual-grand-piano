@@ -82,6 +82,11 @@ The current model is procedural and intentionally lightweight. Future releases c
   face has eyes, brows, nose, lips and ears; heads glance about, turn to the
   stage, and to a neighbour as they clap (**Audience** shows or hides them;
   High graphics and up start with them)
+- **Cinematic**: the piece plays as a film of the hall, letterboxed to 2.39:1,
+  the director cutting between slow moves over the stalls, past the
+  chandeliers, along the keys, round the piano, onto the score, across the
+  stained glass, from the balcony and down the lantern's beam, closing on the
+  applause (Esc or **Exit cinema** to leave)
 - Royal scrollbars: slim gilt thumbs on dark lacquer, on cream in the programme
 - A printed concert programme (click any seat, or **Programme**): every piece
   with its composer and a line about it, each ready to play
@@ -114,6 +119,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Daylight outside        | **Sky:** your clock / day / sunset / night        |
 | Concert programme       | Click any seat, or **Programme**                  |
 | Show / hide audience    | **Audience**                                      |
+| Watch it as a film      | **Cinematic**; Esc to leave                       |
 | House curtain & lights  | **Close curtain / Open curtain**                  |
 | Adjust bench height     | Click a knob at either end of the bench           |
 | Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift`  |
@@ -178,6 +184,7 @@ virtual-grand-piano/
 │   │   ├── performanceRecorder.js # in-memory musical event recording/playback
 │   │   └── midiFile.js         # Standard MIDI File reader for the playlist
 │   ├── interaction/
+│   │   ├── cinematic.js        # cinema mode: the director, its cuts and letterbox
 │   │   ├── dropdown.js         # styled, accessible dropdowns over native selects
 │   │   └── inspection.js       # raycasting selection, labels, mode switching
 │   └── style.css

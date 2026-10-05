@@ -99,6 +99,13 @@
                 >
                   Play
                 </button>
+                <button
+                  id="cinemaBtn"
+                  aria-pressed="false"
+                  title="Plays the piece as a film of the hall"
+                >
+                  Cinematic
+                </button>
                 <button id="programmeBtn" title="Or click any seat in the hall">
                   Programme
                 </button>
@@ -191,6 +198,14 @@
         </button>
       </div>
     </main>
+
+    <!-- Cinema mode: letterbox bars, a dip to black at each cut. -->
+    <div class="letterbox top" aria-hidden="true"></div>
+    <div class="letterbox bottom">
+      <p class="cinemaCaption" id="cinemaCaption"></p>
+      <button id="cinemaExitBtn" class="cinemaExit">Exit cinema (Esc)</button>
+    </div>
+    <div id="cinemaFade" class="cinemaFade" aria-hidden="true"></div>
 
     <dialog id="programme" class="programme" aria-labelledby="programmeTitle">
       <form method="dialog" class="programmeSheet">
