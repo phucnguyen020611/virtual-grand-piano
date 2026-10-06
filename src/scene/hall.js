@@ -18,6 +18,7 @@ import { createComposerProjection } from "./composerProjection.js";
 import { buildLightingRig } from "./stageLighting.js";
 import { buildPassages } from "./passages.js";
 import { buildFoyer, foyerLamps, DOOR } from "./foyer.js";
+import { buildSalon } from "./salon.js";
 import { buildAudience } from "./audience.js";
 
 // One scene unit is ~0.21 m (the keyboard is 5.9 units, 1.22 m wide).
@@ -233,20 +234,19 @@ export function createHall(scene, mats) {
       roughness: rough,
     });
   const stageDepth = STAGE_FRONT_Z - STAGE_BACK_Z;
-  // Herringbone oak parquet, as in a palace salon.
-  const stage = mesh(
-    new THREE.BoxGeometry(HALL_HALF_WIDTH * 2, 0.55, stageDepth),
+  // Herringbone oak parquet, as in a palace salon (and in the music salon).
+  const parquetTiles = parquetSet(aniso);
+  const parquet = (w, h) =>
     new THREE.MeshPhysicalMaterial({
-      ...repeatSet(
-        parquetSet(aniso),
-        (HALL_HALF_WIDTH * 2) / PARQUET_TILE[0],
-        stageDepth / PARQUET_TILE[1],
-      ),
+      ...repeatSet(parquetTiles, w / PARQUET_TILE[0], h / PARQUET_TILE[1]),
       roughness: 1,
       // Satin polyurethane over stained oak.
       clearcoat: 0.3,
       clearcoatRoughness: 0.38,
-    }),
+    });
+  const stage = mesh(
+    new THREE.BoxGeometry(HALL_HALF_WIDTH * 2, 0.55, stageDepth),
+    parquet(HALL_HALF_WIDTH * 2, stageDepth),
     0,
     STAGE_TOP - 0.275,
     (STAGE_FRONT_Z + STAGE_BACK_Z) / 2,
@@ -698,6 +698,19 @@ export function createHall(scene, mats) {
     velvet,
     runner: { geometry: runnerAlong, material: runnerMaterial },
   });
+  // The music salon next door, where the games are played: shown in place of
+  // the hall, round the piano where it stands.
+  const salon = buildSalon(scene, {
+    floorY: STAGE_TOP,
+    gilt: gold,
+    plaster: plasterWall,
+    parquet,
+    damask: (w, h) =>
+      new THREE.MeshStandardMaterial({
+        ...repeatSet(damask, w / 6, h / 9),
+        roughness: 1,
+      }),
+  });
   // Beyond them, the foyer where a visit begins.
   const foyer = buildFoyer(hall, {
     backZ: HALL_BACK_Z,
@@ -991,7 +1004,13 @@ export function createHall(scene, mats) {
     /** Project the playing song's composer on the rear wall (null: none). */
     showComposer: projection.show,
     rollCredits: projection.rollCredits,
+    /** Which room shows round the piano: "hall" or "salon". */
+    setRoom(name) {
+      hall.visible = name === "hall";
+      salon.setVisible(name === "salon");
+    },
     update(dt) {
+      salon.update(dt);
       projection.update(dt);
       // Reduced motion arrives as one huge step: hold the glass still then.
       royal.update(dt < 1 ? dt : 0);
