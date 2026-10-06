@@ -1558,6 +1558,11 @@ export function buildAudience(parent, seats) {
   let sway = 0; // 0..1, eased in while music plays
   let clapFrom = -1;
   let clapUntil = -1;
+  // Someone passing (a point in the parent's space), whom those near enough
+  // turn to watch; each figure's turn [yaw, pitch], eased.
+  let watched = null;
+  const turns = groups.map(({ people }) => new Float32Array(people.length * 2));
+  const toward = new THREE.Vector3();
 
   /** out = parent × (a turn by `quat` about point P). */
   const about = (out, parent, P, quat) => {
@@ -1567,10 +1572,35 @@ export function buildAudience(parent, seats) {
     return out.multiplyMatrices(parent, m);
   };
 
-  function pose() {
-    for (const { people, meshes, frames, sides } of groups) {
+  function pose(dt = 0) {
+    groups.forEach(({ people, meshes, frames, sides }, g) => {
+      const turned = turns[g];
       people.forEach(({ seat: [x, y, z, yaw], i }, n) => {
         const phase = hash(i, 6) * 6.283;
+        // Turning to watch the passer-by: the head as far as the neck allows
+        // (over the shoulder for one behind), the shoulders a little with it.
+        let yawTo = 0;
+        let pitchTo = 0;
+        if (watched) {
+          toward.set(watched.x - x, watched.y - y - 6.1, watched.z - z);
+          const [c, s] = [Math.cos(yaw), Math.sin(yaw)];
+          const lx = toward.x * c - toward.z * s;
+          const lz = toward.x * s + toward.z * c;
+          const near =
+            smooth(15, 6, toward.length()) * (0.7 + 0.3 * hash(i, 22));
+          yawTo =
+            near * THREE.MathUtils.clamp(Math.atan2(-lx, -lz), -1.35, 1.35);
+          pitchTo =
+            near *
+            THREE.MathUtils.clamp(
+              Math.atan2(toward.y, Math.hypot(lx, lz)),
+              -0.35,
+              0.45,
+            );
+        }
+        const ease = Math.min(1, dt * (2 + hash(i, 23)));
+        turned[n * 2] += (yawTo - turned[n * 2]) * ease;
+        turned[n * 2 + 1] += (pitchTo - turned[n * 2 + 1]) * ease;
         // Applause: each joins a moment late and stops on their own.
         const start = clapFrom + 0.6 * hash(i, 7);
         const stop = clapUntil - 1.8 * hash(i, 8);
@@ -1585,7 +1615,7 @@ export function buildAudience(parent, seats) {
         const listen = sway * Math.sin(time * (1.4 + hash(i, 13)) + phase);
         euler.set(
           0.025 * listen + clap * 0.05, // a nod; leaning in to clap
-          0,
+          0.3 * turned[n * 2],
           0.03 * sway * Math.sin(time * (0.9 + hash(i, 14)) + phase), // a sway
         );
         // No two the same: a little taller or shorter, broader or slighter.
@@ -1605,8 +1635,8 @@ export function buildAudience(parent, seats) {
           Math.max(0, Math.sin(time * 0.07 + phase * 3));
         const neighbour = (hash(i, 21) - 0.5) * 0.6;
         gaze.set(
-          -0.06 + 0.05 * listen,
-          glance * idle + neighbour * clap,
+          -0.06 + 0.05 * listen + turned[n * 2 + 1],
+          glance * idle + neighbour * clap + 0.7 * turned[n * 2],
           0.04 * sway * Math.sin(time * 0.8 + phase),
         );
         about(head, body, NECK, q.setFromEuler(gaze));
@@ -1650,7 +1680,7 @@ export function buildAudience(parent, seats) {
         );
         mesh.instanceMatrix.needsUpdate = true;
       }
-    }
+    });
   }
   pose();
 
@@ -1668,7 +1698,12 @@ export function buildAudience(parent, seats) {
     update(dt, playing) {
       time += dt;
       sway += ((playing ? 1 : 0) - sway) * Math.min(1, dt * 0.8);
-      if (all[0].visible) pose();
+      if (all[0].visible) pose(dt);
+    },
+    /** Turn to watch `point` (in the hall's space) as it passes; null to
+     *  turn back. */
+    watch(point) {
+      watched = point;
     },
     get visible() {
       return all[0].visible;
