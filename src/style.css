@@ -8,6 +8,8 @@
   --ui-accent-strong: #f4e4bd;
   --ui-radius: 14px;
   --ui-gap: 8px;
+  /* How far above the bottom edge the dock reaches: panels sit above it. */
+  --dock-clear: 86px;
   --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
   /* Copperplate script for headings only; it is unreadable at UI sizes. */
   --font-script: "Pinyon Script", "Cormorant Garamond", Georgia, cursive;
@@ -212,48 +214,133 @@ canvas {
   background: var(--ui-accent);
 }
 
+/* The menu: a dock of five categories centred along the bottom, big
+   icon-and-word tabs; the open category's panel rises above it. */
 .hud {
   z-index: 11;
   inset: auto max(12px, env(safe-area-inset-right))
     max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-  pointer-events: none;
-}
-
-.controlDeck {
   display: flex;
-  max-width: 760px;
-  margin-left: auto;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: center;
   gap: var(--ui-gap);
   pointer-events: none;
 }
 
-.controlGroup,
-.secondaryControls,
-.helpTrigger {
-  pointer-events: auto;
-}
-
-.controlGroup,
-.secondaryControls,
-.helpTrigger,
+.dock,
+.dockPanel,
 .inspector,
 .helpPanel {
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   background: var(--ui-bg);
-  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.26);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.3);
 }
 
-.controlGroup {
-  padding: 7px;
+.dock {
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  pointer-events: auto;
+}
+
+.dockTab {
+  display: flex;
+  min-width: 84px;
+  min-height: 60px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-color: transparent;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--ui-muted);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.dockTab svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dockTab svg .fill {
+  fill: currentColor;
+  stroke: none;
+}
+
+.dockTab:hover:not(:disabled) {
+  color: var(--ui-text);
+}
+
+.dockTab[aria-expanded="true"] {
+  border-color: rgba(215, 185, 120, 0.72);
+  background: rgba(215, 185, 120, 0.16);
+  color: var(--ui-accent-strong);
+}
+
+.dockPanels {
+  display: contents;
+}
+
+.dockPanel {
+  width: min(560px, calc(100vw - 24px));
+  /* Clear of the top bar above and the dock below. */
+  max-height: calc(100dvh - var(--dock-clear) - 100px);
+  overflow: auto;
+  padding: 14px 16px 16px;
+  background: var(--ui-panel);
+  pointer-events: auto;
+  animation: panelRise 180ms ease-out;
+}
+
+/* One thing at a time: an open panel (but Explore, which names the parts
+   you pick) sends the part card away. */
+.hud:has(.dockPanel:not(#panelExplore, [hidden])) ~ .inspector {
+  opacity: 0;
+  visibility: hidden;
+}
+
+@keyframes panelRise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--ui-accent-strong);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.panelHint {
+  margin: 2px 0 12px;
+  color: var(--ui-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.panelGroup + .panelGroup {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-border);
 }
 
 .groupLabel {
   display: block;
-  margin: 0 4px 5px;
+  margin: 0 0 7px;
+  font-size: 11.5px;
 }
 
 .controlRow,
@@ -261,7 +348,7 @@ canvas {
 .segmented {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .controlRow {
@@ -269,65 +356,25 @@ canvas {
 }
 
 .octaveControl {
+  width: fit-content;
   border: 1px solid var(--ui-border);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
 }
 
 .octaveControl button {
-  min-width: 48px;
+  min-width: 72px;
   border-color: transparent;
   background: transparent;
 }
 
 .octaveControl span {
-  min-width: 58px;
+  min-width: 64px;
   color: var(--ui-accent-strong);
-  font-size: 12px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
   text-align: center;
   white-space: nowrap;
-}
-
-.secondaryControls {
-  min-height: 44px;
-}
-
-.secondaryControls summary {
-  min-height: 44px;
-  cursor: pointer;
-  padding: 12px;
-  color: var(--ui-muted);
-  font-size: 13px;
-  list-style: none;
-}
-
-.secondaryControls summary::-webkit-details-marker {
-  display: none;
-}
-
-.secondaryControls summary::after {
-  content: "+";
-  margin-left: 8px;
-  color: var(--ui-accent);
-}
-
-.secondaryControls[open] summary::after {
-  content: "−";
-}
-
-.secondaryContent {
-  display: grid;
-  gap: var(--ui-gap);
-  padding: 0 7px 7px;
-}
-
-.secondaryControls:not([open]) .secondaryContent {
-  display: none;
-}
-
-.secondaryContent .controlGroup {
-  background: var(--ui-panel);
 }
 
 .segmented {
@@ -482,13 +529,9 @@ canvas {
   white-space: nowrap;
 }
 
-.helpTrigger {
-  color: var(--ui-muted);
-}
-
 .helpPanel {
   right: max(12px, env(safe-area-inset-right));
-  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px);
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--dock-clear));
   width: min(510px, calc(100vw - 24px));
   max-height: min(440px, calc(100dvh - 130px));
   overflow: auto;
@@ -550,7 +593,7 @@ kbd {
 
 .inspector {
   left: max(12px, env(safe-area-inset-left));
-  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px);
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--dock-clear));
   width: min(345px, calc(100vw - 24px));
   min-height: 112px;
   padding: 13px;
@@ -775,71 +818,20 @@ kbd {
     padding: 18px 22px 0;
   }
 
-  /* Primary transport top-centre; secondary tools bottom-right over the
-     empty floor, so neither row covers the raised lid. */
+  :root {
+    --dock-clear: 80px;
+  }
+
   .hud {
-    inset: 18px 22px;
+    bottom: 18px;
   }
 
-  .controlDeck {
-    height: 100%;
-    max-width: none;
-    align-items: flex-end;
-    /* When the tools wrap, keep every line on the floor, not spread up the
-       screen. */
-    align-content: flex-end;
-    justify-content: flex-end;
-  }
-
-  .performanceGroup {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  .secondaryControls {
-    display: contents;
-  }
-
-  .secondaryControls summary {
-    display: none;
-  }
-
-  .secondaryControls summary::after {
-    display: none;
-  }
-
-  /* Clear of the part inspector on the left; groups wrap to a second
-     line at the right instead of running under it. */
-  .secondaryControls:not([open]) .secondaryContent,
-  .secondaryContent {
-    display: flex;
-    max-width: calc(100vw - 440px);
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: flex-end;
-    gap: var(--ui-gap);
-    padding: 0;
-  }
-
-  .secondaryContent .controlGroup {
-    background: var(--ui-bg);
-  }
-
-  .helpTrigger {
-    align-self: end;
-  }
-
-  /* Sits above the bottom-right tool row, which can span most of the width. */
   .inspector {
-    bottom: 112px;
     left: 18px;
   }
 
   .helpPanel {
     right: 18px;
-    bottom: 112px;
   }
 }
 
@@ -851,23 +843,6 @@ kbd {
   .status {
     max-width: 47vw;
     font-size: 11px;
-  }
-
-  .controlDeck {
-    max-width: 100%;
-  }
-
-  .performanceGroup {
-    margin-left: auto;
-  }
-
-  .helpTrigger,
-  .secondaryControls {
-    align-self: end;
-  }
-
-  .inspector {
-    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 136px);
   }
 }
 
@@ -903,49 +878,29 @@ kbd {
     white-space: nowrap;
   }
 
-  .controlDeck {
-    gap: 6px;
+  /* The dock spans the width, five equal tabs. */
+  .hud {
+    align-items: stretch;
   }
 
-  .performanceGroup {
-    width: 100%;
+  .dock {
+    justify-content: space-between;
   }
 
-  .performanceGroup .controlRow {
-    flex-wrap: wrap;
+  .dockTab {
+    min-width: 0;
+    flex: 1;
+    padding: 6px 2px;
+    font-size: 12.5px;
   }
 
-  .performanceGroup button {
-    padding-inline: 9px;
-    font-size: 12px;
-  }
-
-  .octaveControl button {
-    min-width: 42px;
-  }
-
-  .octaveControl span {
-    min-width: 51px;
-    font-size: 11px;
-  }
-
-  .secondaryControls,
-  .helpTrigger {
-    background: var(--ui-panel);
-  }
-
-  .secondaryContent {
-    width: min(360px, calc(100vw - 24px));
-  }
-
-  .secondaryContent .controlRow {
-    gap: 6px;
+  .dockPanel {
+    width: auto;
   }
 
   .inspector {
     width: min(300px, calc(100vw - 24px));
     min-height: 0;
-    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 133px);
   }
 
   .inspector p {
@@ -961,21 +916,9 @@ kbd {
     margin-top: 8px;
   }
 
-  .helpPanel {
-    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 68px);
-  }
-
   .helpGrid {
     grid-template-columns: 1fr;
     gap: 11px;
-  }
-}
-
-/* Below ~380px the performance row wraps to two lines; lift the inspector
-   clear of the taller deck. */
-@media (max-width: 380px) {
-  .inspector {
-    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 186px);
   }
 }
 
@@ -988,12 +931,20 @@ kbd {
     display: none;
   }
 
-  .groupLabel {
+  :root {
+    --dock-clear: 70px;
+  }
+
+  .panelHint {
     display: none;
   }
 
-  .controlGroup {
-    padding: 5px;
+  .dockTab {
+    min-height: 48px;
+  }
+
+  .dockTab svg {
+    display: none;
   }
 
   .audioGate .seal,
@@ -1029,41 +980,95 @@ kbd {
   align-items: safe center;
 }
 
-@media (max-width: 1180px) {
-  .secondaryContent {
-    position: absolute;
-    right: 0;
-    bottom: calc(100% + 8px);
-    width: min(380px, calc(100vw - 24px));
-    max-height: calc(100dvh - 220px);
-    overflow: auto;
-    padding: 7px;
-    border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius);
-    background: var(--ui-panel);
-  }
-}
-
 /* At high zoom or short heights, scroll the controls instead of clipping them. */
 @media (max-height: 440px) {
-  .hud {
-    top: 58px;
-    bottom: max(8px, env(safe-area-inset-bottom));
-    overflow: auto;
-    align-content: end;
-  }
-  .secondaryContent {
-    position: static;
-    max-height: none;
-  }
   .helpPanel {
-    top: 58px;
+    top: 80px;
     bottom: 8px;
     max-height: none;
   }
   .brand .eyebrow {
     display: none;
   }
+}
+
+/* Larger text and buttons (the Aa toggle): for young and older eyes and
+   hands. Every control grows, and so do the words. */
+.largeUI {
+  --dock-clear: 100px;
+}
+
+.largeUI :is(.hud, .topbar, .inspector, .helpPanel) button {
+  min-height: 54px;
+  padding: 11px 16px;
+  font-size: 17px;
+}
+
+.largeUI .dock .dockTab {
+  min-height: 74px;
+  padding: 8px 6px;
+  font-size: 16px;
+}
+
+.largeUI .dockTab svg {
+  width: 28px;
+  height: 28px;
+}
+
+.largeUI .panelTitle {
+  font-size: 30px;
+}
+
+.largeUI :is(.panelHint, .octaveControl span, .status) {
+  font-size: 17px;
+}
+
+.largeUI :is(.groupLabel, .meta) {
+  font-size: 13px;
+}
+
+.largeUI .dockPanel {
+  width: min(680px, calc(100vw - 24px));
+}
+
+.largeUI :is(.inspector p, .helpGrid p) {
+  font-size: 19px;
+}
+
+.largeUI .inspector .part {
+  font-size: 32px;
+}
+
+.largeUI .dropdownList li {
+  min-height: 50px;
+  font-size: 17px;
+}
+
+@media (max-height: 560px) {
+  .largeUI {
+    --dock-clear: 80px;
+  }
+
+  .largeUI .dock .dockTab {
+    min-height: 56px;
+  }
+}
+
+/* The top bar stays compact on phones, whatever the size: the dock below is
+   where the big buttons are. */
+@media (max-width: 560px) {
+  .largeUI .topbar button {
+    min-height: 44px;
+    padding: 9px 12px;
+    font-size: 15px;
+  }
+}
+
+#textSizeBtn {
+  min-width: 44px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
 }
 
 /* The concert programme: a printed card on cream paper, gilt-ruled. */

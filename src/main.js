@@ -501,8 +501,6 @@ const audioGate = document.querySelector("#audioGate");
 const helpBtn = document.querySelector("#helpBtn");
 const helpPanel = document.querySelector("#helpPanel");
 const helpCloseBtn = document.querySelector("#helpCloseBtn");
-const secondaryControls = document.querySelector("#secondaryControls");
-const secondarySummary = secondaryControls.querySelector("summary");
 const gatedInterface = document.querySelectorAll(
   "#app, .topbar, #pianoControls, #inspector",
 );
@@ -580,16 +578,51 @@ function updateRecordingTimer(recording) {
   }
 }
 
-const compactControls = matchMedia("(max-width: 1180px)");
-function syncSecondaryControls() {
-  secondaryControls.open = !compactControls.matches;
-  secondarySummary.setAttribute(
-    "aria-hidden",
-    String(!compactControls.matches),
-  );
+// The menu: a dock of categories along the bottom; a tab opens its panel
+// above the dock (closing any other), again or Esc closes it.
+const dockTabs = document.querySelectorAll(".dockTab[aria-controls^='panel']");
+function openPanel(tab) {
+  for (const other of dockTabs) {
+    const open = other === tab && other.ariaExpanded !== "true";
+    other.ariaExpanded = String(open);
+    document.getElementById(other.getAttribute("aria-controls")).hidden = !open;
+  }
 }
-compactControls.addEventListener("change", syncSecondaryControls);
-syncSecondaryControls();
+function closePanels() {
+  const open = [...dockTabs].find((tab) => tab.ariaExpanded === "true");
+  if (open) openPanel(open);
+}
+dockTabs.forEach((tab) => {
+  tab.onclick = () => {
+    setHelpOpen(false, { restoreFocus: false });
+    openPanel(tab);
+  };
+});
+addEventListener("keydown", (event) => {
+  const open = [...dockTabs].find((tab) => tab.ariaExpanded === "true");
+  if (event.key !== "Escape" || !open || cinematic.active) return;
+  openPanel(open);
+  open.focus();
+});
+
+// Larger text and buttons, for young and older eyes and hands; remembered.
+const textSizeBtn = document.querySelector("#textSizeBtn");
+function setLargeText(on) {
+  document.documentElement.classList.toggle("largeUI", on);
+  textSizeBtn.ariaPressed = String(on);
+  try {
+    localStorage.setItem("vgp.largeText", on ? "1" : "0");
+  } catch {
+    // Private windows may refuse storage; the setting simply is not kept.
+  }
+}
+try {
+  setLargeText(localStorage.getItem("vgp.largeText") === "1");
+} catch {
+  setLargeText(false);
+}
+textSizeBtn.onclick = () =>
+  setLargeText(!document.documentElement.classList.contains("largeUI"));
 
 const computerKeyboard = createComputerKeyboard({
   controller: pianoPerformance,
@@ -1063,6 +1096,7 @@ creditsBtn.onclick = () => {
     return;
   }
   if (autoplay) stopAutoplay();
+  closePanels(); // the credits roll high on the rear wall: clear the view
   setCredits(true);
   hall.rollCredits();
   flyTo(hall.views.projection.position, hall.views.projection.target, 2);
@@ -1158,7 +1192,10 @@ document.addEventListener("focusin", (event) => {
   )
     setHelpOpen(false, { restoreFocus: false });
 });
-helpBtn.onclick = () => setHelpOpen(helpPanel.hidden);
+helpBtn.onclick = () => {
+  closePanels();
+  setHelpOpen(helpPanel.hidden);
+};
 helpCloseBtn.onclick = () => setHelpOpen(false);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !helpPanel.hidden) setHelpOpen(false);

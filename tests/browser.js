@@ -489,32 +489,38 @@ async function run() {
         }
       }
     }
-    const details = d.querySelector("details");
-    details.open = true;
-    await wait(20);
+    // Every category of the dock in turn: its panel's buttons, the dock
+    // and the top-bar toggles must all be on screen and uncovered.
     const hidden = [];
-    for (const e of d.querySelectorAll("#pianoControls button, #hudBtn")) {
-      if (e.disabled || e.closest("[hidden]")) continue;
-      e.focus();
-      e.scrollIntoView({ block: "nearest", inline: "nearest" });
-      const r = e.getBoundingClientRect();
-      const x = Math.min(width - 1, Math.max(1, r.left + r.width / 2)),
-        y = Math.min(height - 1, Math.max(1, r.top + r.height / 2));
-      if (
-        r.left < -0.5 ||
-        r.right > width + 0.5 ||
-        r.top < -0.5 ||
-        r.bottom > height + 0.5 ||
-        !e.contains(d.elementFromPoint(x, y))
-      )
-        hidden.push(e.id);
+    for (const tab of d.querySelectorAll(".dockTab[aria-controls^='panel']")) {
+      tab.click();
+      await wait(20);
+      const panel = tab.getAttribute("aria-controls");
+      for (const e of d.querySelectorAll(
+        `#${panel} button, .dockTab, #hudBtn, #textSizeBtn`,
+      )) {
+        if (e.disabled || e.closest("[hidden]")) continue;
+        e.focus();
+        e.scrollIntoView({ block: "nearest", inline: "nearest" });
+        const r = e.getBoundingClientRect();
+        const x = Math.min(width - 1, Math.max(1, r.left + r.width / 2)),
+          y = Math.min(height - 1, Math.max(1, r.top + r.height / 2));
+        if (
+          r.left < -0.5 ||
+          r.right > width + 0.5 ||
+          r.top < -0.5 ||
+          r.bottom > height + 0.5 ||
+          !e.contains(d.elementFromPoint(x, y))
+        )
+          hidden.push(e.id);
+      }
+      tab.click();
     }
     assert(
       !hidden.length,
-      `${width}×${height} obscured controls: ${hidden.join(",")}`,
+      `${width}×${height} obscured controls: ${[...new Set(hidden)].join(",")}`,
     );
     log(`controls reachable ${width}×${height}`, { pass: true });
-    details.open = width > 1180;
   }
   frame.style.width = "1440px";
   frame.style.height = "900px";
