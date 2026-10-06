@@ -188,15 +188,19 @@ function seatGeometries() {
   const cushion = new RoundedBoxGeometry(2.1, 0.5, 1.9, 2, 0.2);
   cushion.translate(0, 2.1, 0.1);
   const back = new RoundedBoxGeometry(2.1, 2.8, 0.5, 2, 0.22);
-  back.rotateX(-0.16);
+  back.rotateX(0.16); // reclined: the top leans back, away from the stage
   back.translate(0, 3.75, 1.05);
   velvet.push(cushion, back);
   for (const side of [-1, 1]) {
     const arm = new RoundedBoxGeometry(0.28, 0.22, 1.9, 1, 0.08);
     arm.translate(side * 1.18, 3.0, 0.3);
+    // Four legs: the back pair under the arms' ends, the front pair slimmer
+    // under their fronts, clear of the sitters' skirts.
     const post = new THREE.BoxGeometry(0.22, 3.0, 0.22);
     post.translate(side * 1.18, 1.5, 0.9);
-    frame.push(arm, post);
+    const front = new THREE.BoxGeometry(0.16, 3.0, 0.16);
+    front.translate(side * 1.21, 1.5, -0.45);
+    frame.push(arm, post, front);
   }
   // Rounded and plain boxes differ in indexing; merge them as triangle soup.
   const merge = (parts) =>
