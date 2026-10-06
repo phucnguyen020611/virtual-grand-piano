@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
 /**
  * A court audience in about seven seats of ten, dressed as for an evening at
@@ -252,15 +253,21 @@ function headShape(dress, detail = [24, 18]) {
   return g;
 }
 /**
- * Hair over the head: from a hairline (`line`, its height at the brow) back
- * to the nape, standing `lift` off the scalp; `pouf` raises the crown,
+ * Hair over the head: from a hairline (`line`, its height at the brow;
+ * `side`, over the ears) back to the nape, standing `lift` off the scalp; `pouf` raises the crown,
  * `toupee` a roll over the brow. Below the hairline it tucks into the head.
  */
-const hairShell = ({ line = 0.6, lift = 1.08, pouf = 0, toupee = 0 }) =>
+const hairShell = ({
+  line = 0.6,
+  side = -0.08,
+  lift = 1.08,
+  pouf = 0,
+  toupee = 0,
+}) =>
   headShape(
     (x, y, z) => {
       const edge =
-        z > 0 ? -0.08 - 0.72 * z : -0.08 + (line + 0.08) * (-z) ** 0.8;
+        z > 0 ? side - (0.8 + side) * z : side + (line - side) * (-z) ** 0.8;
       // Close to the skin at the hairline, its volume growing above it.
       const on = smooth(edge - 0.12, edge, y);
       const k = 0.93 + 0.08 * on + (lift - 1.01) * smooth(edge, edge + 0.45, y);
@@ -284,21 +291,29 @@ const features = () => [
       [8, 6],
     ),
   ),
-  ball(
-    1,
-    [0, C.y - 0.1, C.z - 0.415],
-    [0.038, 0.115, 0.05],
-    [0.3, 0, 0],
-    [8, 6],
-  ),
-  ball(
-    1,
-    [0, C.y - 0.19, C.z - 0.462],
-    [0.044, 0.03, 0.032],
-    undefined,
-    [8, 6],
-  ),
+  nose(),
 ];
+
+/** A nose: narrow at the bridge, widening to the wings and a rounded tip,
+ *  standing out most at the bottom, its base flat; its back sunk in the face. */
+function nose() {
+  const g = new THREE.SphereGeometry(1, 10, 8);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    let y = p.getY(i);
+    const t = (y + 1) / 2; // 0 at the base, 1 at the bridge
+    const z = p.getZ(i);
+    if (y < -0.55) y = -0.55 + (y + 0.55) * 0.3;
+    p.setXYZ(
+      i,
+      p.getX(i) * 0.05 * (1 - 0.55 * t),
+      y * 0.12,
+      z < 0 ? z * 0.08 * (1 - 0.6 * t) : z * 0.02,
+    );
+  }
+  g.computeVertexNormals();
+  return g.rotateX(0.12).translate(0, C.y - 0.11, C.z - 0.415);
+}
 
 /**
  * The painted face, as seen from the front, in two layers: tones that
@@ -582,24 +597,28 @@ const GENT = {
   shoulder: [0.86, 5.0, 0.5],
   elbow: [1.1, 3.36, 0.36],
   wrist: [0.46, 3.22, -0.76],
-  droop: 0.25,
+  droop: 0.12,
   size: 1,
 };
 const LADY = {
   shoulder: [0.8, 4.92, 0.5],
   elbow: [1.04, 3.34, 0.38],
   wrist: [0.43, 3.32, -0.72],
-  droop: 0.35,
+  droop: 0.2,
   size: 0.88,
 };
 const joint = (J, name, s) => V(s * J[name][0], J[name][1], J[name][2]);
 
-/** How the hand is laid: from DOWN along the forearm, after a droop. */
+/** How the hand is laid: from DOWN toward the knee (the wrist turned out of
+ *  the forearm's inward line, so the hands rest apart, one on each thigh),
+ *  after a droop. */
 function handTurn(J, s) {
   const E = joint(J, "elbow", s);
   const W = joint(J, "wrist", s);
+  const along = W.clone().sub(E);
+  along.x *= 0.3;
   return new THREE.Quaternion()
-    .setFromUnitVectors(DOWN, W.clone().sub(E).normalize())
+    .setFromUnitVectors(DOWN, along.normalize())
     .multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), -J.droop));
 }
 
@@ -608,13 +627,13 @@ function handTurn(J, s) {
 function handShape(J, s) {
   const parts = [ball(1, [0, -0.24, 0], [0.17, 0.25, 0.07], undefined, [8, 6])];
   for (const [x, len, r] of [
-    [0.12, 0.29, 0.04],
-    [0.04, 0.32, 0.042],
-    [-0.045, 0.3, 0.04],
-    [-0.125, 0.24, 0.035],
+    [0.105, 0.27, 0.042],
+    [0.035, 0.3, 0.044],
+    [-0.035, 0.28, 0.042],
+    [-0.105, 0.22, 0.037],
   ])
     parts.push(
-      tube([-s * x, -0.42, 0], [-s * x, -0.42 - len, 0.12], [r, r * 0.85], 4),
+      tube([-s * x, -0.4, 0], [-s * x, -0.4 - len, 0.06], [r, r * 0.85], 6),
     );
   parts.push(
     tube([-s * 0.12, -0.1, 0.03], [-s * 0.22, -0.32, 0.09], [0.05, 0.04], 4),
@@ -650,6 +669,20 @@ const elbowFlounce = (E, top, r0, r1, length, tilt) =>
   ).translate(E.x, 0, 0);
 
 // --- Gentlemen ----------------------------------------------------------------
+
+// The shin, knee to ankle (the stockings and the breeches' knee bands).
+const SHIN = V(0.01, 0.38 - 2.78, -1.06 + 1.42).normalize();
+
+/** The silk bag holding the wig's queue: square, gathered toward the top,
+ *  hanging from the nape. */
+function bag() {
+  const g = new RoundedBoxGeometry(0.3, 0.32, 0.07, 2, 0.03);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++)
+    p.setX(i, p.getX(i) * (1 - 0.35 * smooth(-0.05, 0.16, p.getY(i))));
+  g.computeVertexNormals();
+  return g.rotateX(-0.25).translate(0, C.y - 0.46, C.z + 0.47);
+}
 
 const COAT = [
   [2.5, 0.95, 0.7, 0.4, { gap: 1.6 }],
@@ -766,15 +799,25 @@ function gentleman() {
           10,
           [1, 1, 0.85],
         ),
-        // The band below the knee.
-        new THREE.TorusGeometry(0.265, 0.035, 3, 14)
-          .rotateX(Math.PI / 2)
-          .translate(s * 0.46, 2.48, -1.4),
+        // Over the knee to a band below it, fitting the stocking's line.
+        aim(
+          loft(
+            [
+              [-0.36, 0.3, 0.3, 0],
+              [-0.3, 0.31, 0.31, 0],
+              [0.06, 0.31, 0.31, 0],
+              [0.16, 0.26, 0.26, 0],
+            ],
+            14,
+          ),
+          V(s * 0.46, 2.78, -1.42),
+          SHIN,
+        ),
       ]),
       // Silk stockings over the calf to a slim ankle.
       stockings: [-1, 1].map((s) =>
         tube(
-          [s * 0.46, 2.78, -1.42],
+          [s * 0.46, 2.6, -1.395],
           [s * 0.47, 0.38, -1.06],
           [0.26, 0.28, 0.29, 0.26, 0.21, 0.16, 0.14, 0.15],
           8,
@@ -805,7 +848,17 @@ function gentleman() {
           ),
         ),
         ...[-1, 1].flatMap((s) => [
-          box(0.06, 0.1, 0.1, s * 0.73, 2.48, -1.4), // knee buckles
+          // Knee buckles, flat on the band's outer side.
+          box(0.03, 0.08, 0.11, 0, 0, 0)
+            .applyQuaternion(
+              new THREE.Quaternion().setFromUnitVectors(DOWN, SHIN),
+            )
+            .translate(
+              ...V(s * 0.46, 2.78, -1.42)
+                .addScaledVector(SHIN, 0.33)
+                .add(V(s * 0.31, 0, 0))
+                .toArray(),
+            ),
           box(0.22, 0.05, 0.15, s * 0.47, 0.3, -1.3), // shoe buckles
         ]),
       ],
@@ -840,45 +893,66 @@ function gentleman() {
         who: 0.65,
         key: 30,
         parts: [
-          hairShell({ line: 0.62, lift: 1.1, toupee: 0.12 }),
+          hairShell({ line: 0.62, side: -0.5, lift: 1.1, toupee: 0.12 }),
           ...[-1, 1].flatMap((s) =>
             [-0.02, -0.19].map((dy) =>
               rolled(
                 tube(
-                  [s * 0.385, C.y + dy, C.z - 0.1],
-                  [s * 0.385, C.y + dy, C.z + 0.36],
-                  [0.075, 0.085, 0.075],
+                  [s * (0.37 + dy * 0.2), C.y + dy, C.z - 0.06 - dy * 0.6],
+                  [s * (0.37 + dy * 0.2), C.y + dy, C.z + 0.34],
+                  [0.05, 0.07, 0.072, 0.06],
                   8,
                 ),
               ),
             ),
+          ),
+          // The queue, gathered at the nape into the bag.
+          tube(
+            [0, C.y - 0.16, C.z + 0.36],
+            [0, C.y - 0.34, C.z + 0.45],
+            [0.075, 0.06],
+            8,
           ),
         ],
       },
       bag: {
         who: 0.65,
         key: 30,
-        parts: [ball(1, [0, C.y - 0.44, C.z + 0.6], [0.19, 0.2, 0.06])],
+        parts: [bag()],
       },
       natural: {
         who: -0.65,
         key: 30,
         parts: [
-          hairShell({ line: 0.55, lift: 1.07 }),
+          hairShell({ line: 0.55, side: -0.25, lift: 1.07 }),
           tube(
-            [0, C.y - 0.2, C.z + 0.52],
-            [0, C.y - 0.78, C.z + 0.6],
+            [0, C.y - 0.18, C.z + 0.4],
+            [0, C.y - 0.76, C.z + 0.5],
             [0.075, 0.07, 0.05],
             8,
           ),
         ],
       },
-      bow: [-1, 1].map((s) =>
-        new THREE.ConeGeometry(0.12, 0.26, 8)
-          .rotateZ((s * Math.PI) / 2)
-          .scale(1, 1, 0.4)
-          .translate(s * 0.13, C.y - 0.25, C.z + 0.55),
-      ),
+      // A black silk bow at the nape: two loops, the knot, two tails.
+      bow: [
+        ...[-1, 1].flatMap((s) => [
+          ball(
+            1,
+            [s * 0.09, C.y - 0.27, C.z + 0.48],
+            [0.1, 0.055, 0.028],
+            [0, 0, s * 0.25],
+            [8, 5],
+          ),
+          ball(
+            1,
+            [s * 0.06, C.y - 0.38, C.z + 0.52],
+            [0.026, 0.1, 0.012],
+            [0, 0, s * 0.35],
+            [6, 5],
+          ),
+        ]),
+        ball(0.036, [0, C.y - 0.27, C.z + 0.5], undefined, undefined, [6, 5]),
+      ],
     },
     up: (s) => ({
       coat: [
