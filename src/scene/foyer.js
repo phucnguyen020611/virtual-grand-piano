@@ -108,16 +108,16 @@ function leaf(s, ivory, gilt) {
   for (const f of [-1, 1]) {
     const z = f * (T / 2 + 0.03);
     trim.push(
-      ...frame(cx, H * 0.66, W - 1.0, H * 0.5, z),
-      ...frame(cx, H * 0.66, W - 1.5, H * 0.5 - 0.5, z, 0.06),
-      ...frame(cx, H * 0.2, W - 1.0, H * 0.26, z),
-      ...frame(cx, H * 0.2, W - 1.5, H * 0.26 - 0.5, z, 0.06),
+      ...frame(cx, H * 0.675, W - 1.0, H * 0.47, z),
+      ...frame(cx, H * 0.675, W - 1.5, H * 0.47 - 0.5, z, 0.06),
+      ...frame(cx, H * 0.19, W - 1.0, H * 0.24, z),
+      ...frame(cx, H * 0.19, W - 1.5, H * 0.24 - 0.5, z, 0.06),
       new THREE.TorusGeometry(0.5, 0.06, 6, 28)
         .scale(1, 0.72, 1)
-        .translate(cx, H * 0.385, z),
+        .translate(cx, H * 0.375, z), // centred in the gap between the panels
       new THREE.SphereGeometry(0.16, 10, 8)
         .scale(1, 1, 0.5)
-        .translate(cx, H * 0.385, z),
+        .translate(cx, H * 0.375, z), // centred in the gap between the panels
       ...[
         [-1, -1],
         [-1, 1],
@@ -126,7 +126,7 @@ function leaf(s, ivory, gilt) {
       ].map(([a, b]) =>
         new THREE.SphereGeometry(0.11, 8, 6).translate(
           cx + a * ((W - 1.0) / 2),
-          H * 0.66 + b * (H * 0.25),
+          H * 0.675 + b * (H * 0.235),
           z,
         ),
       ),
