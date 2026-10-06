@@ -3,8 +3,9 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { repeatSet } from "./surfaces.js";
 
 /**
- * The ways in and out: the double doors guests leave by at the end of the
- * centre aisle (lit EXIT sign above), a stage door in each wing where the
+ * The ways in and out: the doorcase of the double doors at the end of the
+ * centre aisle (lit EXIT sign above; the doors and the foyer behind them are
+ * in foyer.js), a stage door in each wing where the
  * performer walks on, and a grand stair up the rear wall to each balcony.
  * Everything is built in a doorway's or stair's own frame and merged per
  * material: a handful of draw calls in all.
@@ -27,14 +28,6 @@ function doorcase(w, h) {
     box(w + 2.4, 0.45, 1.3, 0, h + 2.17, 0.65), // cornice
   ];
 }
-
-/** A raised gilt moulding round a panel, `z` proud of the wall. */
-const panelFrame = (cx, cy, pw, ph, z) => [
-  box(pw, 0.08, 0.06, cx, cy + ph / 2, z),
-  box(pw, 0.08, 0.06, cx, cy - ph / 2, z),
-  box(0.08, ph, 0.06, cx + pw / 2, cy, z),
-  box(0.08, ph, 0.06, cx - pw / 2, cy, z),
-];
 
 /**
  * The lit exit sign as fitted in halls today: ISO 7010's "exit, straight
@@ -94,25 +87,8 @@ export function buildPassages(hall, room) {
     const w = 8;
     const h = 11.5;
     const at = place(Math.PI, 0, rearFloorY, backZ);
+    // The leaves themselves swing, so they are built with the foyer beyond.
     add("gilt", doorcase(w, h), at);
-    const leaves = [];
-    const trim = [];
-    for (const s of [-1, 1]) {
-      const cx = s * (w / 4);
-      leaves.push(box(w / 2 - 0.04, h, 0.3, cx, h / 2, 0.35));
-      trim.push(
-        ...panelFrame(cx, h * 0.68, w / 2 - 1.1, h * 0.42, 0.53),
-        ...panelFrame(cx, h * 0.24, w / 2 - 1.1, h * 0.3, 0.53),
-        // A brass pull on each leaf by the meeting stiles.
-        new THREE.CylinderGeometry(0.06, 0.06, 1.8, 8).translate(
-          s * 0.35,
-          h * 0.47,
-          0.62,
-        ),
-      );
-    }
-    add("wood", leaves, at);
-    add("gilt", trim, at);
     // The light box, about 62 × 20 cm, on two stubs off the wall.
     const signY = h + 3.4;
     add(

@@ -631,6 +631,17 @@ export function buildRoyalInterior(hall, scene, room) {
         sleeves.push([x - side * 1.1, y + 1.05, z + dz]);
       }
     }
+  // Lamps in rooms beyond the hall (the foyer): sconces on its side walls,
+  // and round globes on standing torchères.
+  for (const [x, y, z] of room.extraSconces ?? []) {
+    const side = Math.sign(x);
+    sconce.push([x, y, z]);
+    for (const dz of [-0.95, 0.95]) {
+      bulbs.push([x - side * 1.1, y + 1.55, z + dz, 0.22]);
+      sleeves.push([x - side * 1.1, y + 1.05, z + dz]);
+    }
+  }
+  bulbs.push(...(room.extraBulbs ?? []));
   const sconceParts = [
     new THREE.SphereGeometry(1, 16, 12).scale(0.12, 0.85, 0.42),
     new THREE.SphereGeometry(0.16, 12, 8).translate(0.12, -0.95, 0),

@@ -17,6 +17,7 @@ import { buildRoyalInterior } from "./royalDecor.js";
 import { createComposerProjection } from "./composerProjection.js";
 import { buildLightingRig } from "./stageLighting.js";
 import { buildPassages } from "./passages.js";
+import { buildFoyer, foyerLamps, DOOR } from "./foyer.js";
 import { buildAudience } from "./audience.js";
 
 // One scene unit is ~0.21 m (the keyboard is 5.9 units, 1.22 m wide).
@@ -321,8 +322,32 @@ export function createHall(scene, mats) {
       hall,
     );
   }
+  // The rear wall, open where the exit doors lead out to the foyer.
+  const rearShape = new THREE.Shape()
+    .moveTo(-HALL_HALF_WIDTH, -wallHeight / 2)
+    .lineTo(HALL_HALF_WIDTH, -wallHeight / 2)
+    .lineTo(HALL_HALF_WIDTH, wallHeight / 2)
+    .lineTo(-HALL_HALF_WIDTH, wallHeight / 2)
+    .closePath();
+  const doorFoot = tierY(ROWS - 1) - (wallBase + wallHeight / 2);
+  rearShape.holes.push(
+    new THREE.Path()
+      .moveTo(-DOOR.width / 2, doorFoot)
+      .lineTo(-DOOR.width / 2, doorFoot + DOOR.height)
+      .lineTo(DOOR.width / 2, doorFoot + DOOR.height)
+      .lineTo(DOOR.width / 2, doorFoot)
+      .closePath(),
+  );
+  const rearWall = new THREE.ShapeGeometry(rearShape);
+  const rearUv = rearWall.attributes.uv;
+  for (let i = 0; i < rearUv.count; i++)
+    rearUv.setXY(
+      i,
+      rearUv.getX(i) / (2 * HALL_HALF_WIDTH) + 0.5,
+      rearUv.getY(i) / wallHeight + 0.5,
+    );
   const rear = mesh(
-    new THREE.PlaneGeometry(HALL_HALF_WIDTH * 2, wallHeight),
+    rearWall,
     damaskWall,
     0,
     wallBase + wallHeight / 2,
@@ -343,6 +368,10 @@ export function createHall(scene, mats) {
     velvet,
     glowWall: upperPlaster, // the stained glass lights it
     landing: LANDING,
+    ...(() => {
+      const lamps = foyerLamps(HALL_BACK_Z, tierY(ROWS - 1));
+      return { extraSconces: lamps.sconces, extraBulbs: lamps.bulbs };
+    })(),
     doorBays: [WING_Z],
   });
   // --- Lighting rig: a front-of-house pipe between two chandeliers, and an
@@ -669,6 +698,20 @@ export function createHall(scene, mats) {
     velvet,
     runner: { geometry: runnerAlong, material: runnerMaterial },
   });
+  // Beyond them, the foyer where a visit begins.
+  const foyer = buildFoyer(hall, {
+    backZ: HALL_BACK_Z,
+    floorY: tierY(ROWS - 1),
+    gilt: gold,
+    aniso,
+    plaster: plasterWall,
+    damask: (w, h) =>
+      new THREE.MeshStandardMaterial({
+        ...repeatSet(damask, w / 6, h / 9),
+        roughness: 1,
+      }),
+    runner: { geometry: runnerAlong, material: runnerMaterial },
+  });
 
   const { velvet: seatShape, frame } = seatGeometries();
   const seats = [];
@@ -923,6 +966,24 @@ export function createHall(scene, mats) {
       );
     },
     audience,
+    /**
+     * The way in: from the foyer through the doors, down the centre aisle and
+     * up toward the stage (the caller ends it at the piano), with the doors
+     * and the foyer's candles to work.
+     */
+    entrance: {
+      ...foyer.start,
+      path: [
+        foyer.start.position,
+        new THREE.Vector3(0, tierY(ROWS - 1) + 7, HALL_BACK_Z + 9),
+        new THREE.Vector3(0, tierY(ROWS - 1) + 7.6, HALL_BACK_Z - 3),
+        new THREE.Vector3(0, tierY(10) + 8, FIRST_ROW_Z + 10 * ROW_PITCH),
+        new THREE.Vector3(0, tierY(3) + 8.5, FIRST_ROW_Z + 3 * ROW_PITCH),
+        new THREE.Vector3(1.5, STAGE_TOP + 9.5, STAGE_FRONT_Z + 4),
+      ],
+      setDoors: foyer.setDoors,
+      setLit: foyer.setLit,
+    },
     /** A performance is on: dim the house lamps (or bring them back up). */
     setConcert(on) {
       concertTarget = on ? 1 : 0;
