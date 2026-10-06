@@ -20,6 +20,11 @@ The current model is procedural and intentionally lightweight. Future releases c
 
 ## Features
 
+- **The way in**: a visit opens in a candlelit marble foyer before the hall's
+  white-and-gold double doors under a crowned pediment; **Enter the hall**
+  swings them open, the hall's light spilling out, and the camera walks
+  through and down the centre aisle (the audience turning to watch) to the
+  piano, letterboxed; any key, click or **Skip to the piano** cuts to the end
 - Interactive 3D concert grand piano rendered in real time
 - Full 88-key keyboard geometry
 - Mouse/touch key interaction
@@ -124,6 +129,7 @@ The current model is procedural and intentionally lightweight. Future releases c
 | Concert programme       | Click any seat, or **Programme**                  |
 | Show / hide audience    | **Audience**                                      |
 | Watch it as a film      | **Cinematic**; Esc to leave                       |
+| Skip the way in         | Any key or click, or **Skip to the piano**        |
 | House curtain & lights  | **Close curtain / Open curtain**                  |
 | Adjust bench height     | Click a knob at either end of the bench           |
 | Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift`  |
@@ -175,7 +181,8 @@ virtual-grand-piano/
 │   │   ├── composerProjection.js # old-film lantern on the rear wall: composer or credits
 │   │   ├── credits.js          # the closing credits roll and the developer's card
 │   │   ├── stageLighting.js    # lighting pipes, instruments in yokes, the lantern
-│   │   ├── passages.js         # exit doors, stage doors in the wings, balcony stairs
+│   │   ├── passages.js         # exit doorcase, stage doors in the wings, balcony stairs
+│   │   ├── foyer.js            # the foyer, its swinging double doors and spilt light
 │   │   ├── audience.js         # the seated audience: sway and applause
 │   │   ├── surfaces.js         # procedural PBR sets (parquet, damask, velvet, runner…)
 │   │   └── noteEffects.js      # autoplay key glow, light columns, star dust
@@ -189,6 +196,7 @@ virtual-grand-piano/
 │   │   └── midiFile.js         # Standard MIDI File reader for the playlist
 │   ├── interaction/
 │   │   ├── cinematic.js        # cinema mode: the director, its cuts and letterbox
+│   │   ├── entrance.js         # the way in: foyer to piano, skippable
 │   │   ├── dropdown.js         # styled, accessible dropdowns over native selects
 │   │   └── inspection.js       # raycasting selection, labels, mode switching
 │   └── style.css

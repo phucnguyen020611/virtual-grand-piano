@@ -42,6 +42,18 @@ async function run() {
     d.querySelector("#audioGate").classList.contains("hidden"),
     "entry didn't finish",
   );
+  // The way in walks from the foyer to the piano; skip the walk.
+  assert(
+    d.body.classList.contains("entering") || !p.entrance.busy,
+    "entering did not start the way in",
+  );
+  click("skipIntroBtn");
+  assert(
+    !p.entrance.busy &&
+      !d.body.classList.contains("entering") &&
+      !d.querySelector(".topbar").inert,
+    "skipping the way in did not hand over the piano",
+  );
   const rim = p.piano.explodedComponents.find((x) => x.id === "rim").object;
   const desk = p.piano.explodedComponents.find(
     (x) => x.id === "musicDesk",

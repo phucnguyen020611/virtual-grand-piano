@@ -19,6 +19,7 @@ import { createNoteEffects } from "./scene/noteEffects.js";
 import { enhanceSelect } from "./interaction/dropdown.js";
 import { createInspection } from "./interaction/inspection.js";
 import { createCinematic } from "./interaction/cinematic.js";
+import { createEntrance } from "./interaction/entrance.js";
 import {
   createExplodedView,
   NORMAL_DEFAULT_CAMERA_POSITION,
@@ -1010,6 +1011,39 @@ function startCinema() {
   cinematic.start(cinemaShots().film, `${song.title} — ${song.composer}`);
 }
 if (import.meta.env.DEV) window.__vgp.cinematic = cinematic;
+
+// The way in: a visit opens in the foyer, before the closed doors, and
+// entering walks through them to the piano (see entrance.js).
+const entrance = createEntrance({
+  camera,
+  controls,
+  hall,
+  end: {
+    position: NORMAL_DEFAULT_CAMERA_POSITION,
+    target: NORMAL_DEFAULT_TARGET,
+  },
+  onEnd() {
+    gatedInterface.forEach((element) => element.removeAttribute("inert"));
+    requestAnimationFrame(() =>
+      renderer.domElement.focus({ preventScroll: true }),
+    );
+  },
+});
+entrance.hold();
+if (import.meta.env.DEV) window.__vgp.entrance = entrance;
+document.querySelector("#skipIntroBtn").onclick = () => entrance.skip();
+// Any key or click during the walk skips to the piano.
+addEventListener(
+  "keydown",
+  (event) => {
+    if (!entrance.walking) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    entrance.skip();
+  },
+  true,
+);
+addEventListener("pointerdown", () => entrance.walking && entrance.skip());
 cinemaBtn.onclick = () => (cinematic.active ? cinematic.stop() : startCinema());
 document.querySelector("#cinemaExitBtn").onclick = () => cinematic.stop();
 addEventListener("keydown", (event) => {
@@ -1106,10 +1140,7 @@ document.querySelector("#enterBtn").onclick = async (event) => {
   ]);
   audioGate.classList.add("hidden");
   audioGate.setAttribute("aria-hidden", "true");
-  gatedInterface.forEach((element) => element.removeAttribute("inert"));
-  requestAnimationFrame(() =>
-    renderer.domElement.focus({ preventScroll: true }),
-  );
+  entrance.start(reducedMotion.matches);
 };
 
 function setHelpOpen(open, { restoreFocus = true } = {}) {
@@ -1162,10 +1193,14 @@ function animate(timestamp) {
   updateFlight(dt);
   updateFreeCam(dt);
   controls.update();
-  // Never pass through a wall, the ceiling or a floor.
-  hall.keepInside(camera.position, 0.8);
-  hall.keepInside(controls.target, 0.2);
+  // Never pass through a wall, the ceiling or a floor (but for the way in,
+  // which starts beyond the doors).
+  if (!entrance.busy) {
+    hall.keepInside(camera.position, 0.8);
+    hall.keepInside(controls.target, 0.2);
+  }
   cinematic.update(dt, reducedMotion.matches);
+  entrance.update(dt);
 
   explodedView.update(dt, reducedMotion.matches);
   hall.update(reducedMotion.matches ? 100 : dt);

@@ -638,10 +638,11 @@ kbd {
   padding: max(20px, env(safe-area-inset-top))
     max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom))
     max(20px, env(safe-area-inset-left));
+  /* Light enough to see the foyer's doors waiting behind the card. */
   background: radial-gradient(
     circle at 50% 42%,
-    rgba(69, 55, 33, 0.4),
-    rgba(3, 3, 4, 0.97) 62%
+    rgba(69, 55, 33, 0.2),
+    rgba(3, 3, 4, 0.8) 75%
   );
   transition:
     opacity 200ms ease,
@@ -1260,8 +1261,19 @@ kbd {
   bottom: 0;
 }
 
-.cinema .letterbox {
+:is(.cinema, .entering) .letterbox {
   height: max(56px, calc((100vh - 100vw / 2.39) / 2));
+}
+
+/* The way in shares the letterbox, with a way to skip it instead. */
+.skipIntro,
+.entering .cinemaExit {
+  display: none;
+}
+
+.entering .skipIntro {
+  display: inline-flex;
+  margin-left: auto;
 }
 
 .cinemaCaption {
@@ -1276,7 +1288,8 @@ kbd {
   white-space: nowrap;
 }
 
-.cinemaExit {
+.cinemaExit,
+.skipIntro {
   flex: 0 0 auto;
   border-color: rgba(215, 185, 120, 0.4);
   background: transparent;
@@ -1292,7 +1305,15 @@ kbd {
   pointer-events: none;
 }
 
-.cinema :is(.topbar, .hud, .inspector, .helpPanel, .label3d) {
+/* The interface fades back in when the film or the way in ends. */
+:is(.topbar, .hud, .inspector) {
+  transition:
+    opacity 700ms ease,
+    visibility 700ms ease;
+}
+
+:is(.cinema, .entering, .foyer)
+  :is(.topbar, .hud, .inspector, .helpPanel, .label3d) {
   opacity: 0;
   visibility: hidden;
 }
