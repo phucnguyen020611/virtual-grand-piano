@@ -60,7 +60,10 @@ export function createEntrance({ camera, controls, hall, end, onEnd }) {
       t = 0;
       document.body.classList.add("entering");
     },
-    skip: finish,
+    /** Cut to the piano (only once the walk has begun). */
+    skip() {
+      if (t >= 0) finish();
+    },
     update(dt) {
       if (t >= SECONDS) return;
       if (t < 0) {
