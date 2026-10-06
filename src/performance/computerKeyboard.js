@@ -36,6 +36,20 @@ const NOTE_CODES = new Map([
   ["BracketLeft", 29],
 ]);
 
+const CODE_LABELS = {
+  Comma: ",",
+  Period: ".",
+  Semicolon: ";",
+  Slash: "/",
+  BracketLeft: "[",
+};
+/** The key to press for the note `offset` semitones above the range's
+ *  bottom, as printed on it (the upper row where both rows have it). */
+export function keyLabel(offset) {
+  const code = [...NOTE_CODES].filter(([, o]) => o === offset).at(-1)?.[0];
+  return code && (CODE_LABELS[code] ?? code.replace(/^(Key|Digit)/, ""));
+}
+
 const MIN_MIDI = 21;
 const MAX_MIDI = 108;
 const MAX_OFFSET = Math.max(...NOTE_CODES.values());

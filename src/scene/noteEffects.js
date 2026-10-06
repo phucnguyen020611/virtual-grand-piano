@@ -256,6 +256,37 @@ export function createNoteEffects(scene, piano, renderer, camera) {
   wave.raycast = () => {}; // light, not a part: clicks pass through to the keys
   wave.position.set(0, lineY + 0.13, whiteBack - 0.42);
   keyboard.add(wave);
+
+  // --- The lane, for the games: a dark screen standing behind the keys, so
+  // the falling lights read clearly against it rather than the music desk.
+  const desk = piano.explodedComponents.find(
+    (c) => c.id === "musicDesk",
+  ).object;
+  const lane = new THREE.Mesh(
+    new THREE.PlaneGeometry(WAVE_W + 0.6, FALL_HEIGHT + 0.4),
+    new THREE.ShaderMaterial({
+      vertexShader: waveVertex,
+      fragmentShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          float edge = smoothstep(0.0, 0.03, vUv.x) * (1.0 - smoothstep(0.97, 1.0, vUv.x));
+          float a = 0.82 * (1.0 - smoothstep(0.72, 1.0, vUv.y)) * edge;
+          gl_FragColor = vec4(0.025, 0.02, 0.03, a);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      // Over the music desk standing just behind it; nothing else on the
+      // keys' side comes between it and the player.
+      depthTest: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  lane.renderOrder = 4; // under the lights, over everything behind
+  lane.raycast = () => {};
+  lane.visible = false;
+  lane.position.set(0, lineY + (FALL_HEIGHT + 0.4) / 2 - 0.05, whiteBack - 0.3);
+  keyboard.add(lane);
   const keyU = new Map(
     [...keyInfo].map(([midi, info]) => [
       midi,
@@ -467,5 +498,16 @@ export function createNoteEffects(scene, piano, renderer, camera) {
     updateParticles(dt, clock);
   }
 
-  return { start, stop, update, group };
+  return {
+    start,
+    stop,
+    update,
+    group,
+    /** Stand the dark lane behind the keys (for the games), the music desk
+     *  folded away so nothing on it shows through, or put both back. */
+    setLane(on) {
+      lane.visible = on;
+      desk.visible = !on;
+    },
+  };
 }

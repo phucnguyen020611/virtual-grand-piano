@@ -20,6 +20,13 @@ The current model is procedural and intentionally lightweight. Future releases c
 
 ## Features
 
+- **Games in the music salon** (the hall gives way to a candlelit white and
+  gold room round the piano): **Falling notes**, where light columns fall
+  onto the keys of your part and each strike is judged Perfect or Good, with
+  a combo, stars and your best kept; the piano plays the rest. Easy (right
+  hand, slower), Normal, Hard (both hands). And **Echo**, a tune to play back
+  that grows a note each round, with lives, for younger players. Any input
+  plays: the computer keyboard, a tap on the keys, a MIDI keyboard
 - **The way in**: a visit opens in a candlelit marble foyer before the hall's
   white-and-gold double doors under a crowned pediment; **Enter the hall**
   swings them open, the hall's light spilling out, and the camera walks
@@ -108,43 +115,45 @@ The menu is a dock along the bottom with five categories, one open at a
 time: **Play** (keyboard range, recording, MIDI keyboard), **Listen**
 (pieces, cinematic, programme, practice, your own MIDI), **Explore** (look
 inside the piano, camera), **Hall** (curtain, audience, credits, sky,
-graphics) and **Help**. Each panel says in a line what it is for; **Aa**
+graphics), **Games** (Falling notes, Echo) and **Help**. Each panel says in a line what it is for; **Aa**
 makes every word and button larger.
 
-| Action                  | Control                                           |
-| ----------------------- | ------------------------------------------------- |
-| Orbit camera            | Left-drag / one-finger drag                       |
-| Zoom                    | Mouse wheel / pinch                               |
-| Pan                     | Right-drag / two-finger drag                      |
-| Play visible key        | Press, tap, or drag across piano keys             |
-| Play mapped notes       | `Z–/`, `Q–[`, and nearby number-row black keys    |
-| Shift keyboard range    | `←` / `→` or **Lower** / **Higher** (Play)        |
-| Sustain                 | `Space` (when a UI control is not focused)        |
-| MIDI input              | **Connect MIDI**, then choose an input if needed  |
-| Record performance      | **Record**, then **Play recording**               |
-| Save the take as sound  | **Save audio** after recording                    |
-| Soft / sostenuto pedal  | Click the left / middle pedal, or MIDI CC67 / 66  |
-| Inspect component       | Click a piano component                           |
-| Separate systems        | **Exploded**                                      |
-| Restore assembled piano | **Normal**                                        |
-| Toggle lid              | **Open Lid / Close Lid**                          |
-| Cover the keys          | **Close fallboard / Open fallboard**              |
-| Clean view              | **Hide HUD / Show HUD** (top right)               |
-| Closing credits         | **Closing credits** (Hall); press again to close  |
-| Larger text and buttons | **Aa** (top right); remembered                    |
-| Graphics quality        | **Graphics: Low / Medium / High / Ultra**         |
-| Daylight outside        | **Sky:** your clock / day / sunset / night        |
-| Concert programme       | Click any seat, or **Programme**                  |
-| Show / hide audience    | **Audience**                                      |
-| Watch it as a film      | **Cinematic**; Esc to leave                       |
-| Skip the way in         | Any key or click, or **Skip to the piano**        |
-| House curtain & lights  | **Close curtain / Open curtain**                  |
-| Adjust bench height     | Click a knob at either end of the bench           |
-| Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift`  |
-| Autoplay                | **5-piece playlist**, pedalled, with a soundwave  |
-| Play your own MIDI      | **Open MIDI file…**, or drop a `.mid` anywhere    |
-| Practise a piece        | **Practice:** both / right / left hand, **Tempo** |
-| Restore camera          | **Reset View**                                    |
+| Action                  | Control                                            |
+| ----------------------- | -------------------------------------------------- |
+| Orbit camera            | Left-drag / one-finger drag                        |
+| Zoom                    | Mouse wheel / pinch                                |
+| Pan                     | Right-drag / two-finger drag                       |
+| Play visible key        | Press, tap, or drag across piano keys              |
+| Play mapped notes       | `Z–/`, `Q–[`, and nearby number-row black keys     |
+| Shift keyboard range    | `←` / `→` or **Lower** / **Higher** (Play)         |
+| Sustain                 | `Space` (when a UI control is not focused)         |
+| MIDI input              | **Connect MIDI**, then choose an input if needed   |
+| Record performance      | **Record**, then **Play recording**                |
+| Save the take as sound  | **Save audio** after recording                     |
+| Soft / sostenuto pedal  | Click the left / middle pedal, or MIDI CC67 / 66   |
+| Inspect component       | Click a piano component                            |
+| Separate systems        | **Exploded**                                       |
+| Restore assembled piano | **Normal**                                         |
+| Toggle lid              | **Open Lid / Close Lid**                           |
+| Cover the keys          | **Close fallboard / Open fallboard**               |
+| Clean view              | **Hide HUD / Show HUD** (top right)                |
+| Closing credits         | **Closing credits** (Hall); press again to close   |
+| Larger text and buttons | **Aa** (top right); remembered                     |
+| Graphics quality        | **Graphics: Low / Medium / High / Ultra**          |
+| Daylight outside        | **Sky:** your clock / day / sunset / night         |
+| Concert programme       | Click any seat, or **Programme**                   |
+| Show / hide audience    | **Audience**                                       |
+| Watch it as a film      | **Cinematic**; Esc to leave                        |
+| Skip the way in         | Any key or click, or **Skip to the piano**         |
+| Play a game             | **Games**, then **Play Falling notes** or **Echo** |
+| Leave a game            | `Esc` or **Leave game**                            |
+| House curtain & lights  | **Close curtain / Open curtain**                   |
+| Adjust bench height     | Click a knob at either end of the bench            |
+| Walk the hall           | **Free cam**, then `↑↓` walk, `←→` turn, `Shift`   |
+| Autoplay                | **5-piece playlist**, pedalled, with a soundwave   |
+| Play your own MIDI      | **Open MIDI file…**, or drop a `.mid` anywhere     |
+| Practise a piece        | **Practice:** both / right / left hand, **Tempo**  |
+| Restore camera          | **Reset View**                                     |
 
 ## Tech stack
 
@@ -191,6 +200,7 @@ virtual-grand-piano/
 │   │   ├── stageLighting.js    # lighting pipes, instruments in yokes, the lantern
 │   │   ├── passages.js         # exit doorcase, stage doors in the wings, balcony stairs
 │   │   ├── foyer.js            # the foyer, its swinging double doors and spilt light
+│   │   ├── salon.js            # the music salon where the games are played
 │   │   ├── audience.js         # the seated audience: sway and applause
 │   │   ├── surfaces.js         # procedural PBR sets (parquet, damask, velvet, runner…)
 │   │   └── noteEffects.js      # autoplay key glow, light columns, star dust
@@ -205,6 +215,7 @@ virtual-grand-piano/
 │   ├── interaction/
 │   │   ├── cinematic.js        # cinema mode: the director, its cuts and letterbox
 │   │   ├── entrance.js         # the way in: foyer to piano, skippable
+│   │   ├── games.js            # Falling notes and Echo: judging, score, results
 │   │   ├── dropdown.js         # styled, accessible dropdowns over native selects
 │   │   └── inspection.js       # raycasting selection, labels, mode switching
 │   └── style.css

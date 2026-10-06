@@ -259,6 +259,53 @@
             </div>
           </div>
         </section>
+
+        <section
+          id="panelGames"
+          class="dockPanel"
+          aria-labelledby="panelGamesTitle"
+          hidden
+        >
+          <h2 class="panelTitle" id="panelGamesTitle">Games</h2>
+          <p class="panelHint">
+            Played in the music salon next door. Esc brings you back.
+          </p>
+          <div class="gameCards">
+            <article class="gameCard">
+              <h3>Falling notes</h3>
+              <p>Press each key just as its light lands on it.</p>
+              <div class="controlRow">
+                <select
+                  id="notesSongSelect"
+                  aria-label="Piece for Falling notes"
+                ></select>
+                <select id="notesLevelSelect" aria-label="Falling notes level">
+                  <option value="easy">Easy: right hand, slower</option>
+                  <option value="normal">Normal: right hand</option>
+                  <option value="hard">Hard: both hands</option>
+                </select>
+              </div>
+              <button id="notesStartBtn" class="gold">
+                Play Falling notes
+              </button>
+            </article>
+            <article class="gameCard">
+              <h3>Echo</h3>
+              <p>
+                Listen to a little tune, then play it back. It grows a note each
+                round.
+              </p>
+              <div class="controlRow">
+                <select id="echoLevelSelect" aria-label="Echo level">
+                  <option value="easy">Easy: 5 notes, 3 lives</option>
+                  <option value="normal">Normal: 8 notes, 2 lives</option>
+                  <option value="hard">Hard: 12 notes, 1 life</option>
+                </select>
+              </div>
+              <button id="echoStartBtn" class="gold">Play Echo</button>
+            </article>
+          </div>
+        </section>
       </div>
 
       <nav class="dock" aria-label="Menu">
@@ -313,6 +360,19 @@
           <span>Hall</span>
         </button>
         <button
+          class="dockTab"
+          id="tabGames"
+          aria-expanded="false"
+          aria-controls="panelGames"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="2.5" y="7" width="19" height="11" rx="5.5" />
+            <path d="M7.5 10.5v4M5.5 12.5h4" />
+            <path d="M15.5 11.5h.01M18 13.5h.01" />
+          </svg>
+          <span>Games</span>
+        </button>
+        <button
           id="helpBtn"
           class="dockTab"
           aria-expanded="false"
@@ -337,6 +397,41 @@
       <button id="skipIntroBtn" class="skipIntro">Skip to the piano</button>
     </div>
     <div id="cinemaFade" class="cinemaFade" aria-hidden="true"></div>
+
+    <!-- The games in the music salon: score along the top, a big word in the
+         middle (a count-in, Perfect!, Your turn!), a tip below. -->
+    <section id="gameHud" class="gameHud" aria-label="Game" hidden>
+      <div class="gameBar">
+        <div class="gameStat">
+          <span class="groupLabel" id="gameStatALabel">Score</span>
+          <b id="gameStatA" aria-live="polite">0</b>
+        </div>
+        <div class="gameStat">
+          <span class="groupLabel" id="gameStatBLabel">Combo</span>
+          <b id="gameStatB">0</b>
+        </div>
+        <div class="gameProgress" aria-hidden="true">
+          <i id="gameProgress"></i>
+        </div>
+        <button id="gameExitBtn">Leave game (Esc)</button>
+      </div>
+      <p id="gameCall" class="gameCall" aria-live="assertive"></p>
+      <p id="gameTip" class="gameTip"></p>
+    </section>
+
+    <dialog
+      id="gameResults"
+      class="gameResults"
+      aria-labelledby="gameResultsTitle"
+    >
+      <div id="gameStars" class="gameStars" role="img"></div>
+      <h2 id="gameResultsTitle">Bravo!</h2>
+      <dl id="gameResultsLines" class="gameResultsLines"></dl>
+      <div class="controlRow gameResultsActions">
+        <button id="gameAgainBtn" class="gold">Play again</button>
+        <button id="gameBackBtn">Back to the hall</button>
+      </div>
+    </dialog>
 
     <dialog id="programme" class="programme" aria-labelledby="programmeTitle">
       <form method="dialog" class="programmeSheet">

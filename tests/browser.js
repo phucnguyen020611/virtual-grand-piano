@@ -832,6 +832,55 @@ async function run() {
     log("cinema mode", { pass: true });
   }
 
+  // The games: Echo plays a tune in the salon and waits for it back; a right
+  // answer moves on a round, and leaving brings back the hall.
+  {
+    let heard = [];
+    const listen = p.performance.addObserver?.((event) => {
+      if (event.type === "noteOn" && event.sourceGroup === "game")
+        heard.push(event.midi);
+    });
+    click("echoStartBtn");
+    for (let n = 0; n < 60 && !p.games.active; n++) await wait(50);
+    await wait(600); // the fade into the salon
+    assert(
+      d.body.classList.contains("game") && !p.hall.group.visible,
+      "the game did not open in the salon",
+    );
+    for (
+      let n = 0;
+      n < 200 && d.querySelector("#gameCall").textContent !== "Your turn!";
+      n++
+    )
+      await wait(50);
+    const tune = heard;
+    heard = [];
+    tune.forEach((midi, i) => {
+      p.performance.noteOn(midi, 0.7, `computer:test-${i}`, "computer");
+      p.performance.noteOff(midi, `computer:test-${i}`);
+    });
+    assert(
+      tune.length >= 3 && d.querySelector("#gameStatA").textContent !== "",
+      "Echo did not play a tune to answer",
+    );
+    await wait(200);
+    assert(
+      /Great|Bravo/.test(d.querySelector("#gameCall").textContent),
+      "playing the tune back was not counted right",
+    );
+    listen?.();
+    click("gameExitBtn");
+    for (let n = 0; n < 60 && p.games.active; n++) await wait(50);
+    await wait(600);
+    assert(
+      !d.body.classList.contains("game") &&
+        p.hall.group.visible &&
+        p.controls.enabled,
+      "leaving the game did not bring back the hall",
+    );
+    log("Echo in the salon", { pass: true });
+  }
+
   // Styled dropdowns drive their native select by mouse and keyboard.
   {
     const select = d.querySelector("#qualitySelect");

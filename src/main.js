@@ -20,6 +20,7 @@ import { enhanceSelect } from "./interaction/dropdown.js";
 import { createInspection } from "./interaction/inspection.js";
 import { createCinematic } from "./interaction/cinematic.js";
 import { createEntrance } from "./interaction/entrance.js";
+import { createGames } from "./interaction/games.js";
 import {
   createExplodedView,
   NORMAL_DEFAULT_CAMERA_POSITION,
@@ -1101,6 +1102,58 @@ creditsBtn.onclick = () => {
   hall.rollCredits();
   flyTo(hall.views.projection.position, hall.views.projection.target, 2);
 };
+// --- Games in the music salon (see games.js) -------------------------------
+const games = createGames({
+  camera,
+  controls,
+  hall,
+  player: pianoPerformance,
+  noteEffects,
+  keyboard: computerKeyboard,
+  audio,
+  // At the keys, looking over them to where the lights fall from.
+  view: { position: onStage(0, 6.4, 8.6), target: onStage(0, 3.2, 1.2) },
+  keyAt: (midi) =>
+    piano.keyMeshes
+      .find((key) => key.userData.midi === midi)
+      .getWorldPosition(new THREE.Vector3()),
+  onEnter() {
+    prepareAudio();
+    if (autoplay) stopAutoplay();
+    cinematic.stop();
+    if (credits) {
+      setCredits(false);
+      hall.showComposer(null);
+    }
+    if (freeCam.on) freeCamBtn.click();
+    if (explodedView.exploded) setExplodedMode(false);
+    if (!fallboardOpen) fallBtn.click();
+    closePanels();
+    flight.t = 1;
+  },
+  onLeave() {
+    camera.zoom = Math.min(1, camera.aspect / 1.6);
+    camera.updateProjectionMatrix();
+    document.querySelector("#resetBtn").click();
+    renderer.domElement.focus({ preventScroll: true });
+  },
+});
+if (import.meta.env.DEV) window.__vgp.games = games;
+const notesSongSelect = document.querySelector("#notesSongSelect");
+for (const piece of SONGS)
+  notesSongSelect.add(
+    new Option(`${piece.title} — ${piece.composer.split(" ").at(-1)}`),
+  );
+document.querySelector("#notesStartBtn").onclick = () =>
+  games.start("notes", {
+    song: notesSongSelect.selectedIndex,
+    level: document.querySelector("#notesLevelSelect").value,
+  });
+document.querySelector("#echoStartBtn").onclick = () =>
+  games.start("echo", {
+    level: document.querySelector("#echoLevelSelect").value,
+  });
+
 // The audience: present by default (not at Low), and yours to dismiss.
 const crowdBtn = document.querySelector("#crowdBtn");
 crowdBtn.onclick = () => {
@@ -1238,6 +1291,7 @@ function animate(timestamp) {
   }
   cinematic.update(dt, reducedMotion.matches);
   entrance.update(dt);
+  games.update(dt);
 
   explodedView.update(dt, reducedMotion.matches);
   hall.update(reducedMotion.matches ? 100 : dt);
@@ -1270,7 +1324,13 @@ function animate(timestamp) {
   if (autoplay)
     progressEl.style.width =
       THREE.MathUtils.clamp(songTime / songLength, 0, 1) * 100 + "%";
-  noteEffects.update(dt, songTime, reducedMotion.matches);
+  // In a game the falling lights are the play itself, so they fall even
+  // with reduced motion.
+  noteEffects.update(
+    dt,
+    songTime ?? games.songTime,
+    reducedMotion.matches && !games.active,
+  );
   piano.scoreBook.follow(song.midi ? null : songTime);
   toPiano.subVectors(SOUNDBOARD, camera.position);
   earRight.setFromMatrixColumn(camera.matrixWorld, 0);

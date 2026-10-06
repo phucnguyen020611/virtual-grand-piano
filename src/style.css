@@ -992,6 +992,270 @@ kbd {
   }
 }
 
+/* Games: two cards in the dock's Games panel. */
+.gameCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.gameCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.gameCard h3 {
+  margin: 0;
+  color: var(--ui-accent-strong);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.gameCard p {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.gameCard > button {
+  margin-top: auto;
+}
+
+/* In the salon: the score along the top, a big word mid-screen, a tip. */
+.gameHud {
+  position: fixed;
+  z-index: 12;
+  inset: 0;
+  pointer-events: none;
+}
+
+.gameHud[hidden] {
+  display: none;
+}
+
+.gameBar {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  display: flex;
+  width: min(720px, calc(100vw - 24px));
+  align-items: center;
+  gap: 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  padding: 8px 10px 8px 16px;
+  background: var(--ui-bg);
+  pointer-events: auto;
+}
+
+.gameStat {
+  display: grid;
+  min-width: 64px;
+}
+
+.gameStat .groupLabel {
+  margin: 0;
+}
+
+.gameStat b {
+  color: var(--ui-accent-strong);
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.gameProgress {
+  height: 4px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.gameProgress > i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--ui-accent);
+}
+
+.gameHud[data-mode="echo"] .gameProgress {
+  visibility: hidden;
+}
+
+.gameCall {
+  position: absolute;
+  top: 24%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  color: var(--ui-accent-strong);
+  font-family: var(--font-display);
+  font-size: clamp(40px, 8vw, 76px);
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.7);
+  opacity: 0;
+  transition: opacity 250ms ease;
+}
+
+.gameCall.pop {
+  opacity: 1;
+  animation: callPop 260ms cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes callPop {
+  from {
+    transform: scale(0.7);
+  }
+}
+
+.gameTip {
+  position: absolute;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: 50%;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  margin: 0;
+  transform: translateX(-50%);
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font-size: 15px;
+  text-align: center;
+}
+
+/* The results: a gilt card with stars. */
+.gameResults {
+  width: min(420px, calc(100vw - 32px));
+  border: 1px solid rgba(215, 185, 120, 0.5);
+  border-radius: 14px;
+  padding: 24px 26px;
+  background: #16130f;
+  color: var(--ui-text);
+  text-align: center;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.gameResults::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.gameResults h2 {
+  margin: 6px 0 14px;
+  font-family: var(--font-script);
+  font-size: 44px;
+  font-weight: 400;
+}
+
+.gameStars {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.star {
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.14);
+  clip-path: polygon(
+    50% 0,
+    61% 35%,
+    98% 35%,
+    68% 57%,
+    79% 91%,
+    50% 70%,
+    21% 91%,
+    32% 57%,
+    2% 35%,
+    39% 35%
+  );
+}
+
+.star.on {
+  background: linear-gradient(#f6e3a6, #c99a3e);
+}
+
+.gameResultsLines {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 16px;
+  margin: 0 0 18px;
+  text-align: left;
+}
+
+.gameResultsLines dt {
+  color: var(--ui-muted);
+}
+
+.gameResultsLines dd {
+  margin: 0;
+  color: var(--ui-accent-strong);
+  font-weight: 600;
+  text-align: right;
+}
+
+.gameResultsActions {
+  justify-content: center;
+}
+
+@media (max-width: 560px) {
+  .gameBar {
+    gap: 10px;
+    padding-left: 12px;
+  }
+
+  .gameStat b {
+    font-size: 21px;
+  }
+
+  .gameProgress {
+    display: none;
+  }
+
+  #gameExitBtn {
+    margin-left: auto;
+  }
+
+  /* Under the score bar, clear of the keys at the foot of the screen. */
+  .gameTip {
+    top: calc(max(12px, env(safe-area-inset-top)) + 72px);
+    bottom: auto;
+    width: calc(100vw - 24px);
+    border-radius: 12px;
+    font-size: 14px;
+  }
+
+  /* Six tabs across a phone. */
+  .dockTab {
+    font-size: 12px;
+  }
+
+  .largeUI .dock .dockTab {
+    font-size: 13px;
+  }
+}
+
+.largeUI :is(.gameCard p, .gameTip) {
+  font-size: 17px;
+}
+
+.largeUI :is(.gameBar, .gameResults) button {
+  min-height: 54px;
+  font-size: 17px;
+}
+
 /* Larger text and buttons (the Aa toggle): for young and older eyes and
    hands. Every control grows, and so do the words. */
 .largeUI {
@@ -1317,7 +1581,7 @@ kbd {
     visibility 700ms ease;
 }
 
-:is(.cinema, .entering, .foyer)
+:is(.cinema, .entering, .foyer, .game)
   :is(.topbar, .hud, .inspector, .helpPanel, .label3d) {
   opacity: 0;
   visibility: hidden;
