@@ -74,14 +74,18 @@ The current model is procedural and intentionally lightweight. Future releases c
   follows your clock (or your choice): white day light, long low amber shafts
   at sunset, faint blue moonlight at night
 - A concert ritual: a two-note chime as the house lamps go down and the stage
-  stays lit, then applause from an audience of some 190 in 1770s court dress:
-  velvet frock coats with turned-back cuffs, brocade waistcoats, lace jabots,
-  powdered wigs and queues, officers' epaulettes and the sash of an order;
-  satin gowns over brocade stomachers and petticoats, lace, long gloves,
-  tiaras or flowers in curled, dressed-up hair, a fan here and there. Every
-  face has eyes, brows, nose, lips and ears; heads glance about, turn to the
-  stage, and to a neighbour as they clap (**Audience** shows or hides them;
-  High graphics and up start with them)
+  stays lit, then applause from an audience of some 190 in 1770s court dress,
+  seated in true proportions: velvet coats edged in gold or silver over
+  brocade waistcoats, lace jabots and cuffs, buckled breeches, silk stockings
+  and red-heeled shoes, powdered bag wigs, an order's sash and star or an
+  officer's epaulettes; robes à la française open over brocade petticoats,
+  stomachers laced with bows, lace at the neckline and elbows, gloves or bare
+  arms, pearls, hair raised in a pouf (plumed or strung with pearls) or
+  dressed low with a ringlet, a fan here and there. Faces are painted (eyes,
+  lids, brows, lips, the rouge of the period) on sculpted heads, hair is
+  combed in strands; heads glance about, turn to the stage and to a
+  neighbour, and hands meet palm to palm to clap (**Audience** shows or hides
+  them; High graphics and up start with them)
 - **Cinematic**: the piece plays as a film of the hall, letterboxed to 2.39:1,
   the director cutting between slow moves over the stalls, past the
   chandeliers, along the keys, round the piano, onto the score, across the
