@@ -177,7 +177,7 @@ function spillMaterial(strength) {
       uniform float strength;
       varying vec2 vUv;
       void main() {
-        float across = smoothstep(0.0, 0.3, vUv.x) * smoothstep(1.0, 0.7, vUv.x);
+        float across = smoothstep(0.0, 0.3, vUv.x) * (1.0 - smoothstep(0.7, 1.0, vUv.x));
         float along = pow(1.0 - vUv.y, 1.7);
         gl_FragColor = vec4(color * strength * open * across * along, 1.0);
       }
