@@ -305,26 +305,33 @@ export function createImpulseResponse(context, kind) {
   return buffer;
 }
 
-/** Short filtered noise used for the sustain pedal's felt and linkage. */
+/**
+ * The sustain pedal's felt and linkage: a soft, low thud, not a click. Noise
+ * through two low passes (a few hundred hertz), swelling over ~10 ms and
+ * dying away; pedal up (the dampers settling back) is a touch shorter and
+ * brighter than pedal down. Both sit well beneath a medium piano note.
+ */
 export function createPedalNoise(context, kind) {
-  const seconds = kind === "down" ? 0.09 : 0.065;
+  const down = kind === "down";
+  const seconds = down ? 0.16 : 0.12;
   const length = Math.floor(seconds * context.sampleRate);
   const buffer = context.createBuffer(1, length, context.sampleRate);
   const data = buffer.getChannelData(0);
-  let seed = kind === "down" ? 4242 : 2424;
-  let lp = 0;
+  const cutoff = down ? 220 : 320; // hertz
+  const k = 1 - Math.exp((-2 * Math.PI * cutoff) / context.sampleRate);
+  const rise = 0.01; // seconds
+  const fall = down ? 0.045 : 0.03;
+  let seed = down ? 4242 : 2424;
+  let lp1 = 0;
+  let lp2 = 0;
   for (let i = 0; i < length; i++) {
     seed = (seed * 9301 + 49297) % 233280;
     const white = (seed / 233280) * 2 - 1;
-    lp += (kind === "down" ? 0.1 : 0.22) * (white - lp);
-    const t = i / length;
-    // Pedal down is a soft rail/felt lift; pedal up is shorter and firmer as
-    // dampers return. Both stay well beneath a medium piano note.
-    const envelope =
-      kind === "down"
-        ? Math.exp(-t * 8.5) * (1 - Math.exp(-t * 80))
-        : Math.exp(-t * 16) * (1 - Math.exp(-t * 120));
-    data[i] = lp * envelope;
+    lp1 += k * (white - lp1);
+    lp2 += k * (lp1 - lp2);
+    const t = i / context.sampleRate;
+    const envelope = (1 - Math.exp(-t / rise)) ** 2 * Math.exp(-t / fall);
+    data[i] = lp2 * envelope * 1.6;
   }
   return buffer;
 }

@@ -4,6 +4,7 @@ import { createPerformanceRecorder } from "../src/performance/performanceRecorde
 import { createMidiInput } from "../src/performance/midiInput.js";
 import { createComputerKeyboard } from "../src/performance/computerKeyboard.js";
 import {
+  createPedalNoise,
   createSampleManifest,
   validateSampleCoverage,
   velocityLayerWeights,
@@ -276,6 +277,31 @@ check("MIDI files read into timed events", () => {
   assert(Math.abs(high.velocity - 100 / 127) < 1e-9);
   assert.deepEqual(pedal, [{ time: 0, down: true }]);
   assert.throws(() => parseMidiFile(new Uint8Array(20).buffer));
+});
+check("the pedal's noise is a soft thud, not a click", () => {
+  const context = {
+    sampleRate: 48000,
+    createBuffer: (_, length) => {
+      const data = new Float32Array(length);
+      return { getChannelData: () => data };
+    },
+  };
+  for (const kind of ["down", "up"]) {
+    const data = createPedalNoise(context, kind).getChannelData(0);
+    const peakAt = data.reduce(
+      (at, v, i) => (Math.abs(v) > Math.abs(data[at]) ? i : at),
+      0,
+    );
+    assert(peakAt / 48000 > 0.008, `${kind}: swells, no instant attack`);
+    let edge = 0;
+    let energy = 0;
+    data.forEach((v, i) => {
+      energy += v * v;
+      if (i) edge += (v - data[i - 1]) ** 2;
+    });
+    assert(edge / energy < 0.01, `${kind}: dark, no high click`);
+    assert(Math.max(...data.map(Math.abs)) < 0.12, `${kind}: quiet`);
+  }
 });
 check("a hovering MIDI sustain pedal does not flap", () => {
   // A recorded foot easing down, hovering about 64, then off (channel 0),
