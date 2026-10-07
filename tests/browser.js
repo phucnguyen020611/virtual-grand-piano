@@ -666,15 +666,18 @@ async function run() {
 
   // The ear follows the camera; the open score follows the music.
   {
-    p.audio.setListener(100, 1);
+    p.audio.setListener(100, [18, 0, -100], [22, 0, -98]);
     const far = p.audio.seat;
-    p.audio.setListener(10, 0);
+    p.audio.setListener(10, [-3, 0, -10], [3, 0, -10]);
     const near = p.audio.seat;
     assert(
       far.gain < near.gain && far.cutoff < near.cutoff && far.room > near.room,
       "the sound did not change with the seat",
     );
-    assert(far.pan > 0 && near.pan === 0, "the sound did not pan to the piano");
+    assert(
+      far.bass[0] > 0 && near.bass[0] < 0 && near.treble[0] > 0,
+      "the piano's two ends were not placed round the head",
+    );
     const book = p.piano.scoreBook;
     book.turnTo(1);
     book.update(1, true);

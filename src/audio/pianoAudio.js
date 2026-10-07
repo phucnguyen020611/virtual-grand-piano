@@ -100,17 +100,19 @@ export function createAudioEngine() {
   let finalStage = null; // what reaches the speakers
   let capture = null; // a tap of it for saving takes
   const effects = new Map(); // url -> decoded hall sound
-  // Where the listener sits: tone, level and image of the direct sound.
+  // Where the listener sits: tone and level of the direct sound, and where
+  // the piano's two ends are, as heard (see setListener).
   let seatTone = null;
   let seatGain = null;
-  let seatPan = null;
+  let ends = null; // [bass, treble] PannerNodes
   let room = null; // the convolver of the room the piano is in…
   let roomName = "hall"; // …and its name
   const rooms = {}; // name -> impulse response
+  const heard = { bass: [0, 0, 0], treble: [0, 0, 0] }; // as last given
   const seat = {
     distance: 0,
-    pan: 0,
-    width: 0.5,
+    bass: [-1, 0, -1],
+    treble: [1, 0, -1],
     gain: 1,
     cutoff: 20000,
     room: 0.1,
@@ -207,11 +209,27 @@ export function createAudioEngine() {
     seatTone.type = "lowpass";
     seatTone.Q.value = 0.5;
     seatGain = ctx.createGain();
-    seatPan = ctx.createStereoPanner();
+    // The recordings' left and right (bass and treble, from the player's
+    // bench) come from the two ends of the piano, placed in 3D round the
+    // listener's head (HRTF): on headphones, in front or behind, above or
+    // below, and turning with the camera. Mono fallback samples feed both.
+    seatGain.channelCount = 2;
+    seatGain.channelCountMode = "explicit";
+    const split = ctx.createChannelSplitter(2);
     dry.connect(seatTone);
     seatTone.connect(seatGain);
-    seatGain.connect(seatPan);
-    seatPan.connect(master);
+    seatGain.connect(split);
+    ends = [0, 1].map((channel) => {
+      const panner = new PannerNode(ctx, {
+        panningModel: "HRTF",
+        rolloffFactor: 0, // distance is seatGain's and seatTone's job
+        channelCount: 1,
+        channelCountMode: "explicit",
+      });
+      split.connect(panner, channel);
+      panner.connect(master);
+      return panner;
+    });
     dry.connect(room);
     resonanceInput.connect(resonanceExcitationGain);
     resonanceExcitationGain.connect(resonance);
@@ -247,32 +265,58 @@ export function createAudioEngine() {
   function applySeat(instant = false) {
     if (!ctx) return;
     const now = ctx.currentTime;
-    for (const [param, value] of [
+    for (const [param, value, lag = 0.12] of [
       [seatGain.gain, seat.gain],
       [seatTone.frequency, seat.cutoff],
-      [seatPan.pan, seat.pan],
       [roomGain.gain, seat.room],
+      ...[seat.bass, seat.treble].flatMap((at, end) =>
+        ["positionX", "positionY", "positionZ"].map((axis, i) => [
+          ends[end][axis],
+          at[i],
+          0.04, // the image keeps up with a turning head
+        ]),
+      ),
     ])
       if (instant) param.setValueAtTime(value, now);
-      else param.setTargetAtTime(value, now, 0.12);
+      else param.setTargetAtTime(value, now, lag);
   }
 
   /**
-   * The listener's place: `distance` from the piano in scene units (~0.21 m)
-   * and `pan`, -1 (piano to the left) to 1 (to the right). At the keyboard
-   * the sound is close and dry; at the back of the stalls ~45% as loud,
-   * rolled off above ~5 kHz, narrower, with three to four times the room.
+   * The listener's place: `distance` from the piano in scene units (~0.21 m),
+   * and the piano's `bass` and `treble` ends as [x, y, z] seen from the
+   * listener's head (x right, y up, looking along -z). At the keyboard the
+   * sound is close and dry; at the back of the stalls ~45% as loud, rolled
+   * off above ~5 kHz, with three to four times the room; and the two ends
+   * close together, as a piano far off sounds narrow.
    */
-  function setListener(distance, pan) {
+  function setListener(distance, bass, treble) {
+    const moved = (a, b) => Math.hypot(...a.map((v, i) => v - b[i])) > 0.05;
     if (
       Math.abs(distance - seat.distance) < 0.5 &&
-      Math.abs(pan - seat.pan / seat.width) < 0.02
+      !moved(bass, heard.bass) &&
+      !moved(treble, heard.treble)
     )
       return;
+    heard.bass = [...bass];
+    heard.treble = [...treble];
     const t = clampUnit((distance - 10) / 90);
     seat.distance = distance;
-    seat.width = 0.5 * (1 - 0.6 * t);
-    seat.pan = clampUnit(pan, -1) * seat.width;
+    // Seen end-on the piano's two ends line up; but a piano close by sounds
+    // wide. So they keep at least ±25° apart near it, ±5° far off, each on
+    // its own side, about the direction between them.
+    const azimuth = (p) => Math.atan2(p[0], -p[2]);
+    // (The difference taken the short way round, should it be behind.)
+    const turn = azimuth(treble) - azimuth(bass);
+    const half = Math.atan2(Math.sin(turn), Math.cos(turn)) / 2;
+    const mid = azimuth(bass) + half;
+    const spread = Math.max(Math.abs(half), (Math.PI / 180) * (25 - 20 * t));
+    const place = (p, angle) => {
+      const across = Math.hypot(p[0], p[2]);
+      return [across * Math.sin(angle), p[1], -across * Math.cos(angle)];
+    };
+    const side = Math.sign(half) || 1;
+    seat.bass = place(bass, mid - side * spread);
+    seat.treble = place(treble, mid + side * spread);
     seat.gain = 1 - 0.55 * t ** 0.8;
     seat.cutoff = 20000 * 0.25 ** t;
     seat.room = 0.1 + 0.26 * t;

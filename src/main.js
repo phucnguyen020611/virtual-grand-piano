@@ -1345,10 +1345,15 @@ function shadowsMoved() {
 }
 const timer = new THREE.Timer();
 // The ear goes where the camera goes: near and dry at the keyboard, distant
-// and reverberant at the back of the hall, panned to the piano's side.
+// and reverberant at the back of the hall, and the piano heard where it is
+// from there: its bass strings (long, running to the tail) and its treble
+// (short, by the keys), each placed relative to the head.
 const SOUNDBOARD = onStage(0, 1.2, 0);
-const toPiano = new THREE.Vector3();
-const earRight = new THREE.Vector3();
+const BASS = onStage(-2.7, 1.2, -3.8);
+const TREBLE = onStage(2.9, 1.2, 0.3);
+const heard = new THREE.Vector3();
+const fromHead = (point) =>
+  heard.copy(point).applyMatrix4(camera.matrixWorldInverse).toArray();
 timer.connect(document);
 
 function animate(timestamp) {
@@ -1408,9 +1413,12 @@ function animate(timestamp) {
     reducedMotion.matches && !games.active,
   );
   piano.scoreBook.follow(song.midi ? null : songTime);
-  toPiano.subVectors(SOUNDBOARD, camera.position);
-  earRight.setFromMatrixColumn(camera.matrixWorld, 0);
-  audio.setListener(toPiano.length(), toPiano.normalize().dot(earRight));
+  camera.updateMatrixWorld();
+  audio.setListener(
+    camera.position.distanceTo(SOUNDBOARD),
+    fromHead(BASS),
+    fromHead(TREBLE),
+  );
   if (explodedView.exploded || explodedView.isTransitioning)
     inspection.updateLabels();
 

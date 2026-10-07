@@ -62,8 +62,11 @@ The current model is procedural and intentionally lightweight. Future releases c
   that follows autoplay: a gilt wash on the bar being played, a line sweeping
   through it
 - Sound that follows the camera: close and dry at the keyboard, quieter,
-  darker and more reverberant toward the back of the stalls and the balconies,
-  panned toward the piano
+  darker and more reverberant toward the back of the stalls and the balconies.
+  The piano's bass and treble ends are placed in 3D round your head (HRTF; on
+  headphones, in front or behind, turning with the view), in rooms that ring
+  as their size would: about 1.8 s in the hall, under a second in the salon,
+  with first reflections from their own walls
 - Free orbit, zoom-to-cursor and pan camera with view presets (pianist,
   keyboard, front row, balcony, whole hall) and double-click to orbit a spot
 - Exploded view: pick a part’s name to fly the camera to it
