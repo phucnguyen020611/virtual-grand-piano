@@ -26,7 +26,15 @@ The current model is procedural and intentionally lightweight. Future releases c
   a combo, stars and your best kept; the piano plays the rest. Easy (right
   hand, slower), Normal, Hard (both hands). And **Echo**, a tune to play back
   that grows a note each round, with lives, for younger players. Any input
-  plays: the computer keyboard, a tap on the keys, a MIDI keyboard
+  plays: the computer keyboard, a tap on the keys, a MIDI keyboard. Falling
+  notes also plays any MIDI file you open
+- **English and Vietnamese**: the globe button (on the welcome card and top
+  right) switches every word of the interface; the browser's language picks
+  the first, and the choice is remembered
+- **Graphics that keep up**: each level caps the pixels drawn per frame (a
+  4K screen at High renders at 1440p and is scaled up), and until you pick a
+  level yourself, a device that cannot hold 40 fps in the hall is stepped
+  down a level at a time
 - **The way in**: a visit opens in a candlelit marble foyer before the hall's
   white-and-gold double doors under a crowned pediment; **Enter the hall**
   swings them open, the hall's light spilling out, and the camera walks
@@ -140,12 +148,14 @@ makes every word and button larger.
 | Closing credits         | **Closing credits** (Hall); press again to close   |
 | Larger text and buttons | **Aa** (top right); remembered                     |
 | Graphics quality        | **Graphics: Low / Medium / High / Ultra**          |
+| Language                | Globe button: **Tiếng Việt / English**             |
 | Daylight outside        | **Sky:** your clock / day / sunset / night         |
 | Concert programme       | Click any seat, or **Programme**                   |
 | Show / hide audience    | **Audience**                                       |
 | Watch it as a film      | **Cinematic**; Esc to leave                        |
 | Skip the way in         | Any key or click, or **Skip to the piano**         |
 | Play a game             | **Games**, then **Play Falling notes** or **Echo** |
+| Play your own MIDI file | **Games** → **Or play your own MIDI file…**        |
 | Leave a game            | `Esc` or **Leave game**                            |
 | House curtain & lights  | **Close curtain / Open curtain**                   |
 | Adjust bench height     | Click a knob at either end of the bench            |
@@ -184,6 +194,8 @@ virtual-grand-piano/
 │   ├── audio/hall/         # the chime and the applause (CC0 excerpts)
 │   └── logo.svg
 ├── src/
+│   ├── bootstrap.js           # the language, then main.js (with a fallback card)
+│   ├── i18n.js                # English/Vietnamese: dictionary + in-place DOM translation
 │   ├── main.js                # scene/renderer/camera bootstrap + wiring + render loop
 │   ├── piano/
 │   │   ├── createPiano.js      # assembles the instrument + exploded-view layout
