@@ -64,12 +64,15 @@ camera.zoom = Math.min(1, camera.aspect / 1.6);
 camera.updateProjectionMatrix();
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 // Graphics quality: render resolution, shadows, and the hall's costliest
-// lights and glows. High is the original look and the default.
+// lights and glows. High is the original look and the default. Each level
+// also caps the pixels drawn per frame: a 4K screen at High renders at
+// 1440p and is scaled up, rather than filling four times the pixels.
 const handheld = () =>
   matchMedia("(pointer: coarse)").matches || innerWidth < 768;
 const QUALITY = {
   low: {
     pixelRatio: () => 0.75,
+    maxPixels: 1280 * 720,
     shadow: 0,
     areaLights: false,
     glassGlow: false,
@@ -78,6 +81,7 @@ const QUALITY = {
   },
   medium: {
     pixelRatio: () => 1,
+    maxPixels: 1920 * 1080,
     shadow: 1024,
     areaLights: true,
     glassGlow: true,
@@ -86,6 +90,7 @@ const QUALITY = {
   },
   high: {
     pixelRatio: () => (handheld() ? 1.5 : 2),
+    maxPixels: 2560 * 1440,
     shadow: 2048,
     areaLights: true,
     glassGlow: true,
@@ -94,6 +99,7 @@ const QUALITY = {
   },
   ultra: {
     pixelRatio: () => 3,
+    maxPixels: Infinity,
     shadow: 4096,
     areaLights: true,
     glassGlow: true,
@@ -102,14 +108,21 @@ const QUALITY = {
   },
 };
 let quality = "high";
+let autoQuality = true; // until the visitor picks a level (see watchFrameRate)
 try {
-  if (localStorage.getItem("vgp.quality") in QUALITY)
+  if (localStorage.getItem("vgp.quality") in QUALITY) {
     quality = localStorage.getItem("vgp.quality");
+    autoQuality = false;
+  }
 } catch {
   // Storage blocked: keep the default.
 }
 const renderPixelRatio = () =>
-  Math.min(devicePixelRatio, QUALITY[quality].pixelRatio());
+  Math.min(
+    devicePixelRatio,
+    QUALITY[quality].pixelRatio(),
+    Math.sqrt(QUALITY[quality].maxPixels / (innerWidth * innerHeight)),
+  );
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -1175,22 +1188,42 @@ crowdBtn.onclick = () => {
   crowdBtn.setAttribute("aria-pressed", String(hall.audience.visible));
 };
 const qualitySelect = document.querySelector("#qualitySelect");
-function applyQuality(level) {
+function applyQuality(level, keep = true) {
   quality = level;
   qualitySelect.value = level;
   renderer.setPixelRatio(renderPixelRatio());
   hall.setQuality(QUALITY[level]);
   crowdBtn.setAttribute("aria-pressed", String(hall.audience.visible));
-  try {
-    localStorage.setItem("vgp.quality", level);
-  } catch {
-    // Storage blocked: the choice lasts for this visit.
-  }
+  if (keep)
+    try {
+      localStorage.setItem("vgp.quality", level);
+    } catch {
+      // Storage blocked: the choice lasts for this visit.
+    }
 }
-qualitySelect.addEventListener("change", () =>
-  applyQuality(qualitySelect.value),
-);
-applyQuality(quality);
+qualitySelect.addEventListener("change", () => {
+  autoQuality = false;
+  applyQuality(qualitySelect.value);
+});
+applyQuality(quality, false);
+// Too slow here? Once in the hall, step the graphics down a level at a time
+// until the frame rate keeps up; the level found is kept for next time.
+const frameRate = { frames: 0, time: -2 }; // a moment to settle first
+function watchFrameRate(delta) {
+  if (!autoQuality || entrance.busy || delta > 0.5) return;
+  if ((frameRate.time += delta) < 0) return;
+  frameRate.frames++;
+  if (frameRate.time < 4) return;
+  const levels = Object.keys(QUALITY);
+  if (frameRate.frames / frameRate.time < 40 && quality !== "low") {
+    applyQuality(levels[levels.indexOf(quality) - 1]);
+    setStatus(
+      `Graphics set to ${quality[0].toUpperCase()}${quality.slice(1)} to keep things smooth`,
+    );
+    Object.assign(frameRate, { frames: 0, time: -2 });
+  } else autoQuality = false; // it keeps up: stop watching
+}
+if (import.meta.env.DEV) window.__vgp.watchFrameRate = watchFrameRate;
 
 // The sky outside the stained glass, by choice or by the visitor's clock:
 // day from 7 to 17, sunset either side of it, night otherwise.
@@ -1293,6 +1326,7 @@ timer.connect(document);
 function animate(timestamp) {
   requestAnimationFrame(animate);
   timer.update(timestamp);
+  watchFrameRate(timer.getDelta());
   const dt = Math.min(timer.getDelta(), 0.035);
   updateFlight(dt);
   updateFreeCam(dt);
