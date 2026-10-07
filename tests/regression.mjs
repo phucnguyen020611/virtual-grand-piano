@@ -278,6 +278,22 @@ check("MIDI files read into timed events", () => {
   assert.deepEqual(pedal, [{ time: 0, down: true }]);
   assert.throws(() => parseMidiFile(new Uint8Array(20).buffer));
 });
+check("autoplay works the sustain pedal without its thump", () => {
+  const heard = [];
+  const setSustain = audio.setSustain;
+  audio.setSustain = (down, quiet) => heard.push([down, quiet]);
+  controller.setSustainForSource("autoplay:pedal", true, "autoplay");
+  controller.setSustainForSource("autoplay:pedal", false, "autoplay");
+  controller.setSustainForSource("computer:space", true, "computer");
+  controller.setSustainForSource("computer:space", false, "computer");
+  audio.setSustain = setSustain;
+  assert.deepEqual(heard, [
+    [true, true],
+    [false, true],
+    [true, false],
+    [false, false],
+  ]);
+});
 check("the pedal's noise is a soft thud, not a click", () => {
   const context = {
     sampleRate: 48000,

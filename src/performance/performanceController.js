@@ -89,19 +89,21 @@ export function createPerformanceController(audio, mechanics, resonance) {
     releaseToken(midi, sourceToken);
   }
 
-  function applySustain(down) {
+  /** `quiet`: the pedal is worked by autoplay, so its own thump and the
+   *  dampers landing are not heard (the strings still ring and stop). */
+  function applySustain(down, quiet = false) {
     if (sustain === down) return;
     sustain = down;
     mechanics.setSustain(down);
     resonance.setSustain(down);
-    audio.setSustain(down);
+    audio.setSustain(down, quiet);
     if (down) return;
     for (const midi of [...sustainedReleasedNotes]) {
       if (physicallyHeldNotes.has(midi) || sostenutoHeld.has(midi)) continue;
       sustainedReleasedNotes.delete(midi);
       mechanics.setDamperLifted(midi, false);
       resonance.setDamperOpen(midi, false);
-      audio.noteOff(midi, 0.65, "sustain-release");
+      audio.noteOff(midi, 0.65, "sustain-release", quiet);
     }
   }
 
@@ -134,6 +136,7 @@ export function createPerformanceController(audio, mechanics, resonance) {
   function setSustainForSource(sourceToken, down, sourceGroup = sourceToken) {
     const wasDown = sustainOwners.has(sourceToken);
     if (down === wasDown) return;
+    const group = sustainSourceGroups.get(sourceToken) ?? sourceGroup;
     if (down) {
       sustainOwners.add(sourceToken);
       sustainSourceGroups.set(sourceToken, sourceGroup);
@@ -142,7 +145,7 @@ export function createPerformanceController(audio, mechanics, resonance) {
       sustainSourceGroups.delete(sourceToken);
     }
     emit({ type: "sustain", down, sourceToken, sourceGroup });
-    applySustain(sustainOwners.size > 0);
+    applySustain(sustainOwners.size > 0, group === "autoplay");
   }
 
   /** Backward-compatible default source for existing callers. */

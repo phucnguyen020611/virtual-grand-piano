@@ -685,8 +685,9 @@ export function createAudioEngine() {
   /**
    * Called by the controller only once every source has released the note, so
    * every voice for this MIDI belongs to a note that is genuinely finished.
+   * `quiet`: no damper sound (autoplay's pedal lifting off the strings).
    */
-  function noteOff(midi, release = 0.45, reason = "release") {
+  function noteOff(midi, release = 0.45, reason = "release", quiet = false) {
     if (!ctx) return;
     const set = activeVoices.get(midi);
     if (!set?.size) return;
@@ -711,7 +712,7 @@ export function createAudioEngine() {
             ),
           );
       endVoice(voice, seconds);
-      if (!undamped) damperContact(voice, reason);
+      if (!undamped && !quiet) damperContact(voice, reason);
     }
   }
 
@@ -746,7 +747,7 @@ export function createAudioEngine() {
    * the controller already decides when a note reaches noteOff — it only opens
    * the undamped string bed and plays the pedal's own mechanical noise.
    */
-  function setSustain(down) {
+  function setSustain(down, quiet = false) {
     if (sustain === down) return;
     sustain = down;
     if (!ctx) return;
@@ -758,7 +759,7 @@ export function createAudioEngine() {
       down ? 0.04 : 0.035,
     );
     // Guard against pedal spam building up noise voices.
-    if (now - lastPedalAt < 0.06) return;
+    if (quiet || now - lastPedalAt < 0.06) return;
     lastPedalAt = now;
     const source = ctx.createBufferSource();
     source.buffer = down ? pedalBuffers.down : pedalBuffers.up;
