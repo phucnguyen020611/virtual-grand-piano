@@ -149,6 +149,7 @@ export function createAudioEngine() {
   let ready = false;
   let loading = null;
   let lastPedalAt = -1;
+  let lastDamperAt = -1;
   let fallbackWarmup = null;
 
   function ensureAudio() {
@@ -717,9 +718,12 @@ export function createAudioEngine() {
   /**
    * A damper landing on a live string, not a click: a very quiet filtered
    * burst that scales with register and with how hard the note was struck.
+   * Dampers landing together (a chord let go, the pedal lifted off a
+   * sustained run) make one sound: summed, dozens of them were a clack.
    */
   function damperContact(voice, reason) {
     if (!pedalBuffers || reason === "source-stop") return;
+    if (ctx.currentTime - lastDamperAt < 0.04) return;
     const age = ctx.currentTime - voice.startedAt;
     const energy = voice.velocity * Math.exp(-age / (voice.midi < 40 ? 5 : 3));
     if (energy < 0.05) return;
@@ -730,6 +734,7 @@ export function createAudioEngine() {
     const heldShape = age < 0.18 ? 1.22 : age > 3 ? 0.55 : 1;
     const registerShape = voice.midi < 40 ? 1.25 : voice.midi < 72 ? 1 : 0.62;
     gain.gain.value = 0.014 * energy * heldShape * registerShape;
+    lastDamperAt = ctx.currentTime;
     source.connect(gain);
     gain.connect(dry);
     source.start(ctx.currentTime);

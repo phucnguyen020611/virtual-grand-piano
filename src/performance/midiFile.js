@@ -67,8 +67,8 @@ export function parseMidiFile(buffer) {
       } else if (type === 0x80 || type === 0x90) {
         const start = open.get(key)?.shift();
         if (start) notes.push({ ...start, end: tick });
-      } else if (type === 0xb0 && a === 64)
-        pedals.push({ tick, down: b >= 64 });
+      } else if (type === 0xb0 && a === 64 && channel !== 9)
+        pedals.push({ tick, channel, value: b });
     }
     // Notes never released end with their track.
     for (const starts of open.values())
@@ -105,11 +105,21 @@ export function parseMidiFile(buffer) {
       };
     })
     .sort((x, y) => x.time - y.time);
-  const pedal = pedals
-    .map(({ tick, down }) => ({
-      time: Math.max(0, seconds(tick) - first),
-      down,
-    }))
-    .sort((x, y) => x.time - y.time);
+  // The sustain pedal, down or up. A recorded performance streams every
+  // value of a foot easing on and off; read raw at 64, one hovering near the
+  // middle flaps the dampers (and their thump) many times a second. So it
+  // goes down at 64 and up only below 40, and it is down while any channel
+  // holds it (tracks are merged here, in time order).
+  const held = new Set();
+  const pedal = [];
+  for (const { tick, channel, value } of pedals.sort(
+    (x, y) => x.tick - y.tick,
+  )) {
+    const was = held.size > 0;
+    if (value >= 64) held.add(channel);
+    else if (value < 40) held.delete(channel);
+    if (held.size > 0 !== was)
+      pedal.push({ time: Math.max(0, seconds(tick) - first), down: !was });
+  }
   return { name: name.trim(), events, pedal };
 }

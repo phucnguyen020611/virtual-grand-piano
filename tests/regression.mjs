@@ -277,6 +277,31 @@ check("MIDI files read into timed events", () => {
   assert.deepEqual(pedal, [{ time: 0, down: true }]);
   assert.throws(() => parseMidiFile(new Uint8Array(20).buffer));
 });
+check("a hovering MIDI sustain pedal does not flap", () => {
+  // A recorded foot easing down, hovering about 64, then off (channel 0),
+  // while channel 1 presses and lets go inside that time; 96 ticks a beat.
+  const cc = (dt, channel, value) => [dt, 0xb0 | channel, 64, value];
+  const body = [
+    ...[0, 0x90, 60, 100],
+    ...[70, 50, 66, 58, 70, 60, 64, 45].flatMap((v) => cc(4, 0, v)),
+    ...cc(4, 1, 127),
+    ...cc(4, 1, 0),
+    ...cc(4, 0, 20),
+    ...[0, 0x80, 60, 0],
+    ...[0, 0xff, 0x2f, 0],
+  ];
+  const file = new Uint8Array([
+    ...[0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0, 96],
+    ...[0x4d, 0x54, 0x72, 0x6b, 0, 0, 0, body.length],
+    ...body,
+  ]);
+  const { pedal } = parseMidiFile(file.buffer);
+  assert.deepEqual(
+    pedal.map((change) => change.down),
+    [true, false],
+    "one press, one release",
+  );
+});
 controller.stopAll();
 console.log(`${passed} regression checks passed`);
 
