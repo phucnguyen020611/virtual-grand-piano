@@ -1218,7 +1218,7 @@ function watchFrameRate(delta) {
   if (frameRate.frames / frameRate.time < 40 && quality !== "low") {
     applyQuality(levels[levels.indexOf(quality) - 1]);
     setStatus(
-      `Graphics set to ${quality[0].toUpperCase()}${quality.slice(1)} to keep things smooth`,
+      `Graphics lowered to ${quality[0].toUpperCase()}${quality.slice(1)}`,
     );
     Object.assign(frameRate, { frames: 0, time: -2 });
   } else autoQuality = false; // it keeps up: stop watching

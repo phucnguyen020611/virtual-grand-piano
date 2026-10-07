@@ -316,7 +316,7 @@ export function createInspection(
       // Key names stay in the body face: the script heading would blur them.
       dom.partName.textContent = "Play the piano";
       dom.partText.textContent =
-        "Try Z X C, and Space to sustain. Tap or drag across keys, or select a part to explore the instrument.";
+        "Try Z\u00a0X\u00a0C, and Space to sustain. Tap or drag across keys, or select a part to explore the instrument.";
     }
   }
 

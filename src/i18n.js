@@ -15,13 +15,13 @@ const VI = {
   "Virtual Grand Piano — Interactive 3D Piano":
     "Virtual Grand Piano — Đàn piano 3D tương tác",
   "Interactive instrument": "Nhạc cụ tương tác",
-  "Interactive 88-key concert grand": "Đàn grand hòa nhạc 88 phím tương tác",
+  "Interactive 88-key concert grand": "Đàn grand 88 phím tương tác",
   "A concert grand on a gilded Viennese stage. Play it, take it apart, or listen from the stalls.":
     "Một cây đại dương cầm trên sân khấu mạ vàng kiểu Viên. Hãy chơi đàn, tháo rời để xem bên trong, hoặc ngồi nghe từ hàng ghế khán giả.",
   "Enter the hall": "Vào khán phòng",
   "Preparing piano…": "Đang chuẩn bị đàn…",
   "Keyboard, touch, or MIDI · best with headphones":
-    "Bàn phím, cảm ứng hoặc MIDI · nghe hay nhất với tai nghe",
+    "Bàn phím, cảm ứng, MIDI · nên dùng tai nghe",
   "The 3D piano could not start. Check your connection and WebGL support, then retry.":
     "Không khởi động được đàn 3D. Hãy kiểm tra kết nối mạng và WebGL rồi thử lại.",
   "Retry piano": "Thử lại",
@@ -42,7 +42,7 @@ const VI = {
   // Play
   "Play the piano": "Chơi đàn",
   "Tap the keys, or use your computer keyboard: Z X C and Q W E.":
-    "Chạm vào phím đàn, hoặc dùng bàn phím máy tính: Z X C và Q W E.",
+    "Chạm vào phím đàn, hoặc dùng bàn phím máy tính: Z\u00a0X\u00a0C và Q\u00a0W\u00a0E.",
   "Keyboard range": "Âm vực bàn phím",
   "Computer keyboard range": "Âm vực bàn phím máy tính",
   "Lower keyboard octave": "Hạ một quãng tám",
@@ -249,9 +249,9 @@ const VI = {
   // The inspector and the piano's parts
   "Piano anatomy": "Cấu tạo đàn",
   "Try Z X C, and Space to sustain. Tap or drag across keys. After using controls, click the piano or Tab to its performance surface to play with your keyboard.":
-    "Thử Z X C, và Space để ngân tiếng. Chạm hoặc vuốt qua các phím. Sau khi dùng các nút, bấm vào đàn hoặc Tab tới bề mặt đàn để chơi bằng bàn phím.",
+    "Thử Z\u00a0X\u00a0C, và Space để ngân tiếng. Chạm hoặc vuốt qua các phím. Sau khi dùng các nút, bấm vào đàn hoặc Tab tới bề mặt đàn để chơi bằng bàn phím.",
   "Try Z X C, and Space to sustain. Tap or drag across keys, or select a part to explore the instrument.":
-    "Thử Z X C, và Space để ngân tiếng. Chạm hoặc vuốt qua các phím, hoặc chọn một bộ phận để khám phá cây đàn.",
+    "Thử Z\u00a0X\u00a0C, và Space để ngân tiếng. Chạm hoặc vuốt qua các phím, hoặc chọn một bộ phận để khám phá cây đàn.",
   "Piano component": "Bộ phận của đàn",
   "Individually modeled grand-piano component.":
     "Một bộ phận của đàn grand, được dựng riêng.",
@@ -337,8 +337,8 @@ const PATTERNS = [
   [/^Stop recording, (\d+:\d\d)$/, "Dừng thu, $1"],
   [/^Play (.+)$/, "Phát $1"],
   [
-    /^Graphics set to (\w+) to keep things smooth$/,
-    (_, level) => `Đã chuyển đồ họa sang mức ${LEVEL[level]} cho mượt hơn`,
+    /^Graphics lowered to (\w+)$/,
+    (_, level) => `Đồ họa đã giảm xuống ${LEVEL[level]}`,
   ],
   [
     /^Your keys: (.*) — or tap the keys that light up\.$/,

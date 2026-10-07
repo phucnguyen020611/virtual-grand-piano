@@ -355,6 +355,18 @@ canvas {
   flex-wrap: wrap;
 }
 
+/* A label stays on one line: a row of buttons wraps between buttons, never
+   inside one, and the dock's tabs share the width by their words. */
+.hud button,
+.dockTab span {
+  white-space: nowrap;
+}
+
+.panelHint,
+.gameCard p {
+  text-wrap: pretty;
+}
+
 .octaveControl {
   width: fit-content;
   border: 1px solid var(--ui-border);
@@ -806,6 +818,11 @@ kbd {
   text-transform: uppercase;
 }
 
+.gateInner .eyebrow,
+#gateNote {
+  text-wrap: balance;
+}
+
 #gateNote {
   margin: 16px 0 0;
   color: var(--ui-muted);
@@ -889,7 +906,7 @@ kbd {
 
   .dockTab {
     min-width: 0;
-    flex: 1;
+    flex: 1 1 auto;
     padding: 6px 2px;
     font-size: 12.5px;
   }
@@ -973,7 +990,10 @@ kbd {
   outline-offset: -5px;
 }
 #statusText {
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .audioGate {
   overflow: auto;
@@ -1253,13 +1273,15 @@ button.textLink:hover:not(:disabled) {
     font-size: 14px;
   }
 
-  /* Six tabs across a phone. */
-  .dockTab {
-    font-size: 12px;
+  /* Six tabs across a phone, each label on one line: the words shrink a
+     little on the narrowest screens rather than break. */
+  .dock {
+    gap: 2px;
   }
 
-  .largeUI .dock .dockTab {
-    font-size: 13px;
+  .dockTab {
+    padding-inline: 1px;
+    font-size: min(12px, 3.25vw);
   }
 }
 
@@ -1341,6 +1363,16 @@ button.textLink:hover:not(:disabled) {
     min-height: 44px;
     padding: 9px 12px;
     font-size: 15px;
+  }
+
+  .largeUI .octaveControl button {
+    padding-inline: 10px;
+  }
+
+  /* Larger, but still one line per tab across the phone. */
+  .largeUI .dock .dockTab {
+    padding-inline: 1px;
+    font-size: min(14px, 3.4vw);
   }
 }
 
