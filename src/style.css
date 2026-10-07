@@ -1592,3 +1592,40 @@ kbd {
     transition: none;
   }
 }
+
+/* The language switch: a globe and the other language's own name. */
+.langBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.langBtn svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+
+.gateLang {
+  min-height: 44px;
+  margin-top: 10px;
+  border: 0;
+  background: none;
+  color: var(--ui-accent-strong);
+  font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  .topbar .langBtn span {
+    display: none;
+  }
+}
+
+.gateLang:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

@@ -21,6 +21,7 @@ import { createInspection } from "./interaction/inspection.js";
 import { createCinematic } from "./interaction/cinematic.js";
 import { createEntrance } from "./interaction/entrance.js";
 import { createGames } from "./interaction/games.js";
+import { language } from "./i18n.js";
 import {
   createExplodedView,
   NORMAL_DEFAULT_CAMERA_POSITION,
@@ -380,13 +381,16 @@ function startAutoplay() {
 // The evening's programme: every piece, a line about it, and a button that
 // plays it. Opened from the HUD or by clicking any seat in the hall.
 const programme = document.querySelector("#programme");
-document.querySelector("#programmeDate").textContent =
-  new Date().toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+const showProgrammeDate = () =>
+  (document.querySelector("#programmeDate").textContent =
+    new Date().toLocaleDateString(language() === "vi" ? "vi-VN" : "en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }));
+showProgrammeDate();
+document.addEventListener("vgp:language", showProgrammeDate);
 document.querySelector("#programmeList").replaceChildren(
   ...SONGS.map((piece) => {
     const item = document.createElement("li");

@@ -61,6 +61,7 @@ export function enhanceSelect(select) {
   new MutationObserver(sync).observe(select, {
     childList: true,
     subtree: true,
+    characterData: true, // an option's text changed (as by a translation)
     attributes: true,
     attributeFilter: ["hidden", "disabled"],
   });
