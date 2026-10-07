@@ -4,6 +4,7 @@ import { createPerformanceRecorder } from "../src/performance/performanceRecorde
 import { createMidiInput } from "../src/performance/midiInput.js";
 import { createComputerKeyboard } from "../src/performance/computerKeyboard.js";
 import {
+  createImpulseResponse,
   createPedalNoise,
   createSampleManifest,
   validateSampleCoverage,
@@ -294,6 +295,44 @@ check("autoplay works the sustain pedal without its thump", () => {
     [false, false],
   ]);
 });
+check(
+  "the hall rings about two seconds, the salon under one, both wide",
+  () => {
+    const context = {
+      sampleRate: 48000,
+      createBuffer: (channels, length) => {
+        const data = Array.from(
+          { length: channels },
+          () => new Float32Array(length),
+        );
+        return { getChannelData: (i) => data[i] };
+      },
+    };
+    // RT60 from the Schroeder decay curve, fitted from -5 to -35 dB.
+    const rt60 = (data) => {
+      const left = new Float64Array(data.length);
+      for (let i = data.length - 1, sum = 0; i >= 0; i--)
+        left[i] = sum += data[i] ** 2;
+      const at = (db) =>
+        left.findIndex((v) => 10 * Math.log10(v / left[0]) <= db);
+      return ((at(-35) - at(-5)) / 48000) * 2;
+    };
+    for (const [room, low, high] of [
+      ["hall", 1.6, 2.2],
+      ["salon", 0.6, 1],
+    ]) {
+      const response = createImpulseResponse(context, room);
+      const [l, r] = [0, 1].map((i) => response.getChannelData(i));
+      const seconds = rt60(l);
+      assert(seconds > low && seconds < high, `${room}: RT60 ${seconds}`);
+      let lr = 0;
+      let ll = 0;
+      let rr = 0;
+      l.forEach((v, i) => ((lr += v * r[i]), (ll += v * v), (rr += r[i] ** 2)));
+      assert(Math.abs(lr / Math.sqrt(ll * rr)) < 0.3, `${room}: ears differ`);
+    }
+  },
+);
 check("the pedal's noise is a soft thud, not a click", () => {
   const context = {
     sampleRate: 48000,

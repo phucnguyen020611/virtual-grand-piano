@@ -263,43 +263,127 @@ export function renderFallbackSample(entry, sampleRate) {
 }
 
 /**
- * Impulse responses, generated so no third-party IR file is required.
- * "room" is a small recital room; "resonance" is the darker, longer bloom used
- * for the undamped string bed when the sustain pedal is down.
+ * The rooms the piano is heard in, in metres (a scene unit is ~0.208 m):
+ * the concert hall of hall.js (stalls floor to ceiling, organ wall to the
+ * back doors) and the music salon of salon.js, each with the piano where it
+ * stands, a listener (mid-stalls; at the keys) and a reverberation time for
+ * below and above ~2 kHz (Sabine's estimate for their size, a
+ * gilded hall and a panelled room). [x, y, z]: across, up, along.
+ */
+const ROOMS = {
+  hall: {
+    size: [14.1, 16, 26.2],
+    source: [7.05, 2.1, 5.4],
+    listener: [5.6, 2.4, 16.8],
+    rt: [2.0, 1.3],
+  },
+  salon: {
+    size: [7.1, 4.6, 5.8],
+    source: [3.3, 1.1, 2.9],
+    listener: [1.5, 1.6, 2.9],
+    rt: [0.85, 0.55],
+  },
+};
+
+/**
+ * A room's reverberation as heard from its listener: the six first
+ * reflections off its walls, floor and ceiling (image sources, each from its
+ * own side), then a diffuse tail that sets in after them and dies away at
+ * the room's rate, the treble sooner than the bass; left and right ears
+ * hear different tails, which is what makes it wide.
+ */
+function roomResponse(context, { size, source, listener, rt }) {
+  const rate = context.sampleRate;
+  const length = Math.floor((rt[0] + 0.15) * rate);
+  const buffer = context.createBuffer(2, length, rate);
+  const sub = (a, b) => a.map((v, i) => v - b[i]);
+  const norm = (a) => Math.hypot(...a);
+  const ahead = sub(source, listener);
+  ahead[1] = 0;
+  const forward = ahead.map((v) => v / norm(ahead));
+  const right = [-forward[2], 0, forward[0]]; // forward × up
+  const direct = norm(sub(source, listener));
+  const reflections = [];
+  for (let axis = 0; axis < 3; axis++)
+    for (const wall of [0, size[axis]]) {
+      const image = [...source];
+      image[axis] = 2 * wall - source[axis];
+      const path = sub(image, listener);
+      const distance = norm(path);
+      const side = path.reduce((sum, v, i) => sum + v * right[i], 0) / distance;
+      reflections.push({
+        at: (distance - direct) / 343,
+        gain: (0.8 * direct) / distance,
+        side,
+      });
+    }
+  const onset = Math.min(...reflections.map((r) => r.at));
+  const lowCut = 1 - Math.exp((-2 * Math.PI * 2000) / rate); // mids decay as lows
+  const airCut = 1 - Math.exp((-2 * Math.PI * 7000) / rate);
+  const decay = rt.map((seconds) => -6.91 / seconds); // to -60 dB
+  for (let channel = 0; channel < 2; channel++) {
+    const data = buffer.getChannelData(channel);
+    let seed = channel ? 67890 : 12345;
+    let low = 0;
+    let air = 0;
+    let early = 0;
+    let late = 0;
+    for (let i = 0; i < length; i++) {
+      seed = (seed * 9301 + 49297) % 233280;
+      const white = (seed / 233280) * 2 - 1;
+      low += lowCut * (white - low);
+      const t = i / rate;
+      const grown = t < onset ? 0 : 1 - Math.exp(-(t - onset) / 0.025);
+      const tail =
+        grown *
+        (low * Math.exp(decay[0] * t) + (white - low) * Math.exp(decay[1] * t));
+      air += airCut * (tail - air);
+      data[i] = air;
+      if (t < 0.08) early += air * air;
+      else late += air * air;
+    }
+    // Clear, not muddy: the late sound carries ~1.5 times the early energy
+    // (a concert hall's clarity, C80 of about -2 dB), reflections included.
+    const taps = reflections.map((r) => ({
+      offset: Math.floor(r.at * rate),
+      gain: r.gain * Math.sqrt((1 + (channel ? r.side : -r.side)) / 2),
+    }));
+    const tapEnergy = taps.reduce((sum, tap) => sum + tap.gain ** 2, 0);
+    const scale = Math.sqrt((1.5 * (tapEnergy + early)) / late);
+    for (let i = 0; i < length; i++) if (i / rate >= 0.08) data[i] *= scale;
+    for (const { offset, gain } of taps)
+      if (offset < length) data[offset] += gain;
+    for (let i = length - Math.floor(0.05 * rate); i < length; i++)
+      data[i] *= (length - i) / (0.05 * rate); // no cut-off at the end
+  }
+  return buffer;
+}
+
+/**
+ * Impulse responses, generated so no third-party IR file is required:
+ * "hall" and "salon" (see ROOMS), and "resonance", the darker, longer bloom
+ * used for the undamped string bed when the sustain pedal is down.
  */
 export function createImpulseResponse(context, kind) {
-  const isRoom = kind === "room";
-  const seconds = isRoom ? 1.15 : 2.2;
-  const decay = isRoom ? 3.9 : 1.8;
+  if (ROOMS[kind]) return roomResponse(context, ROOMS[kind]);
+  const seconds = 2.2;
   const length = Math.floor(seconds * context.sampleRate);
   const buffer = context.createBuffer(2, length, context.sampleRate);
-  let seed = isRoom ? 12345 : 67890;
+  let seed = 67890;
   for (let channel = 0; channel < 2; channel++) {
     const data = buffer.getChannelData(channel);
     let lp = 0;
     for (let i = 0; i < length; i++) {
       seed = (seed * 9301 + 49297) % 233280;
       const white = (seed / 233280) * 2 - 1;
-      // The resonance bus is darker and retains a low-level tail, which reads
-      // as undamped strings rather than a second generic room.
-      lp += (isRoom ? 0.48 : 0.105) * (white - lp);
+      // Darker, with a low-level tail, which reads as undamped strings
+      // rather than a second generic room.
+      lp += 0.105 * (white - lp);
       const progress = i / length;
-      const envelope = isRoom
-        ? Math.pow(1 - progress, decay)
-        : 0.68 * Math.pow(1 - progress, 1.25) +
-          0.32 * Math.pow(1 - progress, 4.6);
-      data[i] = lp * envelope;
-    }
-    // A couple of early reflections stop the room sounding like a noise cloud.
-    if (isRoom) {
-      for (const [delay, gain] of [
-        [0.009, 0.42],
-        [0.019, 0.28],
-        [0.031, 0.16],
-      ]) {
-        const offset = Math.floor(delay * context.sampleRate) + channel * 17;
-        if (offset < length) data[offset] += gain;
-      }
+      data[i] =
+        lp *
+        (0.68 * Math.pow(1 - progress, 1.25) +
+          0.32 * Math.pow(1 - progress, 4.6));
     }
   }
   return buffer;

@@ -45,6 +45,7 @@ function createCeilingCurve(knee = 0.7) {
 }
 
 const MAX_VOICES = 64;
+const ROOMS = ["hall", "salon"]; // see createImpulseResponse
 const MAX_VOICES_PER_NOTE = 4;
 
 /** Perceptual velocity curve: soft notes stay audible, loud ones keep headroom. */
@@ -103,6 +104,9 @@ export function createAudioEngine() {
   let seatTone = null;
   let seatGain = null;
   let seatPan = null;
+  let room = null; // the convolver of the room the piano is in…
+  let roomName = "hall"; // …and its name
+  const rooms = {}; // name -> impulse response
   const seat = {
     distance: 0,
     pan: 0,
@@ -175,8 +179,9 @@ export function createAudioEngine() {
     limiter.attack.value = 0.003;
     limiter.release.value = 0.25;
 
-    const room = ctx.createConvolver();
-    room.buffer = createImpulseResponse(ctx, "room");
+    for (const name of ROOMS) rooms[name] = createImpulseResponse(ctx, name);
+    room = ctx.createConvolver();
+    room.buffer = rooms[roomName];
     roomGain = ctx.createGain();
     // The close-miked recordings already carry a little natural space.
     roomGain.gain.value = 0.1;
@@ -272,6 +277,23 @@ export function createAudioEngine() {
     seat.cutoff = 20000 * 0.25 ** t;
     seat.room = 0.1 + 0.26 * t;
     applySeat();
+  }
+
+  /**
+   * The room the piano is heard in: "hall" or "salon". The change is
+   * immediate (the games make it while the screen is dark).
+   */
+  function setRoom(name) {
+    if (name === roomName || !ROOMS.includes(name)) return;
+    roomName = name;
+    if (!ctx) return;
+    const next = ctx.createConvolver();
+    next.buffer = rooms[name];
+    dry.disconnect(room);
+    room.disconnect();
+    dry.connect(next);
+    next.connect(roomGain);
+    room = next;
   }
 
   /**
@@ -794,6 +816,7 @@ export function createAudioEngine() {
     ensureAudio,
     warmFallbacks,
     setListener,
+    setRoom,
     /**
      * A sound of the hall itself (the chime, the applause), played into the
      * mix after `delay` seconds at `rate` (pitch) and `gain`. Decoded once.

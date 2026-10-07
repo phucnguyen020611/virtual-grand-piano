@@ -435,6 +435,7 @@ export function createGames({
     if (!mode) {
       await fadeTo(1);
       hall.setRoom("salon");
+      audio.setRoom("salon");
       noteEffects.setLane(true);
       document.body.classList.add("game");
       hud.hidden = false;
@@ -455,6 +456,7 @@ export function createGames({
     player.stopSource("game");
     await fadeTo(1);
     hall.setRoom("hall");
+    audio.setRoom("hall");
     noteEffects.setLane(false);
     document.body.classList.remove("game");
     hud.hidden = true;
