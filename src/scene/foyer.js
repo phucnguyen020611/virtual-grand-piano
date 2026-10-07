@@ -513,11 +513,17 @@ export function buildFoyer(hall, room) {
   pool.visible = shaft.visible = false;
 
   // Candlelight in the foyer, and the hall's light spilling out once open.
+  // Both are put away once the visitor is inside, the pair together, so
+  // the hall's every pixel stops paying for them (in one shader change,
+  // compiled ahead at the welcome card: see main.js).
   const lamp = new THREE.PointLight(0xffd2a0, 0, 40, 2);
   lamp.position.set(0, F + 13, z0 + 12);
   const spill = new THREE.PointLight(0xffc88c, 0, 34, 2);
   spill.position.set(0, F + 8, backZ - 3);
   group.add(lamp, spill);
+  let lit = false;
+  let open = 0;
+  const show = () => (lamp.visible = spill.visible = lit || open > 0.001);
 
   return {
     /** Where a visit starts: before the closed doors. */
@@ -534,10 +540,14 @@ export function buildFoyer(hall, room) {
       pool.visible = shaft.visible = e > 0.001;
       pool.scale.x = shaft.scale.x = 0.15 + 0.85 * e;
       spill.intensity = 260 * e;
+      open = e;
+      show();
     },
     /** The foyer's candles: lit while a visitor stands there. */
     setLit(on) {
       lamp.intensity = on ? 420 : 0;
+      lit = on;
+      show();
     },
   };
 }

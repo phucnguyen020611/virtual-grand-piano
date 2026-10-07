@@ -364,6 +364,7 @@ export function buildSalon(scene, room) {
   light.position.set(cx, cy - 1, 0);
   const fire = new THREE.PointLight(0xff8a40, 0, 16, 2);
   fire.position.set(X1 - 2, F + 1.5, 0);
+  light.visible = fire.visible = false; // lit only while the salon is shown
   scene.add(light, fire);
   let clock = 0;
 
@@ -375,8 +376,9 @@ export function buildSalon(scene, room) {
     /** Show the salon (its candles lit) or put it away. */
     setVisible(on) {
       group.visible = on;
-      light.intensity = on ? 380 : 0;
-      fire.intensity = on ? 40 : 0;
+      light.visible = fire.visible = on;
+      light.intensity = 380;
+      fire.intensity = 40;
     },
     /** The fire flickers. */
     update(dt) {

@@ -132,6 +132,8 @@ renderer.setPixelRatio(renderPixelRatio());
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = false; // see shadowsMoved()
+renderer.shadowMap.needsUpdate = true;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.35;
@@ -1267,11 +1269,16 @@ document.querySelector("#enterBtn").onclick = async (event) => {
   button.textContent = "Preparing piano…";
   prepareAudio();
   // Compile every shader now, behind "Preparing piano…", so the first
-  // orbit across the hall or first exploded frame does not stall.
-  await Promise.all([
-    audio.warmFallbacks(),
-    renderer.compileAsync?.(scene, camera).catch(() => {}),
-  ]);
+  // orbit across the hall or first exploded frame does not stall: as lit
+  // here in the foyer, and as lit inside once its lights are put away
+  // (compileAsync builds the programs at once, before any frame is drawn
+  // without them).
+  const compile = () => renderer.compileAsync(scene, camera).catch(() => {});
+  const foyer = compile();
+  hall.entrance.setLit(false);
+  const inside = compile();
+  hall.entrance.setLit(true);
+  await Promise.all([audio.warmFallbacks(), foyer, inside]);
   audioGate.classList.add("hidden");
   audioGate.setAttribute("aria-hidden", "true");
   entrance.start(reducedMotion.matches);
@@ -1315,6 +1322,27 @@ if (import.meta.env.DEV)
   });
 
 // --- Animation loop ---------------------------------------------------------
+// The key light's shadow is drawn again only when something in it has moved
+// (a key, a hammer, the lid, the light's aim) or the shadow map is new: idle,
+// that is a pass over the piano's ~440 parts saved every frame. A weighted
+// sum of every visible caster's world matrix tells, checked after each frame
+// (the shadow trails a moving part by one frame at most).
+let shadowSum = NaN;
+function shadowsMoved() {
+  let sum = 0;
+  let k = 0;
+  scene.traverseVisible((o) => {
+    if (!o.castShadow) return;
+    k++;
+    for (const m of [o.matrixWorld, o.target?.matrixWorld].filter(Boolean))
+      m.elements.forEach((e, i) => (sum += e * (k * 32 + i)));
+    if (o.isInstancedMesh) sum += o.instanceMatrix.version * k;
+    if (o.shadow && !o.shadow.map) sum = NaN;
+  });
+  const moved = !(sum + k === shadowSum);
+  shadowSum = sum + k;
+  return moved;
+}
 const timer = new THREE.Timer();
 // The ear goes where the camera goes: near and dry at the keyboard, distant
 // and reverberant at the back of the hall, panned to the piano's side.
@@ -1387,6 +1415,7 @@ function animate(timestamp) {
     inspection.updateLabels();
 
   renderer.render(scene, camera);
+  if (shadowsMoved()) renderer.shadowMap.needsUpdate = true;
 }
 requestAnimationFrame(animate);
 
