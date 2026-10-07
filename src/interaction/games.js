@@ -87,7 +87,7 @@ export function createGames({
 
   let mode = null; // "notes" | "echo" | null
   let level = "easy";
-  let songIndex = 0;
+  let piece = SONGS[0];
   let busy = false; // fading between rooms
   let callTimer = 0;
   const game = {}; // the running game's state
@@ -143,7 +143,7 @@ export function createGames({
   // --- Falling notes ---------------------------------------------------------
   function startNotes() {
     const { hands, tempo } = LEVELS.notes[level];
-    const all = scoreEvents(SONGS[songIndex]);
+    const all = piece.midi?.events ?? scoreEvents(piece);
     fitKeyboard(all.filter((e) => hands.includes(e.hand)).map((e) => e.midi));
     const { minMidi, maxMidi } = keyboard.range;
     const playable = (e) =>
@@ -250,7 +250,7 @@ export function createGames({
     );
     const stars =
       accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : accuracy >= 40 ? 1 : 0;
-    const key = `notes.${SONGS[songIndex].id}.${level}`;
+    const key = `notes.${piece.id}.${level}`;
     const previous = best.get(key);
     if (game.score > previous) best.set(key, game.score);
     showResults({
@@ -430,7 +430,7 @@ export function createGames({
     if (busy) return;
     busy = true;
     level = options.level ?? level;
-    songIndex = options.song ?? songIndex;
+    piece = options.song ?? piece;
     onEnter();
     if (!mode) {
       await fadeTo(1);
@@ -495,7 +495,8 @@ export function createGames({
       if (mode === "echo" && game.phase === "demo") return game.clock;
       return null;
     },
-    /** "notes" or "echo"; options: { level, song } (the song's index). */
+    /** "notes" or "echo"; options: { level, song } (a piece from songs.js,
+     *  or one read from a MIDI file). */
     start,
     leave,
     update(dt) {

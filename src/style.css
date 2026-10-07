@@ -1028,6 +1028,22 @@ kbd {
   margin-top: auto;
 }
 
+.gameCard > button.textLink + button {
+  margin-top: 0;
+}
+
+button.textLink,
+button.textLink:hover:not(:disabled) {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--ui-accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* In the salon: the score along the top, a big word mid-screen, a tip. */
 .gameHud {
   position: fixed;

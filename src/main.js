@@ -306,10 +306,13 @@ async function openMidi(file) {
       composer: "Your MIDI file",
       midi: { events, pedal },
     };
-    let option = songSelect.querySelector('option[value="midi"]');
-    if (!option) songSelect.add((option = new Option("", "midi")));
-    option.textContent = `${title} — MIDI`;
-    songSelect.value = "midi";
+    // The file joins the pieces to listen to and to play as Falling notes.
+    for (const select of [songSelect, notesSongSelect]) {
+      let option = select.querySelector('option[value="midi"]');
+      if (!option) select.add((option = new Option("", "midi")));
+      option.textContent = `${title} — MIDI`;
+      select.value = "midi";
+    }
     setPiece(midiPiece);
     setStatus(`Opened ${title}: ${events.length} notes`);
   } catch (error) {
@@ -1146,11 +1149,18 @@ if (import.meta.env.DEV) window.__vgp.games = games;
 const notesSongSelect = document.querySelector("#notesSongSelect");
 for (const piece of SONGS)
   notesSongSelect.add(
-    new Option(`${piece.title} — ${piece.composer.split(" ").at(-1)}`),
+    new Option(
+      `${piece.title} — ${piece.composer.split(" ").at(-1)}`,
+      piece.id,
+    ),
   );
+document.querySelector("#notesMidiBtn").onclick = () => midiFileInput.click();
 document.querySelector("#notesStartBtn").onclick = () =>
   games.start("notes", {
-    song: notesSongSelect.selectedIndex,
+    song:
+      notesSongSelect.value === "midi"
+        ? midiPiece
+        : SONGS.find((piece) => piece.id === notesSongSelect.value),
     level: document.querySelector("#notesLevelSelect").value,
   });
 document.querySelector("#echoStartBtn").onclick = () =>
