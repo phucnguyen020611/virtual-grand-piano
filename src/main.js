@@ -428,8 +428,9 @@ document.querySelector("#programmeList").replaceChildren(
     item.querySelector(".about").textContent = about;
     const play = document.createElement("button");
     play.value = piece.id;
-    play.textContent = "Play";
+    play.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11.5-7z"/></svg>`;
     play.setAttribute("aria-label", `Play ${piece.title}`);
+    play.title = play.getAttribute("aria-label");
     item.append(play);
     return item;
   }),
