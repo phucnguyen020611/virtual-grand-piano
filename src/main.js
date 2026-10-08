@@ -1,7 +1,12 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-import { createMaterials, makeCanvasTexture } from "./piano/materials.js";
+import {
+  createMaterials,
+  makeCanvasTexture,
+  setFinish,
+  FINISHES,
+} from "./piano/materials.js";
 import { DIM, STAGE_YAW, onStage } from "./piano/geometry.js";
 import { createPiano } from "./piano/createPiano.js";
 import { createBench } from "./scene/bench.js";
@@ -1182,6 +1187,29 @@ document.querySelector("#echoStartBtn").onclick = () =>
   games.start("echo", {
     level: document.querySelector("#echoLevelSelect").value,
   });
+
+// The piano's finish (and the bench's), kept for the next visit.
+const finishButtons = document.querySelectorAll(".finishes button");
+function applyFinish(name) {
+  setFinish(mats, name);
+  finishButtons.forEach((button) =>
+    button.setAttribute("aria-pressed", String(button.value === name)),
+  );
+  try {
+    localStorage.setItem("vgp.finish", name);
+  } catch {
+    // Storage blocked: the finish lasts for this visit.
+  }
+}
+finishButtons.forEach((button) => {
+  button.onclick = () => applyFinish(button.value);
+});
+try {
+  const saved = localStorage.getItem("vgp.finish");
+  if (saved in FINISHES) applyFinish(saved);
+} catch {
+  // Storage blocked: concert black.
+}
 
 // The audience: present by default (not at Low), and yours to dismiss.
 const crowdBtn = document.querySelector("#crowdBtn");

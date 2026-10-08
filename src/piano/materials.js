@@ -289,3 +289,119 @@ export function createMaterials(maxAniso) {
     }),
   };
 }
+
+/**
+ * The case's finish (the bench matches): concert black, ivory white, figured
+ * walnut, or gold leaf, all under a polyester clearcoat but the gilding,
+ * which keeps a softer sheen. Changes `blackLacquer` in place, so everything
+ * built from it follows.
+ */
+export const FINISHES = {
+  black: { color: 0x0a0b0d, roughness: 0.2, metalness: 0, clearcoat: 1 },
+  ivory: { color: 0xece4d4, roughness: 0.24, metalness: 0, clearcoat: 1 },
+  walnut: { color: 0xffffff, roughness: 0.26, metalness: 0, clearcoat: 1 },
+  // Not fully metallic: in the dim hall pure metal only shows what it
+  // mirrors; a little diffuse lets the stage light warm the gilding.
+  gold: { color: 0xe2b85a, roughness: 0.3, metalness: 0.75, clearcoat: 0.4 },
+};
+export function setFinish(mats, name) {
+  const finish = FINISHES[name] ?? FINISHES.black;
+  const lacquer = mats.blackLacquer;
+  const map =
+    name === "walnut"
+      ? (mats.burlWalnut ??= createBurlWalnutTexture(mats.maxAniso))
+      : null;
+  if (lacquer.map !== map) {
+    lacquer.map = map;
+    lacquer.needsUpdate = true;
+  }
+  lacquer.color.set(finish.color);
+  lacquer.roughness = finish.roughness;
+  lacquer.metalness = finish.metalness;
+  lacquer.clearcoat = finish.clearcoat;
+}
+
+/**
+ * Burl walnut veneer, as on a fine case: swirling, eyed figure in warm
+ * browns, with no grain direction (the case's faces are mapped every which
+ * way, so straight grain would run wrong on half of them). Domain-warped
+ * value noise, periodic so it tiles without a seam, at a scale of a few
+ * features per hand's breadth (the case's UVs are in scene units).
+ */
+export function createBurlWalnutTexture(maxAniso) {
+  const SIZE = 512;
+  const CELLS = 6; // lattice cells across the tile, at the first octave
+  // Each octave's lattice of random values, wrapped at its period: tiles.
+  const lattices = new Map();
+  const lattice = (period, o) => {
+    const key = period * 100 + o;
+    if (!lattices.has(key)) {
+      const values = new Float32Array(period * period);
+      for (let i = 0; i < values.length; i++) {
+        const h = Math.sin(i * 127.1 + o * 311.7) * 43758.5453;
+        values[i] = h - Math.floor(h);
+      }
+      lattices.set(key, values);
+    }
+    return lattices.get(key);
+  };
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const noise = (x, y, period, o) => {
+    const values = lattice(period, o);
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const fx = smooth(x - ix);
+    const fy = smooth(y - iy);
+    const x0 = ((ix % period) + period) % period;
+    const y0 = ((iy % period) + period) % period;
+    const x1 = (x0 + 1) % period;
+    const y1 = ((y0 + 1) % period) * period;
+    const r0 = y0 * period;
+    const a = values[r0 + x0] + (values[r0 + x1] - values[r0 + x0]) * fx;
+    const b = values[y1 + x0] + (values[y1 + x1] - values[y1 + x0]) * fx;
+    return a + (b - a) * fy;
+  };
+  const fbm = (x, y, seed) => {
+    let sum = 0;
+    let amp = 0.5;
+    for (let o = 0; o < 4; o++) {
+      const k = 2 ** o;
+      sum += amp * noise(x * k, y * k, CELLS * k, o + seed);
+      amp /= 2;
+    }
+    return sum;
+  };
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = SIZE;
+  const g = canvas.getContext("2d");
+  const image = g.createImageData(SIZE, SIZE);
+  const dark = [52, 30, 17];
+  const mid = [112, 70, 40];
+  const light = [168, 112, 64];
+  for (let y = 0; y < SIZE; y++)
+    for (let x = 0; x < SIZE; x++) {
+      const u = (x / SIZE) * CELLS;
+      const v = (y / SIZE) * CELLS;
+      // Warp the coordinates by noise, twice: the swirls of burl.
+      const qx = fbm(u, v, 1);
+      const qy = fbm(u, v, 7);
+      const n = fbm(u + 2.2 * qx, v + 2.2 * qy, 13);
+      // Close contour lines round the warped hills: the figure…
+      const figure = Math.abs(Math.sin(n * 34));
+      // …and the small dark eyes of a burl, where the noise peaks.
+      const eye = Math.max(0, (fbm(u * 3, v * 3, 21) - 0.72) * 5);
+      let t = 0.35 + 0.5 * (n - 0.5) * 2 + 0.25 * figure ** 0.5;
+      t = Math.min(1, Math.max(0, t - eye));
+      const [a, b, k] = t < 0.5 ? [dark, mid, t * 2] : [mid, light, t * 2 - 1];
+      const i = (y * SIZE + x) * 4;
+      for (let c = 0; c < 3; c++) image.data[i + c] = a[c] + (b[c] - a[c]) * k;
+      image.data[i + 3] = 255;
+    }
+  g.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(0.22, 0.22);
+  texture.anisotropy = maxAniso;
+  return texture;
+}

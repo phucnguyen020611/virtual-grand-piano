@@ -142,6 +142,11 @@ const VI = {
   "Whole hall": "Toàn khán phòng",
   "Free cam": "Camera tự do",
   "Reset view": "Đặt lại góc nhìn",
+  "Piano finish": "Lớp sơn đàn",
+  Black: "Đen bóng",
+  Ivory: "Trắng ngà",
+  Walnut: "Gỗ óc chó",
+  "Gold leaf": "Dát vàng",
   "↑ ↓ walk, ← → turn. Hold Shift with ↑ ↓ to rise and descend (or PageUp / PageDown), with ← → to step sideways. Drag to look around.":
     "↑ ↓ để đi, ← → để xoay. Giữ Shift cùng ↑ ↓ để lên xuống (hoặc PageUp / PageDown), cùng ← → để bước sang ngang. Kéo để nhìn quanh.",
 
