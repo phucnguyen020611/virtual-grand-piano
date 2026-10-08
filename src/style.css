@@ -358,6 +358,7 @@ canvas {
 /* A label stays on one line: a row of buttons wraps between buttons, never
    inside one, and the dock's tabs share the width by their words. */
 .hud button,
+.gameBar button,
 .dockTab span {
   white-space: nowrap;
 }
@@ -1629,7 +1630,7 @@ button.textLink:hover:not(:disabled) {
     visibility 700ms ease;
 }
 
-:is(.cinema, .entering, .foyer, .game)
+:is(.cinema, .entering, .foyer, .game, .hunt)
   :is(.topbar, .hud, .inspector, .helpPanel, .label3d) {
   opacity: 0;
   visibility: hidden;
@@ -1706,4 +1707,132 @@ button.textLink:hover:not(:disabled) {
 }
 .finishes [value="gold"] {
   --swatch: radial-gradient(circle at 35% 30%, #fff1b8, #c99a3c 65%);
+}
+
+/* The treasure hunt: a slot per composer, gilded once their keepsake is
+   found; the clue sits at the foot of the screen, where the dock was. */
+.huntSlots {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  justify-content: center;
+}
+
+.huntSlot {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+  color: var(--ui-muted);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.huntSlot.found {
+  border-color: transparent;
+  background: radial-gradient(circle at 35% 30%, #fff1b8, #c99a3c 70%);
+  color: #2a1d08;
+}
+
+.huntProgress {
+  color: var(--ui-accent-strong) !important;
+  font-weight: 600;
+}
+
+#huntFoundTitle {
+  font-size: 36px;
+  text-wrap: balance;
+}
+
+.huntFact {
+  margin: 0 0 18px;
+  font-size: 16px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.huntHud .gameTip {
+  max-width: min(640px, calc(100vw - 24px));
+  border-radius: 14px;
+  white-space: normal;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.huntTip p {
+  margin: 0;
+}
+
+.huntHow {
+  margin-top: 4px !important;
+  color: var(--ui-muted);
+  font-size: 13px;
+}
+
+/* Mouse and keys, or a touch screen's stick: one way or the other. */
+.howTouch,
+.walkStick {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .howMouse {
+    display: none;
+  }
+
+  .howTouch {
+    display: block;
+  }
+
+  .walkStick {
+    position: absolute;
+    bottom: max(24px, env(safe-area-inset-bottom));
+    left: 24px;
+    display: grid;
+    width: 112px;
+    height: 112px;
+    place-items: center;
+    border: 1px solid var(--ui-border);
+    border-radius: 50%;
+    background: rgba(14, 11, 8, 0.45);
+    pointer-events: auto;
+    touch-action: none;
+  }
+
+  .walkStick i {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff1b8, #c99a3c 70%);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  }
+
+  /* The clue above the stick. */
+  .huntHud .gameTip {
+    bottom: 152px;
+  }
+}
+
+@media (max-width: 560px) {
+  .huntHud .gameBar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .huntSlots {
+    display: none;
+  }
+
+  .huntHud .gameBar button {
+    flex: 1;
+  }
+
+  /* No keys to keep clear here: the clue goes back to the foot (above
+     the stick on a touch screen). */
+  .huntHud .gameTip {
+    top: auto;
+  }
 }

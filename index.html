@@ -291,7 +291,8 @@
         >
           <h2 class="panelTitle" id="panelGamesTitle">Games</h2>
           <p class="panelHint">
-            Played in the music salon next door. Esc brings you back.
+            Games about the piano, in the salon and round the hall. Esc brings
+            you back.
           </p>
           <div class="gameCards">
             <article class="gameCard">
@@ -329,6 +330,15 @@
                 </select>
               </div>
               <button id="echoStartBtn" class="gold">Play Echo</button>
+            </article>
+            <article class="gameCard">
+              <h3>Composers' treasures</h3>
+              <p>
+                Eight great composers each left a keepsake somewhere in the hall
+                and the salon. Can you find them all?
+              </p>
+              <p class="huntProgress" id="huntProgress">0 of 8 found</p>
+              <button id="huntStartBtn" class="gold">Start the hunt</button>
             </article>
           </div>
         </section>
@@ -456,6 +466,47 @@
       <div class="controlRow gameResultsActions">
         <button id="gameAgainBtn" class="gold">Play again</button>
         <button id="gameBackBtn">Back to the hall</button>
+      </div>
+    </dialog>
+
+    <!-- The treasure hunt: found so far, a slot per composer, the way; the
+         clue for the next keepsake below; its story when it is found. -->
+    <section
+      id="huntHud"
+      class="gameHud huntHud"
+      aria-label="Treasure hunt"
+      hidden
+    >
+      <div class="gameBar">
+        <div class="gameStat">
+          <span class="groupLabel">Found</span>
+          <b id="huntCount" aria-live="polite">0 / 8</b>
+        </div>
+        <div id="huntSlots" class="huntSlots" aria-hidden="true"></div>
+        <button id="huntHintBtn">Show me</button>
+        <button id="huntRoomBtn">Go to the salon</button>
+        <button id="huntExitBtn">Leave hunt (Esc)</button>
+      </div>
+      <div class="gameTip huntTip">
+        <p id="huntClue" aria-live="polite"></p>
+        <p class="huntHow howMouse">
+          W A S D or the arrow keys to walk, Shift to hurry, drag to look about.
+          Go up close to a treasure and click it.
+        </p>
+        <p class="huntHow howTouch">
+          The stick walks, a drag looks about. Go up close to a treasure and tap
+          it.
+        </p>
+      </div>
+      <div id="walkStick" class="walkStick" aria-hidden="true"><i></i></div>
+    </section>
+
+    <dialog id="huntFound" class="gameResults" aria-labelledby="huntFoundTitle">
+      <p class="eyebrow" id="huntFoundComposer"></p>
+      <h2 id="huntFoundTitle"></h2>
+      <p id="huntFoundFact" class="huntFact"></p>
+      <div class="controlRow gameResultsActions">
+        <button id="huntOnBtn" class="gold">Keep looking</button>
       </div>
     </dialog>
 

@@ -380,6 +380,19 @@ export function buildSalon(scene, room) {
       light.intensity = 380;
       fire.intensity = 40;
     },
+    /** Keep a point inside the room's walls, floor and ceiling. */
+    keepInside(v, margin = 1) {
+      v.x = THREE.MathUtils.clamp(v.x, X0 + margin, X1 - margin);
+      v.z = THREE.MathUtils.clamp(v.z, -Z + margin, Z - margin);
+      v.y = THREE.MathUtils.clamp(v.y, F + margin * 0.6, F + HEIGHT - margin);
+      return v;
+    },
+    /** Walking: the floor at (x, z), or none at a wall or the hearth. */
+    floorsAt(x, z) {
+      if (x < X0 + 0.8 || x > X1 - 0.8 || Math.abs(z) > Z - 0.8) return [];
+      if (x > X1 - 2.8 && Math.abs(z) < 5.2) return []; // the chimneypiece
+      return [F];
+    },
     /** The fire flickers. */
     update(dt) {
       if (!group.visible) return;

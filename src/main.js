@@ -26,6 +26,7 @@ import { createInspection } from "./interaction/inspection.js";
 import { createCinematic } from "./interaction/cinematic.js";
 import { createEntrance } from "./interaction/entrance.js";
 import { createGames } from "./interaction/games.js";
+import { createHunt } from "./interaction/hunt.js";
 import { language } from "./i18n.js";
 import {
   createExplodedView,
@@ -450,7 +451,7 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
   seatDown = [event.clientX, event.clientY];
 });
 renderer.domElement.addEventListener("click", (event) => {
-  if (!seatDown) return;
+  if (!seatDown || hunt.active) return; // in the hunt a click collects
   const moved = Math.hypot(
     event.clientX - seatDown[0],
     event.clientY - seatDown[1],
@@ -655,7 +656,8 @@ textSizeBtn.onclick = () =>
 
 const computerKeyboard = createComputerKeyboard({
   controller: pianoPerformance,
-  isEnabled: () => audioGate.classList.contains("hidden"),
+  // (In the hunt the letters walk, not play.)
+  isEnabled: () => audioGate.classList.contains("hidden") && !hunt.active,
   arrowsShiftOctave: () => !freeCam.on,
   onRangeChange: ({ minMidi, maxMidi, canShiftDown, canShiftUp }) => {
     octaveLabel.textContent = `${midiToNoteName(minMidi)}–${midiToNoteName(maxMidi)}`;
@@ -1131,6 +1133,20 @@ creditsBtn.onclick = () => {
   flyTo(hall.views.projection.position, hall.views.projection.target, 2);
 };
 // --- Games in the music salon (see games.js) -------------------------------
+/** Before a game: the music stopped, the panels shut, the piano assembled. */
+function clearStage() {
+  prepareAudio();
+  if (autoplay) stopAutoplay();
+  cinematic.stop();
+  if (credits) {
+    setCredits(false);
+    hall.showComposer(null);
+  }
+  if (freeCam.on) freeCamBtn.click();
+  if (explodedView.exploded) setExplodedMode(false);
+  closePanels();
+  flight.t = 1;
+}
 const games = createGames({
   camera,
   controls,
@@ -1146,18 +1162,8 @@ const games = createGames({
       .find((key) => key.userData.midi === midi)
       .getWorldPosition(new THREE.Vector3()),
   onEnter() {
-    prepareAudio();
-    if (autoplay) stopAutoplay();
-    cinematic.stop();
-    if (credits) {
-      setCredits(false);
-      hall.showComposer(null);
-    }
-    if (freeCam.on) freeCamBtn.click();
-    if (explodedView.exploded) setExplodedMode(false);
+    clearStage();
     if (!fallboardOpen) fallBtn.click();
-    closePanels();
-    flight.t = 1;
   },
   onLeave() {
     camera.zoom = Math.min(1, camera.aspect / 1.6);
@@ -1166,7 +1172,22 @@ const games = createGames({
     renderer.domElement.focus({ preventScroll: true });
   },
 });
-if (import.meta.env.DEV) window.__vgp.games = games;
+// The treasure hunt, about the hall and the salon (see hunt.js).
+const hunt = createHunt({
+  camera,
+  controls,
+  canvas: renderer.domElement,
+  hall,
+  audio,
+  obstacles: [piano.group, bench], // not to be walked through
+  onEnter: clearStage,
+  onLeave() {
+    document.querySelector("#resetBtn").click();
+    renderer.domElement.focus({ preventScroll: true });
+  },
+});
+document.querySelector("#huntStartBtn").onclick = () => hunt.start();
+if (import.meta.env.DEV) Object.assign(window.__vgp, { games, hunt });
 const notesSongSelect = document.querySelector("#notesSongSelect");
 for (const piece of SONGS)
   notesSongSelect.add(
@@ -1402,6 +1423,7 @@ function updateHouse() {
   const chatter =
     hall.audience.visible &&
     !games.active &&
+    hunt.room === "hall" &&
     !autoplay &&
     !document.hidden &&
     now < chatterUntil &&
@@ -1427,6 +1449,7 @@ function animate(timestamp) {
   cinematic.update(dt, reducedMotion.matches);
   entrance.update(dt);
   games.update(dt);
+  hunt.update(dt);
 
   explodedView.update(dt, reducedMotion.matches);
   hall.update(reducedMotion.matches ? 100 : dt);

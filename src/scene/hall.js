@@ -904,8 +904,10 @@ export function createHall(scene, mats) {
   return {
     group: hall,
     stageTopY: STAGE_TOP,
-    /** Keep a point inside the room and above whichever floor lies below. */
+    /** Keep a point inside the room and above whichever floor lies below
+     *  (inside the salon's walls while it stands round the piano). */
     keepInside(v, margin = 1) {
+      if (salon.visible) return salon.keepInside(v, margin);
       v.x = THREE.MathUtils.clamp(
         v.x,
         -HALL_HALF_WIDTH + margin,
@@ -1007,6 +1009,42 @@ export function createHall(scene, mats) {
     /** Project the playing song's composer on the rear wall (null: none). */
     showComposer: projection.show,
     rollCredits: projection.rollCredits,
+    /**
+     * Walking (the treasure hunt): the floors one could stand on at (x, z),
+     * lowest first, or none where a wall, a seat (and whoever sits in it) or
+     * the organ's console stands. The stalls' tiers, the stage, the steps up
+     * to it, the stairs along the rear wall and, beside the balconies' rails,
+     * their decks over the side aisles. In the salon, the salon's.
+     */
+    floorsAt(x, z) {
+      if (salon.visible) return salon.floorsAt(x, z);
+      const ax = Math.abs(x);
+      if (
+        ax > HALL_HALF_WIDTH - 0.8 ||
+        z > HALL_BACK_Z - 0.8 ||
+        z < STAGE_BACK_Z + 4
+      )
+        return [];
+      for (const [sx, , sz] of seats)
+        if ((x - sx) ** 2 + (z - sz) ** 2 < 2.25) return [];
+      let ground;
+      if (z < STAGE_FRONT_Z) ground = STAGE_TOP;
+      else if (ax < stairHalf && z < stairZ(0)) {
+        const step = STEPS - Math.ceil((z - stairFront) / stepRun);
+        ground = STALLS_BASE + THREE.MathUtils.clamp(step, 0, STEPS) * stepRise;
+      } else ground = stallsY(z, x);
+      // The balcony stairs (see passages.js): 20 steps of 1.05 from the
+      // floor at |x| = 7 up to the deck at the rail.
+      const rail = HALL_HALF_WIDTH - 6;
+      const deck = BALCONY_Y + 0.5;
+      if (z > HALL_BACK_Z - LANDING && ax > rail - 21 && ax < rail) {
+        const step = 21 - Math.ceil((rail - ax) / 1.05);
+        ground = tierY(ROWS - 1) + (step * (deck - tierY(ROWS - 1))) / 20;
+      }
+      return ax >= rail && z >= 16 ? [ground, deck] : [ground];
+    },
+    /** The rooms, to set things in. */
+    rooms: { hall, salon: salon.group },
     /** Which room shows round the piano: "hall" or "salon". */
     setRoom(name) {
       hall.visible = name === "hall";

@@ -174,8 +174,8 @@ const VI = {
   "Graphics: Ultra": "Đồ họa: Tối đa",
 
   // Games
-  "Played in the music salon next door. Esc brings you back.":
-    "Chơi trong phòng nhạc bên cạnh. Bấm Esc để quay lại.",
+  "Games about the piano, in the salon and round the hall. Esc brings you back.":
+    "Trò chơi về cây đàn, trong phòng salon và quanh khán phòng. Bấm Esc để quay lại.",
   "Falling notes": "Nốt rơi",
   "Press each key just as its light lands on it.":
     "Bấm mỗi phím đúng lúc vệt sáng chạm vào nó.",
@@ -225,6 +225,86 @@ const VI = {
   "Bravo!": "Hoan hô!",
   "Magnificent!": "Xuất sắc!",
   "Play again": "Chơi lại",
+  // The treasure hunt
+  "Composers' treasures": "Báu vật nhà soạn nhạc",
+  "Eight great composers each left a keepsake somewhere in the hall and the salon. Can you find them all?":
+    "Tám nhà soạn nhạc lừng danh, mỗi người để quên một kỷ vật đâu đó trong khán phòng và phòng salon. Bạn tìm được hết không?",
+  "Start the hunt": "Bắt đầu tìm",
+  "Carry on the hunt": "Tìm tiếp",
+  "Hide them again": "Giấu lại từ đầu",
+  "Treasure hunt": "Tìm báu vật",
+  Found: "Đã tìm",
+  "Show me": "Chỉ đường",
+  "Go to the salon": "Sang phòng salon",
+  "Leave hunt (Esc)": "Thôi tìm (Esc)",
+  "Keep looking": "Tìm tiếp",
+  "W A S D or the arrow keys to walk, Shift to hurry, drag to look about. Go up close to a treasure and click it.":
+    "W A S D hoặc phím mũi tên để đi, Shift để đi nhanh, kéo chuột để nhìn quanh. Lại gần báu vật rồi bấm vào nó.",
+  "The stick walks, a drag looks about. Go up close to a treasure and tap it.":
+    "Cần điều khiển để đi, vuốt màn hình để nhìn quanh. Lại gần báu vật rồi chạm vào nó.",
+  "Come closer to pick it up.": "Lại gần hơn để nhặt nhé.",
+  // What to look for…
+  "someone left a cup of coffee.": "có ai để quên tách cà phê.",
+  "something is ticking.": "có thứ gì đang tích tắc.",
+  "a pair of white gloves was dropped.": "có đôi găng tay trắng bị đánh rơi.",
+  "a flute waits for its player.": "một cây sáo đang chờ người thổi.",
+  "a horn for listening lies forgotten.": "một chiếc tù và để nghe bị bỏ quên.",
+  "a little dog sits quietly.": "một chú chó nhỏ ngồi im.",
+  "the moon came down to rest.": "vầng trăng đã xuống nghỉ.",
+  "someone has lost their glasses.": "ai đó làm rơi cặp kính.",
+  // …and where.
+  "On the gilded ledge below the organ pipes, on the left:":
+    "Trên gờ mạ vàng dưới dàn ống organ, phía bên trái:",
+  "On the gilded ledge below the organ pipes, on the right:":
+    "Trên gờ mạ vàng dưới dàn ống organ, phía bên phải:",
+  "On the steps up to the stage:": "Trên bậc thang lên sân khấu:",
+  "At the front of the stage, on the left:": "Ở mép trước sân khấu, bên trái:",
+  "At the back of the stage, on the right:": "Ở phía sau sân khấu, bên phải:",
+  "In front of the first row, on the left:": "Trước hàng ghế đầu, bên trái:",
+  "At the very back of the centre aisle, by the doors:":
+    "Cuối lối đi giữa, sát cửa ra vào:",
+  "Along the left wall, under the balcony:":
+    "Dọc tường bên trái, dưới ban công:",
+  "Along the right wall, under the balcony:":
+    "Dọc tường bên phải, dưới ban công:",
+  "Up the stairs at the back, on the left balcony:":
+    "Lên cầu thang cuối khán phòng, trên ban công bên trái:",
+  "Up the stairs at the back, on the right balcony:":
+    "Lên cầu thang cuối khán phòng, trên ban công bên phải:",
+  "In the salon, up on the mantelpiece:": "Trong phòng salon, trên bệ lò sưởi:",
+  "In the salon, under the window nearer the fire:":
+    "Trong phòng salon, dưới ô cửa sổ gần lò sưởi:",
+  "In the salon, under the window farther from the fire:":
+    "Trong phòng salon, dưới ô cửa sổ xa lò sưởi:",
+  "In the salon, in the corner behind the pianist:":
+    "Trong phòng salon, ở góc phòng sau lưng người chơi đàn:",
+  "In the salon, on the floor beside the fireplace:":
+    "Trong phòng salon, trên sàn cạnh lò sưởi:",
+  "You found every treasure. Bravo!": "Bạn đã tìm thấy mọi báu vật. Hoan hô!",
+  "Bach's coffee cup": "Tách cà phê của Bach",
+  "Haydn's pocket watch": "Đồng hồ bỏ túi của Haydn",
+  "Liszt's white gloves": "Đôi găng trắng của Liszt",
+  "Mozart's magic flute": "Cây sáo thần của Mozart",
+  "Beethoven's ear trumpet": "Tù và trợ thính của Beethoven",
+  "Chopin's little dog": "Chú chó nhỏ của Chopin",
+  "Debussy's moon": "Vầng trăng của Debussy",
+  "Schubert's spectacles": "Cặp kính của Schubert",
+  "Bach loved coffee so much that he wrote a little comic opera about it, the Coffee Cantata, around 1734.":
+    "Bach mê cà phê đến mức viết hẳn một vở nhạc kịch hài nhỏ về nó, bản Cantata Cà phê, khoảng năm 1734.",
+  "Haydn's Symphony No. 101 is nicknamed The Clock, for the steady tick-tock that runs through its slow movement.":
+    "Giao hưởng số 101 của Haydn có biệt danh Đồng hồ, vì tiếng tích tắc đều đặn chạy suốt chương chậm.",
+  "It is told that Liszt peeled off his white gloves and dropped them on the floor before he played, and admirers rushed to keep them.":
+    "Người ta kể Liszt thường tháo đôi găng trắng thả xuống sàn trước khi chơi đàn, và người hâm mộ tranh nhau giữ lấy.",
+  "Mozart's last opera, The Magic Flute (1791), is about a flute that turns danger into dance.":
+    "Vở opera cuối cùng của Mozart, Cây sáo thần (1791), kể về cây sáo biến hiểm nguy thành điệu múa.",
+  "As he grew deaf, Beethoven used ear trumpets made by Johann Mälzel, who also made the metronome, and he kept on composing.":
+    "Khi tai dần điếc, Beethoven dùng tù và trợ thính do Johann Mälzel, người làm ra máy đếm nhịp, chế tạo, và ông vẫn tiếp tục sáng tác.",
+  "Chopin's Minute Waltz is also called the Waltz of the Little Dog: George Sand's dog, chasing its own tail.":
+    "Điệu Valse Một phút của Chopin còn gọi là Valse Chú chó nhỏ: chú chó của George Sand đuổi theo cái đuôi của mình.",
+  "Clair de lune, moonlight, is the best-loved piece of Debussy's Suite bergamasque.":
+    "Clair de lune, Ánh trăng, là khúc được yêu thích nhất trong tổ khúc Suite bergamasque của Debussy.",
+  "Schubert is said to have slept with his glasses on, so he could start writing music the moment he woke.":
+    "Người ta kể Schubert ngủ mà vẫn đeo kính, để vừa thức dậy là viết nhạc được ngay.",
   "Back to the hall": "Về khán phòng",
 
   // Help
@@ -350,6 +430,7 @@ const PATTERNS = [
     "Phím của bạn: $1 — hoặc chạm vào các phím sáng lên.",
   ],
   [/^(\d+) notes$/, "$1 nốt"],
+  [/^(\d+) of (\d+) found$/, "Đã tìm $1/$2"],
   [/^(\d) of 3 stars$/, "$1 trên 3 sao"],
   [/^Zoom to (.+)$/, (_, part) => `Phóng tới ${VI[part] ?? part}`],
   [/^([A-G]#?-?\d) key$/, "Phím $1"],
