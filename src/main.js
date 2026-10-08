@@ -9,6 +9,7 @@ import {
 } from "./piano/materials.js";
 import { DIM, STAGE_YAW, onStage } from "./piano/geometry.js";
 import { createPiano } from "./piano/createPiano.js";
+import { createKeyLabels } from "./piano/keyLabels.js";
 import { createBench } from "./scene/bench.js";
 import { createHall } from "./scene/hall.js";
 import { createReflectionEnvironment } from "./scene/environment.js";
@@ -179,6 +180,7 @@ const hall = createHall(scene, mats);
 const { stageTopY } = hall;
 const bench = createBench(mats, stageTopY);
 const piano = createPiano(mats, stageTopY);
+const keyLabels = createKeyLabels(piano);
 // Side-on to the audience, as at a recital (see STAGE_YAW).
 const stageSet = new THREE.Group();
 stageSet.name = "stage-set";
@@ -661,6 +663,7 @@ const computerKeyboard = createComputerKeyboard({
   isEnabled: () => audioGate.classList.contains("hidden") && !hunt.active,
   arrowsShiftOctave: () => !freeCam.on,
   onRangeChange: ({ minMidi, maxMidi, canShiftDown, canShiftUp }) => {
+    keyLabels.setRange(minMidi);
     octaveLabel.textContent = `${midiToNoteName(minMidi)}–${midiToNoteName(maxMidi)}`;
     octaveDownBtn.disabled = !canShiftDown;
     octaveUpBtn.disabled = !canShiftUp;
@@ -1210,6 +1213,24 @@ document.querySelector("#echoStartBtn").onclick = () =>
   games.start("echo", {
     level: document.querySelector("#echoLevelSelect").value,
   });
+
+// The computer keys printed on the piano's keys: a hint, kept.
+const keyLabelsBtn = document.querySelector("#keyLabelsBtn");
+function showKeyLabels(on) {
+  keyLabels.setVisible(on);
+  keyLabelsBtn.setAttribute("aria-pressed", String(on));
+  try {
+    localStorage.setItem("vgp.keyLabels", on ? "1" : "0");
+  } catch {
+    // Storage blocked: the choice lasts for this visit.
+  }
+}
+keyLabelsBtn.onclick = () => showKeyLabels(!keyLabels.visible);
+try {
+  if (localStorage.getItem("vgp.keyLabels") === "1") showKeyLabels(true);
+} catch {
+  // Storage blocked: no labels.
+}
 
 // The piano's finish (and the bench's), kept for the next visit.
 const finishButtons = document.querySelectorAll(".finishes button");

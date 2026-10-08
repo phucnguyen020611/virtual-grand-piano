@@ -27,6 +27,9 @@ const VI = {
   "Retry piano": "Thử lại",
   Ready: "Sẵn sàng",
   "Larger text and buttons": "Chữ và nút lớn hơn",
+  "Key letters": "Chữ trên phím",
+  "Show the computer keys on the piano keys":
+    "Hiện phím máy tính tương ứng trên phím đàn",
   "Hide HUD": "Ẩn menu",
   "Show HUD": "Hiện menu",
   "Piano controls": "Điều khiển đàn",

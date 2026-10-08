@@ -49,10 +49,11 @@ export function keyLabel(offset) {
   const code = [...NOTE_CODES].filter(([, o]) => o === offset).at(-1)?.[0];
   return code && (CODE_LABELS[code] ?? code.replace(/^(Key|Digit)/, ""));
 }
+export const KEY_SPAN = Math.max(...NOTE_CODES.values()); // offsets 0…
 
 const MIN_MIDI = 21;
 const MAX_MIDI = 108;
-const MAX_OFFSET = Math.max(...NOTE_CODES.values());
+const MAX_OFFSET = KEY_SPAN;
 
 export function isPerformanceTextTarget(target) {
   if (!(target instanceof Element)) return false;

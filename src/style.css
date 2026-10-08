@@ -1688,7 +1688,19 @@ button.textLink:hover:not(:disabled) {
   }
 }
 
+/* The key letters toggle: a keyboard and its name. */
+#keyLabelsBtn svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
 /* The language switch: a globe and the other language's own name. */
+#keyLabelsBtn,
 .langBtn {
   display: inline-flex;
   align-items: center;
@@ -1714,7 +1726,7 @@ button.textLink:hover:not(:disabled) {
 }
 
 @media (max-width: 600px) {
-  .topbar .langBtn span {
+  .topbar :is(.langBtn, #keyLabelsBtn) span {
     display: none;
   }
 }
@@ -1880,5 +1892,21 @@ button.textLink:hover:not(:disabled) {
      the stick on a touch screen). */
   .huntHud .gameTip {
     top: auto;
+  }
+}
+
+/* The narrowest phones: the status keeps speaking but leaves the title
+   its room. */
+@media (max-width: 360px) {
+  .title {
+    font-size: 24px;
+  }
+
+  .topbar .status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 }
