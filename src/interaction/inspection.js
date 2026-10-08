@@ -121,7 +121,8 @@ export function createInspection(
       const source = child.material;
       const materials = Array.isArray(source) ? source : [source];
       const highlighted = materials.map((material) => {
-        if (!material) return material;
+        // (A painted case keeps its own shader: a plain clone would lose it.)
+        if (!material || material.userData.painted) return material;
         let clone = temporaryMaterials.get(material);
         if (!clone) {
           clone = material.clone();

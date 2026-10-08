@@ -1676,7 +1676,7 @@ button.textLink:hover:not(:disabled) {
     visibility 700ms ease;
 }
 
-:is(.cinema, .entering, .foyer, .game, .hunt)
+:is(.cinema, .entering, .foyer, .game, .hunt, .painting)
   :is(.topbar, .hud, .inspector, .helpPanel, .label3d) {
   opacity: 0;
   visibility: hidden;
@@ -1765,6 +1765,97 @@ button.textLink:hover:not(:disabled) {
 }
 .finishes [value="gold"] {
   --swatch: radial-gradient(circle at 35% 30%, #fff1b8, #c99a3c 65%);
+}
+.finishes [value="custom"] {
+  --swatch: conic-gradient(
+    #c0392b,
+    #f1c40f,
+    #27ae60,
+    #2e6fd8,
+    #8e44ad,
+    #c0392b
+  );
+}
+
+/* Painting the piano: round colour wells, brush sizes as dots. */
+.paintBar {
+  flex-wrap: wrap;
+  justify-content: center;
+  width: min(1000px, calc(100vw - 24px));
+  gap: 10px;
+  padding: 8px 10px;
+}
+
+.paintColours,
+.paintSizes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.paintColour,
+.paintPick {
+  width: 36px;
+  min-height: 0;
+  height: 36px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  padding: 0;
+  background: var(--c);
+}
+
+.paintColour:hover:not(:disabled) {
+  background: var(--c);
+  transform: scale(1.08);
+}
+
+.paintColour[aria-pressed="true"] {
+  border-color: var(--ui-accent-strong);
+  background: var(--c);
+  box-shadow: 0 0 0 3px rgba(215, 185, 120, 0.35);
+}
+
+.paintPick {
+  position: relative;
+  overflow: hidden;
+  background: conic-gradient(
+    #c0392b,
+    #f1c40f,
+    #27ae60,
+    #2e6fd8,
+    #8e44ad,
+    #c0392b
+  );
+  cursor: pointer;
+}
+
+.paintPick input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.paintSize {
+  display: grid;
+  width: 44px;
+  place-items: center;
+  padding: 0;
+}
+
+.paintSize i {
+  width: var(--d);
+  height: var(--d);
+  border-radius: 50%;
+  background: currentColor;
+}
+
+@media (pointer: coarse) {
+  .paintColour,
+  .paintPick {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 /* The treasure hunt: a slot per composer, gilded once their keepsake is

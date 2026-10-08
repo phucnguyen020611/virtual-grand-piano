@@ -10,6 +10,7 @@ import {
 import { DIM, STAGE_YAW, onStage } from "./piano/geometry.js";
 import { createPiano } from "./piano/createPiano.js";
 import { createKeyLabels } from "./piano/keyLabels.js";
+import { createPaint } from "./piano/paint.js";
 import { createBench } from "./scene/bench.js";
 import { createHall } from "./scene/hall.js";
 import { createReflectionEnvironment } from "./scene/environment.js";
@@ -253,6 +254,15 @@ const inspection = createInspection(
   controls,
 );
 inspection.addPickable(bench);
+// Paint your own piano (see paint.js), after the inspection so its cursor
+// wins while painting.
+const paint = createPaint({
+  lacquer: mats.blackLacquer,
+  root: stageSet,
+  camera,
+  canvas: renderer.domElement,
+  controls,
+});
 const explodedView = createExplodedView({ piano, camera, controls });
 if (import.meta.env.DEV) window.__vgp.explodedView = explodedView;
 
@@ -454,7 +464,7 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
   seatDown = [event.clientX, event.clientY];
 });
 renderer.domElement.addEventListener("click", (event) => {
-  if (!seatDown || hunt.active) return; // in the hunt a click collects
+  if (!seatDown || hunt.active || paint.active) return; // collect, or paint
   const moved = Math.hypot(
     event.clientX - seatDown[0],
     event.clientY - seatDown[1],
@@ -1140,6 +1150,7 @@ creditsBtn.onclick = () => {
 /** Before a game: the music stopped, the panels shut, the piano assembled. */
 function clearStage() {
   prepareAudio();
+  if (document.body.classList.contains("painting")) stopPainting();
   if (autoplay) stopAutoplay();
   cinematic.stop();
   if (credits) {
@@ -1232,10 +1243,12 @@ try {
   // Storage blocked: no labels.
 }
 
-// The piano's finish (and the bench's), kept for the next visit.
+// The piano's finish (and the bench's), kept for the next visit: one of
+// the four, or the visitor's own painting on white.
 const finishButtons = document.querySelectorAll(".finishes button");
 function applyFinish(name) {
-  setFinish(mats, name);
+  paint.wear(name === "custom");
+  if (name !== "custom") setFinish(mats, name);
   finishButtons.forEach((button) =>
     button.setAttribute("aria-pressed", String(button.value === name)),
   );
@@ -1246,14 +1259,88 @@ function applyFinish(name) {
   }
 }
 finishButtons.forEach((button) => {
-  button.onclick = () => applyFinish(button.value);
+  button.onclick = () => {
+    applyFinish(button.value);
+    if (button.value === "custom") startPainting();
+  };
 });
 try {
   const saved = localStorage.getItem("vgp.finish");
-  if (saved in FINISHES) applyFinish(saved);
+  if (saved in FINISHES || saved === "custom") applyFinish(saved);
 } catch {
   // Storage blocked: concert black.
 }
+
+// The painting tools: a bar along the top while painting, the piano turned
+// three-quarters toward the painter.
+const paintHud = document.querySelector("#paintHud");
+function startPainting() {
+  closePanels();
+  document.body.classList.add("painting");
+  paintHud.hidden = false;
+  paint.setActive(true);
+  setPaintMove(false);
+  flyTo(new THREE.Vector3(-9, 12.5, 9.5), new THREE.Vector3(1, 3, 0));
+}
+function stopPainting() {
+  paint.setActive(false);
+  document.body.classList.remove("painting");
+  paintHud.hidden = true;
+  renderer.domElement.focus({ preventScroll: true });
+}
+const paintColours = paintHud.querySelectorAll(".paintColour");
+function pickColour(value) {
+  paint.setColour(value);
+  paintColours.forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.value === value)),
+  );
+  document
+    .querySelector("#paintEraseBtn")
+    .setAttribute("aria-pressed", "false");
+}
+paintColours.forEach((b) => (b.onclick = () => pickColour(b.value)));
+const paintPick = document.querySelector("#paintPick");
+paintPick.oninput = () => pickColour(paintPick.value);
+paintHud.querySelectorAll(".paintSize").forEach((b) => {
+  b.onclick = () => {
+    paint.setSize(Number(b.value));
+    paintHud
+      .querySelectorAll(".paintSize")
+      .forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+  };
+});
+document.querySelector("#paintEraseBtn").onclick = (event) => {
+  const on = event.currentTarget.getAttribute("aria-pressed") !== "true";
+  paint.setErasing(on);
+  event.currentTarget.setAttribute("aria-pressed", String(on));
+};
+/** Look about with a drag (the brush put down), or paint again. */
+function setPaintMove(on) {
+  paint.setActive(!on);
+  document
+    .querySelector("#paintMoveBtn")
+    .setAttribute("aria-pressed", String(on));
+}
+document.querySelector("#paintMoveBtn").onclick = () =>
+  setPaintMove(paint.active);
+// Starting over asks first, in the house style.
+const paintClear = document.querySelector("#paintClear");
+document.querySelector("#paintClearBtn").onclick = () => {
+  paintClear.returnValue = "";
+  paintClear.showModal();
+};
+paintClear.addEventListener("close", () => {
+  if (paintClear.returnValue === "clear") paint.clear();
+});
+document.querySelector("#paintDoneBtn").onclick = stopPainting;
+addEventListener("keydown", (event) => {
+  if (
+    event.key === "Escape" &&
+    document.body.classList.contains("painting") &&
+    !paintClear.open
+  )
+    stopPainting();
+});
 
 // The audience: present by default (not at Low), and yours to dismiss.
 const crowdBtn = document.querySelector("#crowdBtn");

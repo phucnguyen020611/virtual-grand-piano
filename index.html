@@ -248,6 +248,9 @@
               <button value="ivory" aria-pressed="false">Ivory</button>
               <button value="walnut" aria-pressed="false">Walnut</button>
               <button value="gold" aria-pressed="false">Gold leaf</button>
+              <button value="custom" aria-pressed="false">
+                Paint your own
+              </button>
             </div>
           </div>
         </section>
@@ -514,6 +517,136 @@
       </div>
       <div id="walkStick" class="walkStick" aria-hidden="true"><i></i></div>
     </section>
+
+    <!-- Painting the piano: colours, brush sizes, the eraser, looking about,
+         starting over and done; how to below. -->
+    <section
+      id="paintHud"
+      class="gameHud paintHud"
+      aria-label="Paint the piano"
+      hidden
+    >
+      <div class="gameBar paintBar">
+        <div class="paintColours" role="group" aria-label="Colour">
+          <button
+            class="paintColour"
+            value="#c0392b"
+            style="--c: #c0392b"
+            aria-label="Red"
+            aria-pressed="true"
+          ></button>
+          <button
+            class="paintColour"
+            value="#e67e22"
+            style="--c: #e67e22"
+            aria-label="Orange"
+            aria-pressed="false"
+          ></button>
+          <button
+            class="paintColour"
+            value="#f1c40f"
+            style="--c: #f1c40f"
+            aria-label="Yellow"
+            aria-pressed="false"
+          ></button>
+          <button
+            class="paintColour"
+            value="#27ae60"
+            style="--c: #27ae60"
+            aria-label="Green"
+            aria-pressed="false"
+          ></button>
+          <button
+            class="paintColour"
+            value="#2e6fd8"
+            style="--c: #2e6fd8"
+            aria-label="Blue"
+            aria-pressed="false"
+          ></button>
+          <button
+            class="paintColour"
+            value="#8e44ad"
+            style="--c: #8e44ad"
+            aria-label="Purple"
+            aria-pressed="false"
+          ></button>
+          <button
+            class="paintColour"
+            value="#e86fa4"
+            style="--c: #e86fa4"
+            aria-label="Pink"
+            aria-pressed="false"
+          ></button>
+          <button
+            class="paintColour"
+            value="#1b1a17"
+            style="--c: #1b1a17"
+            aria-label="Black"
+            aria-pressed="false"
+          ></button>
+          <label class="paintPick" title="Any colour">
+            <input
+              type="color"
+              id="paintPick"
+              value="#c9a052"
+              aria-label="Any colour"
+            />
+          </label>
+        </div>
+        <div class="paintSizes" role="group" aria-label="Brush size">
+          <button
+            class="paintSize"
+            value="0.08"
+            aria-label="Fine brush"
+            aria-pressed="false"
+          >
+            <i style="--d: 6px"></i>
+          </button>
+          <button
+            class="paintSize"
+            value="0.18"
+            aria-label="Medium brush"
+            aria-pressed="true"
+          >
+            <i style="--d: 11px"></i>
+          </button>
+          <button
+            class="paintSize"
+            value="0.4"
+            aria-label="Broad brush"
+            aria-pressed="false"
+          >
+            <i style="--d: 18px"></i>
+          </button>
+        </div>
+        <button id="paintEraseBtn" aria-pressed="false">Eraser</button>
+        <button id="paintMoveBtn" aria-pressed="false">Look around</button>
+        <button id="paintClearBtn">Start over</button>
+        <button id="paintDoneBtn" class="gold">Done</button>
+      </div>
+      <p class="gameTip">
+        Drag on the piano to paint. Right-drag or two fingers to move, scroll or
+        pinch to zoom.
+      </p>
+    </section>
+
+    <dialog
+      id="paintClear"
+      class="gameResults"
+      aria-labelledby="paintClearTitle"
+    >
+      <form method="dialog">
+        <h2 id="paintClearTitle">Start over?</h2>
+        <p class="huntFact">
+          The whole piano goes back to white. What you have painted cannot be
+          brought back.
+        </p>
+        <div class="controlRow gameResultsActions">
+          <button value="keep" autofocus>Keep painting</button>
+          <button value="clear" class="gold">Start over</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="huntFound" class="gameResults" aria-labelledby="huntFoundTitle">
       <p class="eyebrow" id="huntFoundComposer"></p>

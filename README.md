@@ -38,6 +38,9 @@ The current model is procedural and intentionally lightweight. Future releases c
 - **A house that talks**: the stalls murmur before the music (heard muffled
   through the doors on the way in), hush as the lights go down or anyone
   plays, and applaud from where they sit
+- **Paint your own piano**: a white case to paint with a brush, by dragging
+  over it (eight colours or any, three brush sizes, an eraser, start over);
+  the paint stays put as the lid moves, and the painting is kept
 - **Piano finishes**: concert black, ivory, figured walnut or gold leaf
   (Explore), the walnut a burl veneer; the bench matches, and the choice is
   kept
@@ -219,6 +222,7 @@ virtual-grand-piano/
 │   ├── main.js                # scene/renderer/camera bootstrap + wiring + render loop
 │   ├── piano/
 │   │   ├── keyLabels.js        # the computer keys printed on the piano's keys
+│   │   ├── paint.js            # paint your own piano: six projected sheets of paint
 │   │   ├── createPiano.js      # assembles the instrument + exploded-view layout
 │   │   ├── anatomy.js          # rim/case, soundboard, plate, strings, action, legs, pedals, lid, desk
 │   │   ├── keyboard.js         # 88-key geometry + MIDI lookups
