@@ -622,7 +622,8 @@ function updateRecordingTimer(recording) {
 }
 
 // The menu: a dock of categories along the bottom; a tab opens its panel
-// above the dock (closing any other), again or Esc closes it.
+// above the dock (closing any other), again or Esc closes it, as does a
+// click (not a drag about the view) anywhere outside it.
 const dockTabs = document.querySelectorAll(".dockTab[aria-controls^='panel']");
 function openPanel(tab) {
   for (const other of dockTabs) {
@@ -640,6 +641,24 @@ dockTabs.forEach((tab) => {
     setHelpOpen(false, { restoreFocus: false });
     openPanel(tab);
   };
+});
+let pressedAt = [0, 0];
+addEventListener(
+  "pointerdown",
+  (event) => (pressedAt = [event.clientX, event.clientY]),
+  { capture: true },
+);
+addEventListener("click", (event) => {
+  const moved = Math.hypot(
+    event.clientX - pressedAt[0],
+    event.clientY - pressedAt[1],
+  );
+  // The menu's own parts: its dropdowns' lists and the dialogs it opens sit
+  // outside it on the page; the top bar and the parts' labels are left be.
+  const inside = event.target.closest?.(
+    ".hud, .dropdownList, dialog, .topbar, .helpPanel, .label3d",
+  );
+  if (moved <= 6 && !inside) closePanels();
 });
 addEventListener("keydown", (event) => {
   const open = [...dockTabs].find((tab) => tab.ariaExpanded === "true");
