@@ -28,6 +28,19 @@ The current model is procedural and intentionally lightweight. Future releases c
   that grows a note each round, with lives, for younger players. Any input
   plays: the computer keyboard, a tap on the keys, a MIDI keyboard. Falling
   notes also plays any MIDI file you open
+- **Composers' treasures**: a hunt on foot, in the first person, about the
+  hall (stage, stalls, up the rear stairs to the balconies) and the salon,
+  for the keepsakes of the eight composers whose portraits hang there
+  (Bach's coffee cup, Beethoven's ear trumpet, Debussy's moon…), hidden in
+  eight of sixteen places drawn afresh for each hunt. Each has a
+  clue, a **Show me** that turns you toward it, and its story once you walk
+  up and pick it up; what you find is kept
+- **A house that talks**: the stalls murmur before the music (heard muffled
+  through the doors on the way in), hush as the lights go down or anyone
+  plays, and applaud from where they sit
+- **Piano finishes**: concert black, ivory, figured walnut or gold leaf
+  (Explore), the walnut a burl veneer; the bench matches, and the choice is
+  kept
 - **English and Vietnamese**: the globe button (on the welcome card and top
   right) switches every word of the interface; the browser's language picks
   the first, and the choice is remembered
@@ -150,6 +163,7 @@ makes every word and button larger.
 | Clean view              | **Hide HUD / Show HUD** (top right)                |
 | Closing credits         | **Closing credits** (Hall); press again to close   |
 | Larger text and buttons | **Aa** (top right); remembered                     |
+| Letters on the keys     | Keyboard button (top right); follows the octave    |
 | Graphics quality        | **Graphics: Low / Medium / High / Ultra**          |
 | Language                | Globe button: **Tiếng Việt / English**             |
 | Daylight outside        | **Sky:** your clock / day / sunset / night         |
@@ -159,6 +173,9 @@ makes every word and button larger.
 | Skip the way in         | Any key or click, or **Skip to the piano**         |
 | Play a game             | **Games**, then **Play Falling notes** or **Echo** |
 | Play your own MIDI file | **Games** → **Or play your own MIDI file…**        |
+| Treasure hunt           | **Games** → **Start the hunt**; click a keepsake   |
+| Walk (in the hunt)      | `W A S D` / arrows, `Shift` to hurry, drag to look |
+| Piano finish            | **Explore** → Black / Ivory / Walnut / Gold leaf   |
 | Leave a game            | `Esc` or **Leave game**                            |
 | House curtain & lights  | **Close curtain / Open curtain**                   |
 | Adjust bench height     | Click a knob at either end of the bench            |
@@ -201,6 +218,7 @@ virtual-grand-piano/
 │   ├── i18n.js                # English/Vietnamese: dictionary + in-place DOM translation
 │   ├── main.js                # scene/renderer/camera bootstrap + wiring + render loop
 │   ├── piano/
+│   │   ├── keyLabels.js        # the computer keys printed on the piano's keys
 │   │   ├── createPiano.js      # assembles the instrument + exploded-view layout
 │   │   ├── anatomy.js          # rim/case, soundboard, plate, strings, action, legs, pedals, lid, desk
 │   │   ├── keyboard.js         # 88-key geometry + MIDI lookups
@@ -216,6 +234,7 @@ virtual-grand-piano/
 │   │   ├── passages.js         # exit doorcase, stage doors in the wings, balcony stairs
 │   │   ├── foyer.js            # the foyer, its swinging double doors and spilt light
 │   │   ├── salon.js            # the music salon where the games are played
+│   │   ├── treasures.js        # the composers' eight keepsakes for the hunt
 │   │   ├── audience.js         # the seated audience: sway and applause
 │   │   ├── surfaces.js         # procedural PBR sets (parquet, damask, velvet, runner…)
 │   │   └── noteEffects.js      # autoplay key glow, light columns, star dust
@@ -231,6 +250,8 @@ virtual-grand-piano/
 │   │   ├── cinematic.js        # cinema mode: the director, its cuts and letterbox
 │   │   ├── entrance.js         # the way in: foyer to piano, skippable
 │   │   ├── games.js            # Falling notes and Echo: judging, score, results
+│   │   ├── hunt.js             # the treasure hunt: clues, Show me, finds, the salon
+│   │   ├── walker.js           # walking in the first person: floors, steps, obstacles
 │   │   ├── dropdown.js         # styled, accessible dropdowns over native selects
 │   │   └── inspection.js       # raycasting selection, labels, mode switching
 │   └── style.css
