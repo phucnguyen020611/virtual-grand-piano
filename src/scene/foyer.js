@@ -531,6 +531,10 @@ export function buildFoyer(hall, room) {
       position: new THREE.Vector3(0, F + 6.2, z1 - 3),
       target: new THREE.Vector3(0, F + 8.6, backZ),
     },
+    /** How open the doors are: 0 = shut, 1 = open wide. */
+    get doors() {
+      return open;
+    },
     /** 0 = shut, 1 = open wide. */
     setDoors(e) {
       for (const pivot of leaves)

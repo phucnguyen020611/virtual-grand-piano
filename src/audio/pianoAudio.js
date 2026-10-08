@@ -1,6 +1,7 @@
 import { DIM } from "../piano/geometry.js";
 import {
   VELOCITY_LAYERS,
+  createCrowdMurmur,
   createImpulseResponse,
   createPedalNoise,
   createSampleManifest,
@@ -106,6 +107,13 @@ export function createAudioEngine() {
   let seatGain = null;
   let ends = null; // [bass, treble] PannerNodes
   let room = null; // the convolver of the room the piano is in…
+  let roomInput = null; // …and what feeds it (the piano and the house)
+  // The house: its murmur and its applause, from where the audience sits.
+  let crowdInput = null;
+  let crowdTone = null; // closed doors muffle it
+  let crowdEnds = null; // [left, right] PannerNodes
+  let murmurGain = null;
+  const crowdState = { murmur: -1, muffled: -1 };
   let roomName = "hall"; // …and its name
   const rooms = {}; // name -> impulse response
   const heard = { bass: [0, 0, 0], treble: [0, 0, 0] }; // as last given
@@ -116,6 +124,10 @@ export function createAudioEngine() {
     gain: 1,
     cutoff: 20000,
     room: 0.1,
+    crowd: [
+      [-1, 0, -1],
+      [1, 0, -1],
+    ],
   };
   let disposed = false;
 
@@ -215,22 +227,51 @@ export function createAudioEngine() {
     // below, and turning with the camera. Mono fallback samples feed both.
     seatGain.channelCount = 2;
     seatGain.channelCountMode = "explicit";
-    const split = ctx.createChannelSplitter(2);
+    // A stereo source's left and right, each from its own place round the
+    // head (distance is the gains' and filters' job, not the panners').
+    const placed = (stereo) => {
+      const split = ctx.createChannelSplitter(2);
+      stereo.connect(split);
+      return [0, 1].map((channel) => {
+        const panner = new PannerNode(ctx, {
+          panningModel: "HRTF",
+          rolloffFactor: 0,
+          channelCount: 1,
+          channelCountMode: "explicit",
+        });
+        split.connect(panner, channel);
+        panner.connect(master);
+        return panner;
+      });
+    };
     dry.connect(seatTone);
     seatTone.connect(seatGain);
-    seatGain.connect(split);
-    ends = [0, 1].map((channel) => {
-      const panner = new PannerNode(ctx, {
-        panningModel: "HRTF",
-        rolloffFactor: 0, // distance is seatGain's and seatTone's job
-        channelCount: 1,
-        channelCountMode: "explicit",
-      });
-      split.connect(panner, channel);
-      panner.connect(master);
-      return panner;
-    });
-    dry.connect(room);
+    ends = placed(seatGain);
+    roomInput = ctx.createGain();
+    dry.connect(roomInput);
+    roomInput.connect(room);
+
+    // The house: the left and right halves of the stalls, and the room.
+    crowdInput = ctx.createGain();
+    crowdInput.channelCount = 2;
+    crowdInput.channelCountMode = "explicit";
+    crowdTone = ctx.createBiquadFilter();
+    crowdTone.type = "lowpass";
+    crowdTone.frequency.value = 20000;
+    crowdInput.connect(crowdTone);
+    crowdEnds = placed(crowdTone);
+    const crowdRoom = ctx.createGain();
+    crowdRoom.gain.value = 0.5;
+    crowdTone.connect(crowdRoom);
+    crowdRoom.connect(roomInput);
+    murmurGain = ctx.createGain();
+    murmurGain.gain.value = 0;
+    const murmur = ctx.createBufferSource();
+    murmur.buffer = createCrowdMurmur(ctx);
+    murmur.loop = true;
+    murmur.connect(murmurGain);
+    murmurGain.connect(crowdInput);
+    murmur.start();
     resonanceInput.connect(resonanceExcitationGain);
     resonanceExcitationGain.connect(resonance);
     room.connect(roomGain);
@@ -269,9 +310,14 @@ export function createAudioEngine() {
       [seatGain.gain, seat.gain],
       [seatTone.frequency, seat.cutoff],
       [roomGain.gain, seat.room],
-      ...[seat.bass, seat.treble].flatMap((at, end) =>
+      ...[
+        [ends[0], seat.bass],
+        [ends[1], seat.treble],
+        [crowdEnds[0], seat.crowd[0]],
+        [crowdEnds[1], seat.crowd[1]],
+      ].flatMap(([panner, at]) =>
         ["positionX", "positionY", "positionZ"].map((axis, i) => [
-          ends[end][axis],
+          panner[axis],
           at[i],
           0.04, // the image keeps up with a turning head
         ]),
@@ -287,16 +333,20 @@ export function createAudioEngine() {
    * listener's head (x right, y up, looking along -z). At the keyboard the
    * sound is close and dry; at the back of the stalls ~45% as loud, rolled
    * off above ~5 kHz, with three to four times the room; and the two ends
-   * close together, as a piano far off sounds narrow.
+   * close together, as a piano far off sounds narrow. `crowd`: the left and
+   * right halves of the audience, seen the same way.
    */
-  function setListener(distance, bass, treble) {
+  function setListener(distance, bass, treble, crowd = seat.crowd) {
     const moved = (a, b) => Math.hypot(...a.map((v, i) => v - b[i])) > 0.05;
     if (
       Math.abs(distance - seat.distance) < 0.5 &&
       !moved(bass, heard.bass) &&
-      !moved(treble, heard.treble)
+      !moved(treble, heard.treble) &&
+      !moved(crowd[0], seat.crowd[0]) &&
+      !moved(crowd[1], seat.crowd[1])
     )
       return;
+    seat.crowd = crowd.map((at) => [...at]);
     heard.bass = [...bass];
     heard.treble = [...treble];
     const t = clampUnit((distance - 10) / 90);
@@ -333,11 +383,33 @@ export function createAudioEngine() {
     if (!ctx) return;
     const next = ctx.createConvolver();
     next.buffer = rooms[name];
-    dry.disconnect(room);
+    roomInput.disconnect(room);
     room.disconnect();
-    dry.connect(next);
+    roomInput.connect(next);
     next.connect(roomGain);
     room = next;
+  }
+
+  /**
+   * The house's murmur, 0 (hushed) to 1, and how `muffled` it is, 0 (in the
+   * hall) to 1 (behind closed doors). It hushes in a moment and returns
+   * slowly, as an audience does.
+   */
+  function setCrowd(murmur, muffled = 0) {
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    if (murmur !== crowdState.murmur) {
+      murmurGain.gain.setTargetAtTime(
+        0.12 * murmur,
+        now,
+        murmur > crowdState.murmur ? 2 : 0.5,
+      );
+      crowdState.murmur = murmur;
+    }
+    if (muffled !== crowdState.muffled) {
+      crowdTone.frequency.setTargetAtTime(20000 * 0.03 ** muffled, now, 0.3);
+      crowdState.muffled = muffled;
+    }
   }
 
   /**
@@ -861,11 +933,13 @@ export function createAudioEngine() {
     warmFallbacks,
     setListener,
     setRoom,
+    setCrowd,
     /**
      * A sound of the hall itself (the chime, the applause), played into the
-     * mix after `delay` seconds at `rate` (pitch) and `gain`. Decoded once.
+     * mix after `delay` seconds at `rate` (pitch) and `gain`; with `crowd`,
+     * from where the audience sits (the applause). Decoded once.
      */
-    playEffect(url, { delay = 0, rate = 1, gain = 1 } = {}) {
+    playEffect(url, { delay = 0, rate = 1, gain = 1, crowd = false } = {}) {
       ensureAudio();
       if (!effects.has(url))
         effects.set(
@@ -880,7 +954,7 @@ export function createAudioEngine() {
         source.playbackRate.value = rate;
         level.gain.value = gain;
         source.connect(level);
-        level.connect(master);
+        level.connect(crowd ? crowdInput : master);
         source.start(ctx.currentTime + delay);
       });
     },

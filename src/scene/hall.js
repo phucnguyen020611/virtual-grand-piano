@@ -996,6 +996,9 @@ export function createHall(scene, mats) {
       ],
       setDoors: foyer.setDoors,
       setLit: foyer.setLit,
+      get doors() {
+        return foyer.doors;
+      },
     },
     /** A performance is on: dim the house lamps (or bring them back up). */
     setConcert(on) {

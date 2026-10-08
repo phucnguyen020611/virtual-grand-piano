@@ -419,3 +419,94 @@ export function createPedalNoise(context, kind) {
   }
   return buffer;
 }
+
+/**
+ * The house before the music: some 40 people talking at once, too far off
+ * and too many to make out a word. Each talker is a voice (a sawtooth at
+ * their own pitch, falling through a phrase) shaped by two formants that
+ * glide from vowel to vowel, syllable by syllable, with pauses between
+ * phrases; half the room on each side, softened by distance. Made at 16 kHz
+ * (the room's air takes off the rest) and looped seamlessly.
+ */
+export function createCrowdMurmur(context, seconds = 10) {
+  const rate = 16000;
+  const fade = Math.floor(0.6 * rate); // the loop's crossfade
+  const length = Math.floor(seconds * rate);
+  const total = length + fade;
+  const buffer = context.createBuffer(2, length, rate);
+  const mix = [new Float32Array(total), new Float32Array(total)];
+  const VOWELS = [
+    [800, 1200], // a
+    [500, 1900], // e
+    [320, 2300], // i
+    [500, 900], // o
+    [340, 800], // u
+  ];
+  let seed = 97531;
+  const random = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const resonator = () => ({ y1: 0, y2: 0, a1: 0, a2: 0, b0: 0 });
+  const tune = (r, frequency, bandwidth) => {
+    const radius = Math.exp((-Math.PI * bandwidth) / rate);
+    r.a1 = 2 * radius * Math.cos((2 * Math.PI * frequency) / rate);
+    r.a2 = -radius * radius;
+    r.b0 = 1 - radius;
+  };
+  const ring = (r, x) => {
+    const y = r.b0 * x + r.a1 * r.y1 + r.a2 * r.y2;
+    r.y2 = r.y1;
+    r.y1 = y;
+    return y;
+  };
+  for (let talker = 0; talker < 40; talker++) {
+    const side = talker % 2;
+    const pitch = 95 + random() * 135;
+    const level = 0.4 + random() * 0.6;
+    const formants = [resonator(), resonator()];
+    let phase = 0;
+    let i = Math.floor(random() * rate); // each starts in their own time
+    while (i < total) {
+      const syllables = 3 + Math.floor(random() * 6);
+      for (let s = 0; s < syllables && i < total; s++) {
+        const [f1, f2] = VOWELS[Math.floor(random() * VOWELS.length)];
+        const span = Math.floor((0.12 + random() * 0.16) * rate);
+        const start = i;
+        for (; i < start + span && i < total; i++) {
+          const t = (i - start) / span;
+          if ((i - start) % 32 === 0) {
+            // Glide toward this vowel; the pitch sags through the phrase.
+            tune(formants[0], f1 * (0.9 + 0.1 * t), 90);
+            tune(formants[1], f2 * (0.92 + 0.08 * t), 130);
+          }
+          const f0 = pitch * (1.08 - (0.14 * s) / syllables) * (1 - 0.04 * t);
+          phase = (phase + f0 / rate) % 1;
+          const voice = 1 - 2 * phase + (random() - 0.5) * 0.3;
+          const envelope = Math.min(1, t / 0.15, (1 - t) / 0.25);
+          mix[side][i] +=
+            level *
+            envelope *
+            (ring(formants[0], voice) + 0.6 * ring(formants[1], voice));
+        }
+      }
+      i += Math.floor((0.25 + random() * 1.1) * rate); // a breath, a listen
+    }
+  }
+  const cut = 1 - Math.exp((-2 * Math.PI * 2500) / rate); // distance
+  for (let channel = 0; channel < 2; channel++) {
+    const data = buffer.getChannelData(channel);
+    const source = mix[channel];
+    let low = 0;
+    let peak = 0;
+    for (let i = 0; i < total; i++) {
+      low += cut * (source[i] - low);
+      source[i] = low;
+    }
+    for (let i = 0; i < length; i++) {
+      // The tail past the end fades into the start: no seam when looping.
+      const over = i < fade ? source[length + i] * (1 - i / fade) : 0;
+      data[i] = source[i] * (i < fade ? i / fade : 1) + over;
+      peak = Math.max(peak, Math.abs(data[i]));
+    }
+    for (let i = 0; i < length; i++) data[i] *= 0.5 / peak;
+  }
+  return buffer;
+}

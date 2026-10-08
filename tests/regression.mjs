@@ -4,6 +4,7 @@ import { createPerformanceRecorder } from "../src/performance/performanceRecorde
 import { createMidiInput } from "../src/performance/midiInput.js";
 import { createComputerKeyboard } from "../src/performance/computerKeyboard.js";
 import {
+  createCrowdMurmur,
   createImpulseResponse,
   createPedalNoise,
   createSampleManifest,
@@ -333,6 +334,34 @@ check(
     }
   },
 );
+check("the house murmurs evenly and loops without a seam", () => {
+  const murmur = createCrowdMurmur({
+    createBuffer: (channels, length) => {
+      const data = Array.from(
+        { length: channels },
+        () => new Float32Array(length),
+      );
+      return { length, getChannelData: (i) => data[i] };
+    },
+  });
+  const left = murmur.getChannelData(0);
+  const rms = (from, to) => {
+    let sum = 0;
+    for (let i = from; i < to; i++) sum += left[i] ** 2;
+    return Math.sqrt(sum / (to - from));
+  };
+  // A crowd, not a few voices: every half second within ~3 dB of the
+  // loudest (a few talkers would drop to near silence between phrases).
+  const levels = [];
+  for (let i = 0; i + 8000 <= murmur.length; i += 8000)
+    levels.push(rms(i, i + 8000));
+  assert(Math.min(...levels) > 0.5 * Math.max(...levels), "steady");
+  let step = 0;
+  for (let i = 1; i < murmur.length; i++)
+    step += Math.abs(left[i] - left[i - 1]);
+  step /= murmur.length;
+  assert(Math.abs(left[0] - left.at(-1)) < 3 * step, "no click at the loop");
+});
 check("the pedal's noise is a soft thud, not a click", () => {
   const context = {
     sampleRate: 48000,

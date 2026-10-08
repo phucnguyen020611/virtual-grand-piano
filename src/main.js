@@ -359,6 +359,7 @@ addEventListener("drop", (event) => {
 
 function stopAutoplay(finished = false) {
   if (!finished) cinematic.stop();
+  if (autoplay) chatterFor(finished ? 40 : 30); // the house talks it over
   autoplay = false;
   waiting = null;
   autoBtn.textContent = "Play";
@@ -373,7 +374,7 @@ function stopAutoplay(finished = false) {
 function finishPiece() {
   stopAutoplay(true);
   cinematic.finale(cinemaShots().applause);
-  audio.playEffect("audio/hall/applause.ogg", { gain: 0.55 });
+  audio.playEffect("audio/hall/applause.ogg", { gain: 0.55, crowd: true });
   if (!reducedMotion.matches) hall.audience.applaud(10);
 }
 function startAutoplay() {
@@ -1309,6 +1310,7 @@ document.querySelector("#enterBtn").onclick = async (event) => {
   await Promise.all([audio.warmFallbacks(), foyer, inside]);
   audioGate.classList.add("hidden");
   audioGate.setAttribute("aria-hidden", "true");
+  chatterFor(45); // the house is filling
   entrance.start(reducedMotion.matches);
 };
 
@@ -1382,6 +1384,30 @@ const TREBLE = onStage(2.9, 1.2, 0.3);
 const heard = new THREE.Vector3();
 const fromHead = (point) =>
   heard.copy(point).applyMatrix4(camera.matrixWorldInverse).toArray();
+// The house before the music: the two halves of the stalls murmur, heard
+// through the doors on the way in, hushed the moment the lights go down or
+// anyone plays, back a few seconds after, and quiet again after a while (so
+// it never becomes a drone). Not in the salon, nor with the audience away.
+const STALLS = [new THREE.Vector3(-15, 2, 50), new THREE.Vector3(15, 2, 50)];
+let chatterUntil = 0; // on the timer
+let lastNoteAt = -Infinity;
+function chatterFor(seconds) {
+  chatterUntil = timer.getElapsed() + seconds;
+}
+pianoPerformance.addObserver((event) => {
+  if (event.type === "noteOn") lastNoteAt = timer.getElapsed();
+});
+function updateHouse() {
+  const now = timer.getElapsed();
+  const chatter =
+    hall.audience.visible &&
+    !games.active &&
+    !autoplay &&
+    !document.hidden &&
+    now < chatterUntil &&
+    now - lastNoteAt > 6;
+  audio.setCrowd(chatter ? 1 : 0, entrance.busy ? 1 - hall.entrance.doors : 0);
+}
 timer.connect(document);
 
 function animate(timestamp) {
@@ -1446,7 +1472,9 @@ function animate(timestamp) {
     camera.position.distanceTo(SOUNDBOARD),
     fromHead(BASS),
     fromHead(TREBLE),
+    STALLS.map(fromHead),
   );
+  updateHouse();
   if (explodedView.exploded || explodedView.isTransitioning)
     inspection.updateLabels();
 
