@@ -532,8 +532,7 @@ export function buildFoyer(hall, room) {
       target: new THREE.Vector3(0, F + 8.6, backZ),
     },
     /** 0 = shut, 1 = open wide. */
-    setDoors(open) {
-      const e = open;
+    setDoors(e) {
       for (const pivot of leaves)
         pivot.rotation.y = pivot.userData.side * SWING * e;
       poolMaterial.uniforms.open.value = shaftMaterial.uniforms.open.value = e;
